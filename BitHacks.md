@@ -170,7 +170,7 @@ n |= n >> 16;
 
 Example: n = **0101 0000**		--n = **0100 1111**		n |= n >> 1 = **0110 1111**		...  n = **0111 1111**		++n = **1000 0000**
 
-#### 9. Least-Significant 1
+#### 9. Least-Significant
 
 Compute the mask of the least-significant 1 in word x.
 
@@ -182,10 +182,59 @@ why is works:
 
 The binary representation of **-x is (~x + 1)**
 
-#### 10. Log Base 2 of a power of 2
+#### 10. Queens Problem
 
-Compute $\lg x$, where x is a power of 2. (Find position of 1 in x)
+3 bit vectors of size n,  2n - 1 and 2n - 1 (there are 2n -1 possible diagonals)
 
+Placing a queen in column c is not safe if **down & (1 << c )** is nonzero (check specific column has 1)  where down is size n vector.
 
+Placing a queen in row r and column c is not safe if **left & (1 << (r + c))** is nonzero.
 
-#### Clear the $K^{th}$ Bit
+Placing a queen in row r and column c is not safe if **right & (1 << ( n -1 -r +c))** is nonzero.
+
+#### 11. Population Count 1
+
+Count the number of 1 bits in a word x
+
+`for (r = 0; x != 0; ++r) {`
+
+`x &= x - 1`		(clear  least significant bit)
+
+`}`
+
+Worse case: O(n) where n is length of the bits.
+
+#### 12. Population Count 2
+
+Create a `int count[256]` which store number of 1's of each 8-bit word
+
+`int count[256] = {0, 1, 1, 2, 1, 2, 2, 3, 1, ..., 8} `
+
+`for (int r = 0; x != 0; x >>= 8) {`
+
+​	`r += count[x & 0xFF]`
+
+`}`
+
+Performance: Memory access
+
+#### 13. Population Count 3
+
+```java
+// Create masks
+M5 = ~((-1) << 32); 		//0 power of 32, 1 power of 32.
+M4 = M5 ^ (M5 << 16);		// (0 power of 16, 1 power of 16) power of 2
+M3 = M4 ^ (M4 << 8);		// (0 power of 8, 1 power of 8) power of 4
+M2 = M3 ^ (M3 << 4);		// (0000 1111) power of 8
+M1 = M2 ^ (M2 << 2);		// (0011) power of 16
+M0 = M1 ^ (M1 << 1);		// (01) power of 32
+
+// Compute popcount
+x = ((x >> 1) & M0) + (x & M0);  //avoid overflow
+x = ((x >> 2) & M1) + (x & M1);	 //avoid overflow
+x = ((x >> 4) & x) + M2;
+x = ((x >> 8) & x) + M3;
+x = ((x >> 16) & x) + M4;
+x = ((x >> 32) & x) + M5;
+```
+
