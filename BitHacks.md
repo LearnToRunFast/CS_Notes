@@ -8,7 +8,7 @@ There is no negative value for one's complement.
 
 Example:  x = **0000 1101**
 
-The corresponding integer value is $ 13 = 2^3 + 2^2 + 2^0 = 8 + 4 + 1 $ $ \sum_{\forall i}{x_i^{2}} $
+The corresponding integer value is $ 13 = 2^3 + 2^2 + 2^0 = 8 + 4 + 1 $
 
 #### Two's Complement(sign integer)
 
