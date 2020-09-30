@@ -30,5 +30,5 @@ Properties of Segment Tree:
 2. O($\log n$) for query sum (at most height of the tree).
 3. O($\log n$) for update sum (at most height of the tree).
 
-[Click here to see the Java Implementation of Segement Tree](https://github.com/LearnToRunFast/cs-related-notes/Data Structures and Algorithms/Code Implementations/SegmentTree)
+[Click here to see the Java Implementation of Segement Tree](https://github.com/LearnToRunFast/cs-related-notes/Data%20Structures%20and%20Algorithms/Code%20Implementations/SegmentTree)
 
