@@ -34,7 +34,13 @@ Example of Sum Segment Tree:
 2. O($\log n$) for query sum (at most height of the tree).
 3. O($\log n$) for update sum (at most height of the tree).
 
+**Implementation:**
+
 [Java Implementation of Segement Tree](https://github.com/LearnToRunFast/cs-related-notes/Data%20Structures%20and%20Algorithms/Code%20Implementations/SegmentTree)
 
-[Reference](https://cp-algorithms.com/data_structures/segment_tree.html)
+**References:**
+
+[cp-algorithms](https://cp-algorithms.com/data_structures/segment_tree.html)
+
+[geeksforgeeks](https://www.geeksforgeeks.org/segment-tree-set-1-sum-of-given-range/)
 
