@@ -1,4 +1,4 @@
-## Segment Tree
+## Segment Tree(range query, update, find min and max)
 
 For a given array arr[0... n - 1], 
 
@@ -13,7 +13,11 @@ Properties of Segment Tree:
 1. Leaf nodes are the elements of the input array.
 2. Each internal node(parents) represents the merge information of the leaf nodes(eg. parents represent **Sum of the leaf nodes**) .
 
-**Array representation:** if one particular node is at index **i**, then the left child will be located `2 * i + 1` and right child will be located at`2 * i + 2`. The parent of such node is at <img src="https://render.githubusercontent.com/render/math?math=\lfloor (i - 1) / 2 \rfloor">.
+**Array representation:** Assuming the root index is at `1`.Then the left child will be located `2 * i` and right child will be located at`2 * i + 1`. The parent of such node is at <img src="https://render.githubusercontent.com/render/math?math=\lfloor i / 2 \rfloor">.
+
+Example of Sum Segment Tree:
+
+![image-20201001123520192](Asserts/image-20201001123520192.png)
 
 **Construction:** Dividing the array into two halves segments until the length of every segments become 1.  
 
@@ -30,5 +34,7 @@ Properties of Segment Tree:
 2. O($\log n$) for query sum (at most height of the tree).
 3. O($\log n$) for update sum (at most height of the tree).
 
-[Click here to see the Java Implementation of Segement Tree](https://github.com/LearnToRunFast/cs-related-notes/Data%20Structures%20and%20Algorithms/Code%20Implementations/SegmentTree)
+[Java Implementation of Segement Tree](https://github.com/LearnToRunFast/cs-related-notes/Data%20Structures%20and%20Algorithms/Code%20Implementations/SegmentTree)
+
+[Reference](https://cp-algorithms.com/data_structures/segment_tree.html)
 
