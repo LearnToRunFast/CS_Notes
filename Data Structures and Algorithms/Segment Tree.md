@@ -23,10 +23,13 @@ Example of Sum Segment Tree:
 
 **Total size of segment tree:** Let n be the size of the array. 
 
-1. If n is a power of 2, then there are no dummy nodes.Total of `2*n - 1` nodes (n leaf nodes and n - 1internal nodes).
-2. If n is not a power of 2, then the size will be `2*x - 1` where `x` is the smallest power of 2 greater than `n`.(eg. if n = 6, then x = 8 = $2^3$ so the size will be 2 * 8 - 1 = 15).
+By obervation, number of parents node is n - 1.For any number n, the total size will be 2n - 1.If we start from index 1 instead of 0, then 2n is just nice to store the complete segments.
 
-**Height of segment tree:** The height of segment tree is <img src="https://render.githubusercontent.com/render/math?math=\lceil \log_2{n} \rceil"> as we always divide the segments into two halves at every level.In order to maintain the relation between parents and children, the size of the tree must be a Full Binary Tree which is<img src="https://render.githubusercontent.com/render/math?math=2 * 2^{\lceil\log_2{n} \rceil} - 1">.
+**Height of segment tree:** The height of segment tree is <img src="https://render.githubusercontent.com/render/math?math=\lceil \log_2{n} \rceil">.
+
+**Lazy propagation:**Optimization to make range updates faster.
+
+Idea: create an lazy[] array with same size of tree array. Keep positive or negative number if there is a update otherwise 0.
 
 **Time Complexity:** 
 
@@ -36,7 +39,9 @@ Example of Sum Segment Tree:
 
 **Implementation:**
 
-[Java Implementation of Segement Tree](https://github.com/LearnToRunFast/cs-related-notes/Data%20Structures%20and%20Algorithms/Code%20Implementations/SegmentTree)
+[Java Implementation of Segement Tree(recursive version)](https://github.com/LearnToRunFast/cs-related-notes/Data%20Structures%20and%20Algorithms/Code%20Implementations/SegmentTree_R)
+
+[Java Implementation of Segement Tree(iterative version with lazy propagation)](https://github.com/LearnToRunFast/cs-related-notes/Data%20Structures%20and%20Algorithms/Code%20Implementations/SegmentTree_I)
 
 **References:**
 

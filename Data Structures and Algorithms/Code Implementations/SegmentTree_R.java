@@ -1,9 +1,10 @@
 import java.util.*;
 
-class SegmentTree {
+class SegmentTree_R {
 
     private int[] tree, arr; //segment tree and original array.
     private int n;  // size of original arr
+    private int[] lazy; // for lazy propagation
 
     private int left(int i) {
         // left child, index is i * 2
@@ -20,6 +21,13 @@ class SegmentTree {
         return l + (r - l) / 2;
     }
 
+    private void error(String msg) {
+        System.out.println(msg);
+    }
+
+    /*
+        Starting of Range sum
+    */
     private void buildSumTreeHelper(int i, int l, int r) {
         if (l == r) {
             tree[i] = arr[l];
@@ -33,7 +41,7 @@ class SegmentTree {
         }
     }
 
-    private void buildSumTree() {
+    void buildSumTree() {
         buildSumTreeHelper(1, 0, n - 1);
     }
     
@@ -54,7 +62,7 @@ class SegmentTree {
         }
     }
 
-    private void updateSum(int j, int newValue) {
+    void updateSum(int j, int newValue) {
         if (j < 0 || j > n - 1) {
             return;
         }
@@ -66,7 +74,21 @@ class SegmentTree {
         updateSumHelper(1, j, diff, 0, n - 1);
     }
 
+    private void lazyMove(int i, int l, int r) {
+        if (lazy[i] != 0) {
+            tree[i] += (r - l + 1) * lazy[i];
+
+            if (l < r) {
+                lazy[left(i)] += lazy[i];
+                lazy[right(i)] += lazy[i];
+            }
+            lazy[i] = 0;
+        }
+    }
+    
     private int getSumHelper(int i, int ql, int qr, int l, int r) {
+        // lazy propagation part
+        lazyMove(i, l, r);
 
         if (ql <= l && qr >= r) {
             return tree[i];
@@ -85,20 +107,113 @@ class SegmentTree {
 
     }
 
-    private int getSum(int ql, int qr) {
+    int getSum(int ql, int qr) {
         if (ql > qr || ql < 0 || qr > n - 1) {
+            error("Invalid input");
             return -1;
         }
 
         return getSumHelper(1, ql, qr, 0, n - 1);
     }
+    /*
+        End of Range Sum.
 
-    public SegmentTree(int[] a) {
+    */
+
+
+    /* 
+        Starting of Range Min
+    
+    */
+
+    private void buildRMQHelper(int i, int l, int r) {
+        if (l == r) {
+            tree[i] = arr[l]; 
+        } else {
+            int mid = getMid(l, r);
+
+            buildRMQHelper(left(i), l, mid);
+            buildRMQHelper(right(i), mid + 1, r);
+    
+            tree[i] = Math.min(tree[left(i)], tree[right(i)]);
+        }
+    }
+
+    void buildRMQ() {
+        buildRMQHelper(1, 0, n - 1);
+    }
+
+
+    private int RMQHelper(int i, int ql, int qr, int l, int r) {
+        if (ql <= l && qr >= r) {
+            return tree[i];
+        }
+
+        if (ql > r || qr < l) {
+            return Integer.MAX_VALUE;
+        }
+
+        int mid = getMid(l, r);
+
+        int x = RMQHelper(left(i), ql, qr, l, mid);
+        int y = RMQHelper(right(i), ql, qr, mid + 1, r);
+
+        return Math.min(x, y);
+    }
+
+    int RMQ(int ql, int qr) {
+        if (ql < 0 || qr > n - 1 || ql > qr) {
+            error("Invalid input");
+            return -1;
+        }
+
+        return RMQHelper(1, ql, qr, 0, n - 1);
+    }
+    /* 
+        End of Range Min
+    
+    */
+
+    /*
+        Update Range
+
+    */
+    private void updateRangeHelper(int i, int ql, int qr, int diff, int l, int r) {
+        lazyMove(i, l, r);
+
+        if (l > r || l > qr || r < ql) {
+            return;
+        }
+
+        if (l >= ql && r <= qr) {
+            tree[i] += (r - l + 1) * diff;
+
+            if (l < r) {
+                lazy[left(i)] += diff;
+                lazy[right(i)] += diff;
+            }
+            return;
+        }
+
+        int mid = getMid(l, r);
+        updateRangeHelper(left(i), ql, qr, diff, l, mid);
+        updateRangeHelper(right(i), ql, qr, diff, mid + 1, r);
+
+        tree[i] = tree[left(i)] + tree[right(i)];
+    }
+
+    private void updateRange(int ql, int qr, int diff) {
+        updateRangeHelper(1, ql, qr, diff, 0, n - 1);
+    }
+    public SegmentTree_R(int[] a) {
         n = a.length;
         tree = new int[2 * n];
+        lazy = new int[2 * n];
         arr = a;
     }
 
+
+    // debugging purposes
     private static void testing(int i, int j, int expcted, int actual) {
         boolean correctAns = (expcted == actual);
         String result = correctAns ? "Correct" : "Wrong";
@@ -108,10 +223,12 @@ class SegmentTree {
             System.out.println("Expected: " + expcted + " but got " + actual);
         }
     }
+
     public static void main(String[] args) {
         int[] arr = new int[] {9, -2, 7, 3, 0, -1, -8};
-        SegmentTree st = new SegmentTree(arr);
+        SegmentTree_R st = new SegmentTree_R(arr);
         st.buildSumTree();
+
         // testing for getsum
         testing(0, 1, 7, st.getSum(0, 1)); // head
         testing(0, 6, 8, st.getSum(0, 6)); // full
@@ -124,5 +241,13 @@ class SegmentTree {
         
         st.updateSum(4, 10);
         testing(0, 6, 23, st.getSum(0, 6)); 
+
+        arr = new int[] {9, -2, 7, 3, 0, -1, -8};
+        SegmentTree_R st1 = new SegmentTree_R(arr);
+        st1.buildRMQ();
+        testing(0, 1, -2, st1.RMQ(0, 1)); // head
+        testing(0, 6, -8, st1.RMQ(0, 6)); // full
+        testing(5, 6, -8, st1.RMQ(5, 6)); // tail
+        testing(3, 4, 0, st1.RMQ(3, 4)); // head
     }
 }
