@@ -85,7 +85,7 @@ class SegmentTree_R {
             lazy[i] = 0;
         }
     }
-    
+
     private int getSumHelper(int i, int ql, int qr, int l, int r) {
         // lazy propagation part
         lazyMove(i, l, r);
@@ -185,9 +185,12 @@ class SegmentTree_R {
             return;
         }
 
+        // if current l and r is in range of query (ql, qr)
         if (l >= ql && r <= qr) {
             tree[i] += (r - l + 1) * diff;
 
+            // we already calculate the result above, so if  current segment is not leaf,
+            // mark the lazy array and postpone the updates.
             if (l < r) {
                 lazy[left(i)] += diff;
                 lazy[right(i)] += diff;
@@ -224,6 +227,13 @@ class SegmentTree_R {
         }
     }
 
+    private int getTreeItem(int i) {
+        return tree[i];
+    }
+    private int getLazyItem(int i) {
+        return lazy[i];
+    }
+
     public static void main(String[] args) {
         int[] arr = new int[] {9, -2, 7, 3, 0, -1, -8};
         SegmentTree_R st = new SegmentTree_R(arr);
@@ -249,5 +259,20 @@ class SegmentTree_R {
         testing(0, 6, -8, st1.RMQ(0, 6)); // full
         testing(5, 6, -8, st1.RMQ(5, 6)); // tail
         testing(3, 4, 0, st1.RMQ(3, 4)); // head
+
+        arr = new int[] {9, -2, 7, 3, 0, -1, -8};
+        SegmentTree_R st2 = new SegmentTree_R(arr);
+        st2.buildSumTree();
+
+        // testing for lazy propagation
+        int prev1 = st2.getSum(0, 2);
+        int prev2 = st2.getSum(3, 5);
+
+        st2.updateRange(3, 6, 5);
+        testing(0, 2, prev1, st2.getSum(0, 2));
+        testing(3, 5, prev2 + 15, st2.getSum(3, 5));
+        testing(0, 2, 9, st2.getSum(4, 5));
+        testing(0, 2, 4, st2.getSum(5, 5));
+
     }
 }
