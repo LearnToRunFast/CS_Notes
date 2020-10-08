@@ -8,13 +8,30 @@
 
 **Dockerfile**: file that used to create image.
 
-**Alpine:** Compact and small version
+**Alpine:** Compact and small version.
+
+**Docker Compose:** A separate CLI used to start up multiple docker containers at the same time and automates some of the long-winded arguments we were passing to 'docker run'.
+
+#### **docker-compose.yml keyword:**
+
+1. `version`: version of docker compose
+2.  `services`: specify type and name of the containers
 
 #### Component of docker file:
 
 1. Specify a base image.
-2. run some commands to install additional programs.
-3. specify a command to run on container startup.
+2. Run some commands to install additional programs.
+3. Specify a command to run on container startup.
+
+#### **Docker restart policies:**
+
+`"no"`:Never attempt to restart(normal no is a keyword in yml file).
+
+`always` Restart for any reason.
+
+`on-failure`Only restart with error code.
+
+`unless-stopped` Always restart unless we forcibly stop it.
 
 #### Dockerfile keyword:
 
@@ -40,12 +57,15 @@ By running command `docker run hello-world`, docker will
 **Common commands:**
 
 1. `docker Run` = `docker create` + `docker start`, create and run the container.
+   - Corresponding `docker-compose up` for docker-compose
+   - `docker-compose up --build` will include `docker build .` in with `docker run image`
 2. `docker build dockerId/nameOfContainer:latest .` Build image use Dockerfile that in current directory.
 3. **Overwrite the default start command** by specify command after the image name. 
 4. `docker ps`  list of running containers, `docker ps --all` all containers were created.
 5. `docker system prune` delete all stopped containers and some other stuff.
 6. `docker logs ` show the logs.
 7. `docker stop` send a **SIGTERM** to container and shut it down.
+   - `docker compose down` shut down all the linked containers
 8. `docker kill` send a **SIGKILL** to container and force it to shut down.
 9. `docker exec -it <container id> <command>` pass the command into containner and execute it inside the container. 
    1. `docker exec -it <container id> sh` give back shell.
@@ -64,6 +84,8 @@ By running command `docker run hello-world`, docker will
 `-c`  allow set the default command.   
 
 `-p <FROM>:<TO>`  port mapping
+
+`-d` Run container in background and print container ID.
 
 
 
