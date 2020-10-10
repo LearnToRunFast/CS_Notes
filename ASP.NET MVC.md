@@ -45,6 +45,12 @@ public class MoviesController : Controller
 | HttpNotFoundResult |  HttpNotFound()   |
 |    EmptyResult     | new EmptyResult() |
 
+**Action Parameters:**
+
+1. Embedded in the URL:/movie/edit/1
+2. In the query string: /movie/edit?id=1
+3. In the form data
+
 **Router:** Select the right controller to handle a request
 
 ```c#
@@ -80,7 +86,7 @@ public ActionResult Random() {
   var movie = new Movie() {
     Name = "Joel";
   }
-  return View(movie);
+ return View(movie);
 }
 // On cshtml
 @model xxx.Models.Movie
@@ -112,3 +118,54 @@ public ActionResult Random() {
 <h2>@(((Movie) ViewData["Movie"]).Name)</h2> // ViewData version
 @ViewBag.Movie // ViewBag version
 ```
+
+**ViewModel:** Model specifically built for a view.It includes any data and rules specific to that view(usually combine two or more models together).
+
+**Razor sytax:** support html and C# on cshtml
+
+```c#
+// on cshtml
+@*
+  comments here
+*@
+// if-else statement
+@if (Model.Customers.Count == 0) {
+  <text>No one has rented this movie before. </text>
+} else {
+  <ul>
+    // for loop
+  @foreach (va r customer in Model.Customers) {
+  	<li>@customer.Name </li>
+  }
+  </ul>
+}
+
+// conditional rendering
+@{
+  var className = Model.Customers.Count > 5 ? "popular" : null;
+}
+<h2 class="@className">... </h2>
+```
+
+**Partial View:** Break View into different small pieces for better maintainability(by convention start naming with a "_").
+
+```c#
+// after create a partial view, simple render it by using
+@Html.Partial("_NavBar", Model.Movie);// 2nd argument is optional Model passing
+```
+
+**Link Creation:**There are various ways to create links
+
+1. ```html
+   // raw html
+   <a href="/Movies/Index">View Movies</a>
+   ```
+
+2. ```c#
+   // actionLink in htmlhepler class
+   @Html.ActionLink("View Movies", "Index", "Movies"); //name , action , model
+   
+   // if requires paramter
+   // remember the null at the end for some reason.
+   @Html.ActionLink("View Movies", "Index", "Movies", new {id = 1}, null); 
+   ```

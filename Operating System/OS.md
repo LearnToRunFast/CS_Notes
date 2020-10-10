@@ -30,3 +30,16 @@
 
 ### Scheduling
 
+**Turnaround time:**The turnaround time of a job is defined as the time at which the job completes minus the time at which the job arrived in the system.
+
+**Response time:** The time from when the job arrives in a system to the first time it is scheduled.
+
+1. **First In, First Out(FIFO):**Early arrive process will get executed first.
+   - It suffers from **convoy effect**, where a number of relatively-short potential consumers of a resource get queued behind a heavy weight resource comsumer.
+2. **Shortest Job First(SJF, non-preemptive)**: Shortest process get executed first.But this algorithm still does not solve the problem when heavy process run first, as it is **non-preemptive** the short process which arrive late will still suffer from **convoy effect**.
+3. **Shortest Time-to-Completion First (STCF, preemptive)**:Preemptive version of **SJF**. The **STCF** scheduler determines which of the remaining jobs (including the new job) has the least time left, and schedules that one.
+4. **Round Robin:**Instead of running jobs to completion, **RR** runs a job for a time slice (sometimes called a scheduling quantum) and then switches to the next job in the run queue. It repeatedly does so until the jobs are finished. RR is sometimes called time-slicing. 
+   - Note that the length of a time slice must be a multiple of the timer-interrupt period; thus if the timer interrupts every 10 milliseconds, the time slice could be 10, 20, or any other multiple of 10 ms.
+
+**SJF** or **STCS** has less turnaround time but suffer from bad response time compare to **RR**. **RR** has a great response time but has worst turnaround time. Either good at turnaround time or response time, but not both. Such **trade-off** is common in systems.
+
