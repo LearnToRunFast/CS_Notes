@@ -12,10 +12,28 @@
 
 **Docker Compose:** A separate CLI used to start up multiple docker containers at the same time and automates some of the long-winded arguments we were passing to 'docker run'.
 
-#### **docker-compose.yml keyword:**
+#### docker-compose:
+
+Docker compose can simplify the docker commands by create a file called `docker-compose.yml`.Below are some attributes for `.yml` file.
 
 1. `version`: version of docker compose
 2.  `services`: specify type and name of the containers
+
+```yaml
+version: '3'
+services:
+    web: # this is container name
+        stdin_open: true
+        build:
+            context: .
+            dockerfile: Dockerfile.dev
+        ports: 
+            - "3000:3000"
+        volumes:
+            - /app/node_modules
+            - .:/app
+        command: ["npm", "run", "test"] #overwrite default command 
+```
 
 #### Component of docker file:
 
@@ -71,7 +89,7 @@ By running command `docker run hello-world`, docker will
    1. `docker exec -it <container id> sh` give back shell.
 10. `docker commit -c <command>  <container id> ` create image from container
 
-#### **Common flags**: 
+#### **Common flags**
 
 `-a` show output from container.
 
@@ -83,9 +101,20 @@ By running command `docker run hello-world`, docker will
 
 `-c`  allow set the default command.   
 
-`-p <FROM>:<TO>`  port mapping
+`-p <FROM>:<TO>`  port mapping.
 
 `-d` Run container in background and print container ID.
 
+`-f`Specify file name that is going to be used to build out the image.
 
+`-v` Set up a volume.
 
+#### Docker Volume
+
+Start a reference to local machine disk instead of snapsot of data.
+
+`docker run -p 3000:3000 -v /app/node_modules -v $(pwd):/app <image_id>`
+
+`-v $(pwd):/app` Map current working directory into the '/app' folder in container.
+
+`-v /app/node_modules` Put a bookmark on the node_modules folder.
