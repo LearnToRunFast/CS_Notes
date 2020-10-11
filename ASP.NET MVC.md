@@ -107,6 +107,8 @@ public ActionResult Random() {
   }
   ViewData["Movie"] = movie; // ViewData version
   ViewBag.Movie = movie; // ViewBag version, is not compile safe
+  // accessing controller name, more attribute like "action" or "id"
+  var controller = RouteData.Values["controller"]; 
   return View();
 }
 // On cshtml
