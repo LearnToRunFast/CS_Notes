@@ -169,3 +169,6 @@ public ActionResult Random() {
    // remember the null at the end for some reason.
    @Html.ActionLink("View Movies", "Index", "Movies", new {id = 1}, null); 
    ```
+
+**Entity Framework(Oject Relational Mapper)**
+

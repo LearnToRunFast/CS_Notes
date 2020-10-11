@@ -118,3 +118,19 @@ Start a reference to local machine disk instead of snapsot of data.
 `-v $(pwd):/app` Map current working directory into the '/app' folder in container.
 
 `-v /app/node_modules` Put a bookmark on the node_modules folder.
+
+#### **Multi Phase**
+
+```dockerfile
+FROM node:alpine
+WORKDIR '/app'
+COPY package.json .
+RUN npm install
+COPY . .
+RUN npm run build 
+
+FROM nginx
+EXPOSE 80
+COPY --from=0 /app/build /usr/share/nginx/html
+```
+
