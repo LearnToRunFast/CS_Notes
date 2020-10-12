@@ -121,6 +121,17 @@ public ActionResult Random() {
 @ViewBag.Movie // ViewBag version
 ```
 
+3. TempData: which can be used from current session
+
+```c#
+// tempData required session state is turn on
+TempData.add("Country", "India");
+TempData.Keep()
+  
+// on post action
+TempData.Keep()
+```
+
 **ViewModel:** Model specifically built for a view.It includes any data and rules specific to that view(usually combine two or more models together).
 
 **Razor sytax:** support html and C# on cshtml
