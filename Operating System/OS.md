@@ -43,3 +43,14 @@
 
 **SJF** or **STCS** has less turnaround time but suffer from bad response time compare to **RR**. **RR** has a great response time but has worst turnaround time. Either good at turnaround time or response time, but not both. Such **trade-off** is common in systems.
 
+5. **Multi-Level Feefback Queue(MLFQ)**
+   - Rule 1: If Priority(A) > Priority(B), A runs (B doesn’t).
+   - Rule 2: If Priority(A) = Priority(B), A & B run in round-robin fash-
+     ion using the time slice (quantum length) of the given queue.
+   - Rule 3: When a job enters the system, it is placed at the highest
+     priority (the topmost queue).
+   - Rule 4: Once a job uses up its time allotment at a given level (re-
+     gardless of how many times it has given up the CPU), its priority is
+     reduced (i.e., it moves down one queue).
+   - Rule 5: After some time period S, move all the jobs in the system
+     to the topmost queue.
