@@ -83,7 +83,7 @@
       $$
       time\_slice_k = \frac{weight_k}{\sum_{i=0}^{n - 1}weight_i}\times sched\_latency
       $$
-      The **vruntime ** formula
+      The **vruntime** formula
       $$
       vruntime_i = vruntime_i + \frac{weight_0}{weight_i}\times runtime_i
       $$
