@@ -1,3 +1,7 @@
+# Docker & Kubenetes
+
+{:toc}
+
 ## Docker
 
 **Docker Client:** Issuing commands
@@ -12,7 +16,7 @@
 
 **Docker Compose:** A separate CLI used to start up multiple docker containers at the same time and automates some of the long-winded arguments we were passing to 'docker run'.
 
-#### docker-compose:
+### Docker-Compose
 
 Docker compose can simplify the docker commands by create a file called `docker-compose.yml`.Below are some attributes for `.yml` file.
 
@@ -35,13 +39,13 @@ services:
         command: ["npm", "run", "test"] #overwrite default command 
 ```
 
-#### Component of docker file:
+### Component of docker file
 
 1. Specify a base image.
 2. Run some commands to install additional programs.
 3. Specify a command to run on container startup.
 
-#### **Docker restart policies:**
+### Docker restart policies
 
 `"no"`:Never attempt to restart(normal no is a keyword in yml file).
 
@@ -51,7 +55,7 @@ services:
 
 `unless-stopped` Always restart unless we forcibly stop it.
 
-#### Dockerfile keyword:
+### Dockerfile Keyword
 
 1. `FROM` select image
 2. `RUN` run the commands inside the container
@@ -59,7 +63,7 @@ services:
 4. `COPY <FROM> <TO>` copy file from local to container
 5. `WORKDIR <path>` set working directory
 
-#### Process of build dockefile:
+### Process of Build Dockefile
 
 1. Get base image from local or remotely
 2. Create a temporary container from the base image and run the **commands from component step 2** on that container and create **new image** (will be cached at somewhere for future use). If the commands order of component step 2 is different, the cache will no longer works.
@@ -72,7 +76,7 @@ By running command `docker run hello-world`, docker will
 1. Check image named `hello-world` locally(look into **image cache**). If it is not existed check with docker hub(Images repo that holded by docker) and pull the image to local machine.
 2. With the image, loaded up into memory and create a container and run the container.
 
-**Common commands:**
+### Common Commands
 
 1. `docker Run` = `docker create` + `docker start`, create and run the container.
    - Corresponding `docker-compose up` for docker-compose
@@ -89,7 +93,7 @@ By running command `docker run hello-world`, docker will
    1. `docker exec -it <container id> sh` give back shell.
 10. `docker commit -c <command>  <container id> ` create image from container
 
-#### **Common flags**
+### Common Flags
 
 `-a` show output from container.
 
@@ -109,7 +113,7 @@ By running command `docker run hello-world`, docker will
 
 `-v` Set up a volume.
 
-#### Docker Volume
+### Docker Volume
 
 Start a reference to local machine disk instead of snapsot of data.
 
@@ -119,7 +123,7 @@ Start a reference to local machine disk instead of snapsot of data.
 
 `-v /app/node_modules` Put a bookmark on the node_modules folder.
 
-#### **Multi Phase**
+### Multi Phase
 
 ```dockerfile
 FROM node:alpine
@@ -134,3 +138,86 @@ EXPOSE 80
 COPY --from=0 /app/build /usr/share/nginx/html
 ```
 
+## Kubernete
+
+A system to deploy containerized apps with master-node architecture
+
+### Development
+
+Use minikube to manage
+
+- **Local Kubernetes Dev process**
+  - Install **Kubectl**(CLI for interacting with our master)
+    - run `brew install kubectl`
+  - Install a Virtual machine driver(VMware, virtual box etc), used to make a VM as single node.
+    - download any VM.
+  - Install **minukube**,runs a single node (kubernete node) using VM
+    - run `brew install minikube`
+    - start **minikube** by run `minikube start`
+
+- **minikuke(dev only)**: Create kubernetes cluster on local machine and manage virtual machine itself.
+- **Kubectl(both dev and production)**: Manage containers in the node.
+
+### Production
+
+Use Managed solutions(Google Cloud Kubernetes Engine)
+
+### Kube-Proxy
+
+A proxy for node to reach outside world.
+
+- Browser -> kube-proxy -> Service NodePort - > Pod
+
+### Config File
+
+The file will be in **yaml** format. Config file is used to create an object.
+
+```yaml
+# pod
+apiVersion: v1
+kind: Pod #type of object
+metadata:
+    name: client-pod # name of obj
+    lalels:
+        component: web #coupled with service
+spec:
+    containers:
+        - name: client #ref purpose
+          image: jiang1993/docker-client
+          ports:
+            - containerPort: 3000 #expose port 3000 of container to outside world 
+            
+#Service,  this should be in another yaml file
+apiVersion: v1
+kind: Service
+metadata:
+    name: client-node-port
+spec:
+    type: NodePort # sub type of service
+    ports:
+        - port: 3050 # port for another pod/container to access
+          targetPort: 3000 # open port for current pod
+          nodePort: 31515 #(30000-32767) port for outside world
+    selector: # labele-selector system with key-value pair component: web.
+        component: web
+```
+
+- **Objects**
+  - **StatefulSet**:
+  - **ReplicaController**:
+  - **Pod**: Run a container
+  - **Service**: Setup networking
+    - **NodePort**: **dev only**, Exposes a container to the outside world
+    - **ClusterIP**:
+    - **LoadBalancer**
+    - **Ingress**
+- **apiVersion**
+  - **v1**: contains **Pod**, **Event** and other object types
+  - **apps/v1**: Different set of types like **StatefulSet**, **ContollerRevision**
+
+### Cubectl Command
+
+- `apply` Change current configuration of the cluster 
+  - `kubectl apply -f <filename>`: Feed a config file to kubectl where`-f` specify a file that has the config changes
+- `get` Retrieve information about a running object
+  - `kubectl get pods`: Get status for all pods
