@@ -45,11 +45,20 @@ A block-level element always starts on a new line and takes up the full width av
 
 Here are the block-level elements in HTML:
 
-<address> 	<article>		<aside>		<blockquote>		<canvas>		<dd>		<div>		<dl>		<dt><fieldset>		<figcaption>		<figure>		<footer>		<form>		<h1>-<h6>		<header>		<hr><li>		<main>		<nav>		<noscript>		<ol>		<p>		<pre>		<section>		<table>		<tfoot><ul>		<video>
+```html
+<p>		<dd>		<dl>		<dt>		<hr>		<li>		<ol>		<ul>		<div>		<nav>		<pre>	<form>		<main>		<aside>		<table>		<tfoot>		<video>		<canvas>		<figure>		<footer>		<header>		<section>		<address> 	<article>		<h1>-<h6>		<fieldset><noscript>		<blockquote>		<figcaption>	
+									
+```
 
 ## Inline Elements
 
 An inline element does not start on a new line and it only takes up as much width as necessary.**An inline element cannot contain a block-level element!**
 
-<a>	<abbr><acronym><b><bdo><big><br><button><cite><code><dfn><em><i><img><input><kbd><label><map><object><output><q><samp><script><select><small><span><strong><sub><sup><textarea><time><tt><var>
+Here are the inline elements in HTML:
+
+```html
+<a>		<b>		<i>		<q>		<br>		<em>		<tt>		<bdo>		<dfn>		<big>		<img>		<kbd>		<map>	<sub>		<sup>		<var>		<abbr>		<cite>			<code>		<samp>		<span>		<time><input>		<label>		<small>		<button>		<object>		<output>		<strong>		<select>	<acronym>			<textarea>		<script>
+```
+
+
 
