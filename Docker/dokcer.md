@@ -1,6 +1,6 @@
 # Docker & Kubenetes
 
-{:toc}
+[toc]
 
 ## Docker
 
