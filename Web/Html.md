@@ -118,3 +118,99 @@ In HTML there are some semantic elements that can be used to define different pa
 
 ![HTML Semantic Elements](Asserts/img_sem_elements-20201023175832740.gif)
 
+## HTML Table
+
+Tables `<table> </table>`are structured sets of data, made up of rows and columns.They can be a great way of displaying data clearly.
+
+| Tag         | Description                                                  |
+| :---------- | :----------------------------------------------------------- |
+| \<table>    | Defines a table                                              |
+| \<th>       | Defines a header cell in a table                             |
+| \<tr>       | Defines a row in a table                                     |
+| \<td>       | Defines a cell in a table                                    |
+| \<caption>  | Defines a table caption                                      |
+| \<colgroup> | Specifies a group of one or more columns in a table for formatting |
+| \<col>      | Specifies column properties for each column within a \<colgroup> element |
+| \<thead>    | Groups the header content in a table                         |
+| \<tbody>    | Groups the body content in a table                           |
+| \<tfoot>    | Groups the footer content in a table                         |
+
+### Attributes
+
+1. `rowspan`, `<th rowspan="2"`specifies row take up 2 row length.
+2. `copspan`,`<th colspan="2"` specifies column take up 2 column length.
+
+## HTML Form
+
+An HTML form `<form> </form>`  is used to collect user input. It is a container for different types of input elements, such as: text fields, checkboxes, radio buttons, submit buttons, etc.
+
+### Attributes
+
+1. `action`,`<form action="/search/">` decides the destination after submit of the input.
+
+### The \<input> Element
+
+The HTML `<input>` element is the most used form element.
+
+An `<input>` element can be displayed in many ways, depending on the `type` attribute.
+
+Here are some examples:
+
+| Type                     | Description                                                  |
+| :----------------------- | :----------------------------------------------------------- |
+| \<input type="text">     | Displays a single-line text input field                      |
+| \<input type="radio">    | Displays a radio button (for selecting one of many choices)  |
+| \<input type="checkbox"> | Displays a checkbox (for selecting zero or more of many choices) |
+| \<input type="submit">   | Displays a submit button (for submitting the form)           |
+| \<input type="button">   | Displays a clickable button                                  |
+| \<input type="password"> | Display a text input field for password                      |
+
+#### Grouping Radio Input
+
+If the name attibute of radio have the same values, they are by default belong to one group.
+
+#### Default Checked Input 
+
+`<input type="checkbox" name="agree" id="agree" checked>` Simply put checked at tail.
+
+#### Default Selected Input 
+
+```html
+<select name="meal" id="meal">
+  <option value="fish" selected>Fish</optional>
+  <option value="steak">Steak</option>
+</select>
+```
+
+#### Range Input Example
+
+```html
+<section>
+	<label for="price">Price:</label>
+  <input type="range" id="price" min="1" max="100" value="70" name="price" step="2">
+</section>
+```
+
+#### Attributes
+
+1. `Placeholder`, `<intput placeholder="Enter your text">` messages Hint for user.
+2. `type`,` <input  type="text"> ` indicates the type of the input.
+3. `name`, `<input name="cheese">` indicates the name of the input, it use inside the query.
+4. `id`,`<input id="cheese">` indicates the id of the input and the id must be **unique** within the page.
+5. `value`,`<input value="value">` indicates the value of the input, especially useful to **distinguish which radio input was submitted**.
+
+### The \<label> Element
+
+The HTML `<label> </label>` element represents a caption for an item in a user interface.
+
+#### Attributes
+
+1. `for`,`<label for="cheese">` indicates the label is belongs to one element with **id=cheese**
+
+### The \<button> Element
+
+The HTML `<button> </button>` element represents a clickable button.
+
+#### Attributes
+
+1. `type`, `<button type="button">` indicates type of the button, as **button** type will not submit the form
