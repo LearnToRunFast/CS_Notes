@@ -347,3 +347,31 @@ spec:
 	# storageClassName   may need to be set in cloud env
 ```
 
+### Secrets Object
+
+Any sensitive information that need to be stored secretly in the kubernetes. Secrets object provide such function but instead of using config to create secrets object, we need to use **imperative** method to create the object so that the content is not visible to others. The command provides below:
+
+`kubectl create secret generic  <secret_name> --from-literal key=value` where
+
+1. `create` Imperative command to create a new object.
+2. `secret` Type of object that we are going to create.
+3. `generic` Type of secret. othet types like`docker-registry` is refer to authentication with some custome docker registry and '`tls` is for http set-up.
+4. `--from-literal`Indicates we are going to add the secret information into this command.
+5. `key=value` Key value pair for the secret.
+
+```yaml
+# Using for secret object in the env section, 
+# instead of using name and value pair
+env:
+	- name:
+		value:
+# we use
+env:
+	- name: PASSWORD
+		valueFrom:
+			secretKeyRef:
+				name: #name of the secret
+				key: # key of the secret 
+```
+
+**Notes**: To change the default password of postgres, specify the `POSTGRES_PASSWORD`  variable in the environment (`env` in the config file).
