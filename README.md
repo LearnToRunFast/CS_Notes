@@ -1,6 +1,6 @@
-## Programming
+## Docker
 
-- [SICP](https://github.com/learntorunfast/cs-related-notes/tree/master/Structure%20and%20Interpretation%20of%20computer%20programs)
+- [Docker and Kubernete](https://github.com/learntorunfast/CS_Notes/Docker)
 
 ## Algorithm
-- [Algorithm](https://github.com/LearnToRunFast/cs-related-notes/tree/master/Data%20Structures%20and%20Algorithms)
+- [Algorithm](https://github.com/LearnToRunFast/CS_Notes/Data%20Structures%20and%20Algorithms)
