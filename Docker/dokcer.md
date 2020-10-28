@@ -189,10 +189,6 @@ Use minikube to manage
 - **minikuke(dev only)**: Create kubernetes cluster on local machine and manage virtual machine itself.
 - **Kubectl(both dev and production)**: Manage containers in the node.
 
-### Production
-
-Use Managed solutions(Google Cloud Kubernetes Engine)
-
 ### Config File
 
 The file will be in **yaml** format. Config file is used to create an object.
@@ -247,8 +243,10 @@ spec:
   - **Service**: Setup networking
     - **NodePort**: **dev only**, Exposes a container to the outside world.
     - **ClusterIP**: Only objects within the cluster are able to access the clusterIP pointing at.
-    - **LoadBalancer**
-    - **Ingress**:
+    - **LoadBalancer**: Legacy way to getting network traffic into a cluster.
+    - **Ingress**: Exposes a set of services to the outside world(replace LoadBalancer).There are two types of Nginx Ingress.
+      - [Ingress-nginx](https://github.com/kubernetes/ingress-nginx)  which a community led project
+      - [kubernetes-ingress](github.com/nginxinc/kubernetes-ingress) which lead by company nginx
 - **apiVersion**
   - **v1**: contains **Pod**, **Event** and other object types
   - **apps/v1**: Different set of types like **StatefulSet**, **ContollerRevision**
@@ -304,11 +302,11 @@ As kubernetes does not provide a easy way to automatecally update the new image 
 3. Use an **imperative command** to update the imgae version that the deployment should use.
    - Tag the image with a version number and push to docker hub.
    - Run a **kubectl** command forcing the deployment to use the new image version.
-     - `kubectl  set image <object_type>/<object_name> <container_name>=<new image>`
+     - `kubectl set image <object_type>/<object_name> <container_name>=<new image>`
 
 ### Persistent Volume Claim
 
-A advertisement(claim) for persistent volume that can be provided to **pods**, but it may not be ready yet. It can be dynamically provisioned if necessary.
+A advertisement(claim) for peyersistent volume that can be provided to **pods**, but it may not be ready yet. It can be dynamically provisioned if necessary.
 
 **Problem**: The postgres database was created in a container and is located inside the virtual machine(Deployment object), any crash happened to the container will potentially destroy all the data.
 
@@ -375,3 +373,235 @@ env:
 ```
 
 **Notes**: To change the default password of postgres, specify the `POSTGRES_PASSWORD`  variable in the environment (`env` in the config file).
+
+### Ingress
+
+With **Ingress config file**, it will create an **Ingress controller** to make an load balancer service with additional deployment object(**nginx pod**) to handle the traffic. Addtional to that, it will create another pair of **ClusterIp Service** and Depolyment(**default-backend pod**) to handle health check in order to make sure everything is working correctly.
+
+```yaml
+# ingress services
+apiVersion: networking.k8s.io/v1beta1
+# UPDATE THE API
+kind: Ingress
+metadata:
+  name: ingress-service
+  annotations:
+    kubernetes.io/ingress.class: nginx # ingress controller base on nginx project
+    nginx.ingress.kubernetes.io/use-regex: 'true'
+    nginx.ingress.kubernetes.io/rewrite-target: /$1 #rewrite /api/ to /
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /?(.*)
+            backend:
+              serviceName: client-cluster-ip-service
+              servicePort: 3000
+          - path: /api/?(.*)
+            backend:
+              serviceName: server-cluster-ip-service
+              servicePort: 5000
+```
+
+### Production
+
+1. Create github repo
+2. Tie repo to Travis CI
+   1. Go to [Travis CI](travis-ci.rog), sync it with github first and enable the project 
+   2. Use ruby docker to install travis and use travis to encrypt login credentials.
+   3. push the encrypted file into GitHub. 
+3. Create Google Cloud project
+4. Add deployment scripts to the repo
+
+Example of `.tavis.ymal`
+
+```yaml
+sudo: required
+services:
+  - docker
+env:
+  global:
+    - SHA=$(git rev-parse HEAD)  #create env variable
+    - CLOUDSDK_CORE_DISABLE_PROMPTS=1 # disable gcloud prompt
+before_install:
+  - openssl aes-256-cbc -K encrypted0c35eebf403ckey−ivencrypted_0c35eebf403c_iv -in service-account.json.enc -out service-account.json -d
+  - curl https://sdk.cloud.google.com | bash > /dev/null;
+  - source $HOME/google-cloud-sdk/path.bash.inc
+  - gcloud components update kubectl
+  - gcloud auth activate-service-account --key-file service-account.json
+  - gcloud config set project skilful-berm-214822
+  - gcloud config set compute/zone us-central1-a
+  - gcloud container clusters get-credentials multi-cluster
+  - echo "DOCKER_PASSWORD"|dockerlogin−u"DOCKER_USERNAME" --password-stdin
+  - docker build -t stephengrider/react-test -f ./client/Dockerfile.dev ./client
+
+script:
+  - docker run -e CI=true stephengrider/react-test npm test
+
+deploy:
+  provider: script
+  script: bash ./deploy.sh
+  on:
+    branch: master
+```
+
+Example of `deploy.sh`
+
+```bash
+docker build -t stephengrider/multi-client:latest -t stephengrider/multi-client:$SHA -f ./client/Dockerfile ./client
+docker build -t stephengrider/multi-server:latest -t stephengrider/multi-server:$SHA -f ./server/Dockerfile ./server
+docker build -t stephengrider/multi-worker:latest -t stephengrider/multi-worker:$SHA -f ./worker/Dockerfile ./worker
+
+docker push stephengrider/multi-client:latest
+docker push stephengrider/multi-server:latest
+docker push stephengrider/multi-worker:latest
+
+docker push stephengrider/multi-client:$SHA
+docker push stephengrider/multi-server:$SHA
+docker push stephengrider/multi-worker:$SHA
+
+kubectl apply -f k8s
+# update image if necessary
+kubectl set image deployments/server-deployment server=stephengrider/multi-server:$SHA
+kubectl set image deployments/client-deployment client=stephengrider/multi-client:$SHA
+kubectl set image deployments/worker-deployment worker=stephengrider/multi-worker:$SHA
+```
+
+#### Install Ingress
+
+Use **Helm** to install Nginx Ingress controller.
+
+```yaml
+# ingress config
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ingress-service
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    certmanager.k8s.io/cluster-issuer: 'letsencrypt-prod'
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+spec:
+  tls:
+    - hosts:
+        - k8s-multi.com
+        - www.k8s-multi.com
+      secretName: k8s-multi-com #secret name to get certificate
+  rules:
+    - host: k8s-multi.com
+      http:
+        paths:
+          - path: /?(.*)
+            backend:
+              serviceName: client-cluster-ip-service
+              servicePort: 3000
+          - path: /api/?(.*)
+            backend:
+              serviceName: server-cluster-ip-service
+              servicePort: 5000
+    - host: www.k8s-multi.com
+      http:
+        paths:
+          - path: /?(.*)
+            backend:
+              serviceName: client-cluster-ip-service
+              servicePort: 3000
+          - path: /api/?(.*)
+            backend:
+              serviceName: server-cluster-ip-service
+              servicePort: 5000
+```
+
+#### HTTP Setup
+
+**Issuer** is an object that will tell **cer manager** where to get the certificate from
+
+```yaml
+apiVersion: cert-manager.io/v1alpha2
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: "youremail@email.com"
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+```
+
+**Certificate** is an object that describing details about the certificate that should be obtained and create one secret will holds the certificate.
+
+```yaml
+apiVersion: certmanager.k8s.io/v1alpha2
+kind: Certificate
+metadata:
+  name: k8s-multi-com-tls
+spec:
+  secretName: k8s-multi-com # look up secret for this name
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: k8s-multi.com
+  dnsNames:
+    - k8s-multi.com
+    - www.k8s-multi.com
+  acme:
+    config:
+      - http01:
+          ingressClass: nginx
+        domains:
+          - k8s-multi.com
+          - www.k8s-multi.com
+```
+
+**Cert Manager** is created by **Helm** to set up infra to respond to HTTP challenge, get certificate and stores it in **secret**
+
+### Skaffold For Local Development
+
+skafold watches the kubernetes application changes. Once it detects the changes, it will take certain action base on different modes.
+
+1. Rebuild client imahe from scratch(**rebuild image**), update K8S(kubernetes application).
+2. Inject updated files into the client pod, rely on react app to automatically update itself.
+   1. In this mode, make sure the client pod can automatelly update itself.
+
+```yaml
+apiVersion: skaffold/v1beta2
+kind: Config
+build:
+  local:
+    push: false # no push to hub
+  artifacts:
+    - image: stephengrider/multi-client
+      context: client
+      docker:
+        dockerfile: Dockerfile.dev
+      sync: # take update file and inject the changeI
+        '**/*.js': .
+        '**/*.css': .
+        '**/*.html': .
+    - image: stephengrider/multi-server
+      context: server
+      docker:
+        dockerfile: Dockerfile.dev
+      sync:
+        '**/*.js': .
+    - image: stephengrider/multi-worker
+      context: worker
+      docker:
+        dockerfile: Dockerfile.dev
+      sync:
+        '**/*.js': .
+deploy:
+  kubectl:
+    manifests:
+      - k8s/client-deployment.yaml
+      - k8s/server-deployment.yaml
+      - k8s/worker-deployment.yaml
+      - k8s/server-cluster-ip-service.yaml
+      - k8s/client-cluster-ip-service.yaml
+```
