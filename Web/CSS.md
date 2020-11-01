@@ -14,7 +14,7 @@ selector {
 }
 ```
 
-## **Three ways of Using CSS**
+## Three ways of Using CSS
 
 1. Inline style
 
@@ -161,3 +161,114 @@ When there is multiple rules could apply to the same element, the more specific 
 ID > CLASS > ELEMENT, one ID = ten CLASSes = 100 ELEMENTs
 
 **Note**:`!important`  is alway the most weighted style.
+
+### Inheritance
+
+The CSS follows Inheritance rules which rules apply to parent will affect the chilren too.But some of them are not affected by inheritance.
+
+## The CSS Properties
+
+### Border Properties
+
+- `border:` Specify the width | style | color in one line.
+  - `border-width` Control the thickness of the border
+    - `border-left-width`
+  - `border-color` Control the color of the border
+    - `border-left-color`
+  - `border-style` Control the line style of the border
+  - `border-sizing: border-box` Include no extra weight and height for border
+
+- `border-radius: 30%`: Rounded cornor for the border
+  - `border-radius:top-left top-right bottom-right bottom-left`
+
+### Padding
+
+The gap area between border and content.
+
+- `padding` : vertical | horizontal,  top | right | bottom | left
+
+### Margin
+
+The gaps between elements.
+
+- `margin` : vertical | horizontal,  top | right | bottom | left
+
+### Display Properties
+
+Allow change the inline to block element and vice verse. By default, the inline the the padding or margin will not work as expected.
+
+- `display: inline` or `display: block`
+- `display:inline-block` Helps the inline to take effect with padding and margin. Same to block.
+
+### Alpha Channel
+
+`rgba(255, 255, 255, 0.7)` 0.7 is called alpha channel and is only affect background color.
+
+`#FFFFFFb9` is another way to change the transparent.
+
+### Opacity
+
+Opacaity will change the all the elements become transparent. eg. `opacity: 0.5`
+
+### Position
+
+The position property sets how an element is positioned in a document.
+
+#### Static
+
+The position is static, static is default option.
+
+#### Relative
+
+Use `top`, `left`, `right`, `bottom` move the element.
+
+#### Absolute
+
+The element is removed from the normal document flow, and no space is created for the element in the page layout.
+
+#### Fixed
+
+It similar to 'absolute' to root container, normally use it to create a floating effect. eg a nav bar that can move down when scrolling down.
+
+### Transitions
+
+Use to change the transition delay.
+
+It follows a order: Name | Duration | Timing Function | Delay
+
+- `transition: 3s` Change all
+- `transition: background-color 3s` Only background color only
+
+### Transform
+
+Move the element.
+
+`transform: rotate(45deg)`
+
+`transform: scale(0.5)`
+
+`transform: translateX(200px)` Move to right 200px
+
+### Background
+
+`background: center/cover url("")`
+
+- `background-size`
+- `background-image`
+- `background-position`
+
+### Google Fonts
+
+
+
+## CSS Units
+
+### Relative
+
+- **Percentages**
+- **em**
+  - With font-size, 1em equals the font-size of the parent. 2em is double.
+  - With other properties, 1em is equal to the computed font-size of the element itself.
+- **rem**: 1rem equals to the font-size of the root element.
+
+## 
