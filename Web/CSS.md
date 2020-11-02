@@ -257,10 +257,6 @@ Move the element.
 - `background-image`
 - `background-position`
 
-### Google Fonts
-
-
-
 ## CSS Units
 
 ### Relative
@@ -271,4 +267,74 @@ Move the element.
   - With other properties, 1em is equal to the computed font-size of the element itself.
 - **rem**: 1rem equals to the font-size of the root element.
 
-## 
+## The CSS Flexbox
+
+Flexbox is a one-dimensional layout method for laying out items in rows or columns.
+
+Set `display:flex;`
+
+### Flex Direction
+
+**Key**:`flex-direction`
+
+**Value**: `row` `row-reverse` `column` `column-reverse`
+
+### Justify Content
+
+Control the content on flex direction axis.
+
+**Key**:`Justify-content` 
+
+**Value**: `flex-start` `flex-end` `center` `space-between` `space-around` `space-evenly`
+
+### Flex Wrap
+
+Wrap the content.
+
+**Key**:`flex-wrap` 
+
+**Value**: `wrap` `wrap-reverse`
+
+### Align Items
+
+If Flex direction is row,  justify content control the row direction and align items will control the column direction.
+
+**Key**:`align-items:` 
+
+**Value**: `flex-start` `flex-end` `center`  `baseline`(align with text)
+
+### Align Content
+
+**Key**:`align-items:` 
+
+**Value**: `flex-start` `flex-end` `center` `space-between` `space-around` `space-evenly`
+
+### Align Self
+
+**Key**:`align-self:` 
+
+**Value**: `flex-start` `flex-end` `center` `space-between` `space-around` `space-evenly`
+
+### Flex
+
+**Key**:`flex:` 
+
+**Value**: flex-grow | flex-shrink | flex-basis
+
+#### Flex Basis
+
+Defines the initial size of an element before addtional space is distributed.
+
+**Key**:`flex-basis:` 
+
+**Value**: `px`
+
+#### Flex Grow
+
+Control the amount of available space an element should take up. Accepts a unit-less number value.
+
+**Key**:`flex-grow`
+
+#### Flex Shrink
+
+If items are larger than the container, they shrink accodring to flex shrink
