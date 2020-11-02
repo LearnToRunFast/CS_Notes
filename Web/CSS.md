@@ -299,25 +299,25 @@ Wrap the content.
 
 If Flex direction is row,  justify content control the row direction and align items will control the column direction.
 
-**Key**:`align-items:` 
+**Key**:`align-items` 
 
 **Value**: `flex-start` `flex-end` `center`  `baseline`(align with text)
 
 ### Align Content
 
-**Key**:`align-items:` 
+**Key**:`align-items` 
 
 **Value**: `flex-start` `flex-end` `center` `space-between` `space-around` `space-evenly`
 
 ### Align Self
 
-**Key**:`align-self:` 
+**Key**:`align-self` 
 
 **Value**: `flex-start` `flex-end` `center` `space-between` `space-around` `space-evenly`
 
 ### Flex
 
-**Key**:`flex:` 
+**Key**:`flex` 
 
 **Value**: flex-grow | flex-shrink | flex-basis
 
@@ -338,3 +338,77 @@ Control the amount of available space an element should take up. Accepts a unit-
 #### Flex Shrink
 
 If items are larger than the container, they shrink accodring to flex shrink
+
+## The Media Queries
+
+Media queries allow us to modify our styles depending on particular parameters like screen diwth or device type.
+
+```css
+@media (min-width: 200px) and (max-width: 360px) {
+	div {
+		color: red;
+	}
+}
+
+@media (orientation: landscape) {
+  h1 {
+    color: blue;
+  }
+}
+```
+
+## CSS Reset
+
+The goal of a reset stylesheet is to reduce browser inconsistencies in things like default line height, nargins and font size of headings and so on.
+
+```css
+/* http://meyerweb.com/eric/tools/css/reset/ 
+   v2.0 | 20110126
+   License: none (public domain)
+*/
+
+html, body, div, span, applet, object, iframe,
+h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+a, abbr, acronym, address, big, cite, code,
+del, dfn, em, img, ins, kbd, q, s, samp,
+small, strike, strong, sub, sup, tt, var,
+b, u, i, center,
+dl, dt, dd, ol, ul, li,
+fieldset, form, label, legend,
+table, caption, tbody, tfoot, thead, tr, th, td,
+article, aside, canvas, details, embed, 
+figure, figcaption, footer, header, hgroup, 
+menu, nav, output, ruby, section, summary,
+time, mark, audio, video {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	font-size: 100%;
+	font: inherit;
+	vertical-align: baseline;
+}
+/* HTML5 display-role reset for older browsers */
+article, aside, details, figcaption, figure, 
+footer, header, hgroup, menu, nav, section {
+	display: block;
+}
+body {
+	line-height: 1;
+}
+ol, ul {
+	list-style: none;
+}
+blockquote, q {
+	quotes: none;
+}
+blockquote:before, blockquote:after,
+q:before, q:after {
+	content: '';
+	content: none;
+}
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+```
+
