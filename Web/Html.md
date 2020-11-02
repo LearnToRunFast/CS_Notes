@@ -135,6 +135,21 @@ Tables `<table> </table>`are structured sets of data, made up of rows and column
 | \<tbody>    | Groups the body content in a table                           |
 | \<tfoot>    | Groups the footer content in a table                         |
 
+```html
+<table>
+  <thead>
+    <tr> 
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr> 
+      <td> </td>
+    </tr>
+  </tbody>
+</table>
+```
+
 ### Attributes
 
 1. `rowspan`, `<th rowspan="2"`specifies row take up 2 row length.
@@ -214,3 +229,8 @@ The HTML `<button> </button>` element represents a clickable button.
 #### Attributes
 
 1. `type`, `<button type="button">` indicates type of the button, as **button** type will not submit the form
+
+## Class Attribute
+
+You can specify one element with two classes separated with a space and use `.firstClassName.secondClassName` to in CSS to style it.
+
