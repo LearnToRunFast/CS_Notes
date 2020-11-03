@@ -412,3 +412,51 @@ table {
 }
 ```
 
+##  Bootstrap
+
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css" integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
+```
+
+Place above link into the header link tag. 
+
+### Grid System
+
+Must be inside a container.
+
+**12** units in a row. 
+
+```html
+<div class="container">
+  <div class="row">
+    <div class="col-4"></div>
+    <div class="col-4"></div>
+  </div>
+</div>
+```
+
+#### Responsive Grid
+
+```html
+<div class="container">
+  <div class="row">
+    <div class="col-md-6 col-xl-4"></div> <!--1 <= md  6  <= xl  4-->
+    <div class="col-md-6 col-xl-4"></div>
+  </div>
+</div>
+```
+
+#### Responsive Images
+
+`<class="img-fluid">` and wrap inside the responsive grid.
+
+### Forms
+
+Group them into grid to get responsive forms.
+
+Use `class="form-row"`to group the forms instead of normal `class="row"`.
+
+Use `class="form-control"` for `input` element.
+
+### Navbar
+
