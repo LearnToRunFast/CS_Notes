@@ -39,9 +39,9 @@ Idea: create an lazy[] array with same size of tree array. Keep positive or nega
 
 **Implementation:**
 
-[Java Implementation of Segement Tree(recursive version)](.CodeImplementations/SegmentTree_R.java)
+[Java Implementation of Segement Tree(recursive version)](./CodeImplementations/SegmentTree_R.java)
 
-[Java Implementation of Segement Tree(iterative version)](.CodeImplementations/SegmentTree_I.java)
+[Java Implementation of Segement Tree(iterative version)](./CodeImplementations/SegmentTree_I.java)
 
 **References:**
 
