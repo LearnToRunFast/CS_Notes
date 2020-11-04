@@ -12,3 +12,13 @@ First-In-Last-Out(**FILO**) or Last-in-First-Out(**LIFO**). Stack can provides e
 
 [ResizingArrayStack with Java (Implemented with Resizing Array)](./CodeImplementations/ResizingArrayStack.java)
 
+## Queue
+
+First-In-First-Out(**FIFO**) or Last-in-Last-Out(**LILO**). Queue can provides every first item that get enqueued into the queue.
+
+### Implementation
+
+[Queue with Java (Implemented with LinkedList)](./CodeImplementations/LinkedListQueue.java)
+
+[ResizingArrayStack with Java (Implemented with Resizing Array)](./CodeImplementations/ResizingArrayQueue.java)
+
