@@ -1,4 +1,4 @@
-## Segment Tree(range query, update, find min and max)
+# Segment Tree(range query, update, find min and max)
 
 For a given array arr[0... n - 1], 
 

@@ -8,7 +8,7 @@ First-In-Last-Out(**FILO**) or Last-in-First-Out(**LIFO**). Stack can provides e
 
 ### Implementation
 
-[Stack with Java (Implemented with LinkedList)](.CodeImplementations/LinkedListStack.java)
+[Stack with Java (Implemented with LinkedList)](./CodeImplementations/LinkedListStack.java)
 
-[ResizingArrayStack(Implemented with Resizing Array)](.CodeImplementations/ResizingArrayStack.java)
+[ResizingArrayStack(Implemented with Resizing Array)](./CodeImplementations/ResizingArrayStack.java)
 
