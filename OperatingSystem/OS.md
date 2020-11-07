@@ -78,6 +78,8 @@ Instead of running jobs to completion, **RR** runs a job for a time slice (somet
 
 #### Multi-Level Feefback Queue(MLFQ)
 
+**Multilevel Feedback Queue** scheduling allows a process to move between queues. This movement is facilitated by the characteristic of the CPU burst of the process. If a process uses too much CPU time, it will be moved to a lower-priority queue. This scheme leaves I/O-bound and interactive processes in the higher priority queues. 
+
 - Rule 1: If Priority(A) > Priority(B), A runs (B doesn’t).
 - Rule 2: If Priority(A) = Priority(B), A & B run in round-robin fash-
   ion using the time slice (quantum length) of the given queue.
