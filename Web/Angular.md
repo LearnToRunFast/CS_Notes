@@ -12,6 +12,8 @@
 
 **Project Running Flow**: `main.ts`  -> `app.module.ts` -> `app.component.ts`
 
+**Structure**: 
+
 ## Component
 
 Create a new Component with **CLI**:`ng generate component <component-name>` or `ng g c <component-name>`
@@ -65,13 +67,30 @@ export class AppModule { }
 
 ### String Interpolation
 
-Use `{{}}`
+Use `{{age}}`
 
 #### Property Binding
 
 Use `[]`, place a property inside `[]`.
 
-Eg. `[disabled]="!allowNewServer"`
+Eg. `[disabled]="!allowNewServer"` The `"!allowNewServer"` coming from ts file
+
+```ts
+// parent html
+<app-recipe-item 
+  *ngFor=let recipeEl of recipes"
+		[recipe]="recepeEl"></app-recipe-item>
+
+// child ts
+import { Input } from '@angular/core';
+export class RecipeItemComponent {
+  // @Input() makes child able to receive data from parent.
+  @Input() recipe: Recipe; // Recipe is model
+}
+
+// child html
+<h1>{{recipe.name}}</h1>
+```
 
 ### React to User Event
 
@@ -81,7 +100,39 @@ Use `()`,
 
 `$event` get access to event data, the data is on `(<HTMLInputElement>event.target).value`
 
-Eg `(click)="onCreateServer()"`
+Eg `(click)="onCreateServer()"`, the `"onCreateServer()"` coming from ts file.
+
+```ts
+// child html side
+<a hred="#" (click)="onSelect('recipe')"></a>
+
+// child ts side
+import { EventEmitter, Output } from '@angular/core';
+
+export class HeaderComponent {
+  // @Output() make it's parent able to listen to the event.
+  @Output() featureSelected = new EventEmitter<stirng>(); 
+  
+  onSelect(feature: string) { // trigger function of onclick
+    this.featureSelected.emit(feature);
+  }
+}
+
+// parent html side
+<app-header (featureSelected)="onNavigate($event)"></app-header>
+<app-recipes *ngIf="loadedFeature === 'recipe'"></app-recipes>
+
+
+//parent ts side
+export class AppComponent {
+  loadedFeature = 'recipe';
+  onNavigate(feature: string) {
+    this.loadedFeature = feature;
+  }
+}
+```
+
+
 
 ### Two Way Binding
 
@@ -96,6 +147,8 @@ Eg. `[(ngModel)]="serverName"`
 Directives are instructions in the DOM.
 
 ### Structure Directives
+
+Adds or removes HTML elements
 
 ### Ng-if
 
@@ -114,6 +167,8 @@ Directives are instructions in the DOM.
 
 ### Attribute Directives
 
+Changes the properties of the HTML element it gets applied to.
+
 #### ngStyle
 
 Change style dynamically.
@@ -126,3 +181,29 @@ Change class dynamically.
 
 `[ngClass]="{online: status == 'online'}"`
 
+## Models
+
+```ts
+// blueprint
+//ver 1
+export class Recipe {
+  public name: string;
+  public description: string;
+  public imagePath: string;
+  
+	constructor(name: string, desc: string, imagePath: string) {
+    this.name = name;
+    this.description = desc;
+    this.imagePath = imagePath;
+  }
+}
+// ver2
+export class Recipe {
+	constructor(public name: string, public description: string, public imagePath: string) {
+  }
+}
+```
+
+## CSS
+
+Special selector `:host` to style own component.
