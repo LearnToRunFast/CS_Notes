@@ -1,3 +1,5 @@
+[toc]
+
 
 
 # Javascript && DOM
@@ -135,4 +137,15 @@ function fullName({firstName, lastName}) {
 }
 ```
 
-# DOM
+# Document Object Model(DOM)
+
+The `Document` object is the entry point of DOM. It contains representations of all the content on a page, plus tons of useful methods and properties.
+
+## Selection
+
+### Select by Id
+
+```javascript
+document.getElementById("item_id");
+```
+
