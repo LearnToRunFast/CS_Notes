@@ -208,3 +208,50 @@ export class Recipe {
 
 Special selector `:host` to style own component.
 
+## Pipe
+
+Pipe is a value formatter in Angular.
+
+### Currency Pipe
+
+```html
+<!--output '$0.26'-->
+<p>A: {{a | currency}}</p>
+```
+
+### Jason Pipe
+
+```html
+<p>With JSON pipe:</p>
+<pre>{{object | json}}</pre>
+```
+
+### Data Pipe
+
+```html
+<div>
+   <p>Today is {{today | date}}</p>
+   <p>Or if you prefer, {{today | date:'fullDate'}}</p>
+   <p>The time is {{today | date:'h:mm a z'}}</p>
+ </div>`
+```
+
+### Custom Pipe
+
+```ts
+ng generate pipe pipe_name
+
+// ts
+import {Pipe, PipeTransform } from '@angular/core';
+
+@Pipe({
+  name: 'convert'
+})
+
+export class ConvertPipe implements PipeTransform {
+  transform(value: any, ...args: any[]):  any {
+    return null;
+  }
+}
+```
+
