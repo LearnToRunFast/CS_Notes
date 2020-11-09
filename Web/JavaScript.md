@@ -141,11 +141,193 @@ function fullName({firstName, lastName}) {
 
 The `Document` object is the entry point of DOM. It contains representations of all the content on a page, plus tons of useful methods and properties.
 
-## Selection
+## Document
 
-### Select by Id
+### Selection
+
+#### Select by Id
 
 ```javascript
 document.getElementById("item_id");
+```
+
+#### Select by Tag Name
+
+```javascript
+document.getElementsByTagName("img");
+```
+
+#### Select by Class Name
+
+```javascript
+document.getElementsByClassName("item_id");
+```
+
+### Query Selector
+
+#### Selector
+
+```javascript
+document.querySelector('#banner'); // first id with banner
+document.querySelector('.square'); // first class name with square
+document.querySelector('img:nth-of-type(2)'); // second element of image
+document.querySelector('a[title="java"]');
+document.querySelectorAll('p a'); 
+
+console.dir() // to see all the attributes
+```
+
+#### Attribute
+
+```javascript
+document.querySelector('p').innerHTML
+document.querySelector('p').innerText
+```
+
+#### Style
+
+```javascript
+document.querySelector('p').style.color // change style
+```
+
+#### ClassList
+
+```javascript
+document.querySelector('p').classList.add("class1");
+document.querySelector('p').classList.remove("class1");
+document.querySelector('p').classList.toggle("class1"); // if has class1 remove it, else add it
+```
+
+#### Parent, Children and Sibling
+
+```javascript
+let a = document.querySelector('p');
+let parent = a.parentElement;
+let children = a.children;
+let prevSibling = a.previousElementSibling; // actual element
+prevSibling = a.previousSibling; //DOM node
+
+let nextSibling = a.nextElementSibling; // actual element
+nextSibling = a.nextSibling; // DOM node
+```
+
+### Create New Element
+
+#### Child
+
+```javascript
+let img = document.createElement('img');
+img.src = "http://...";
+img.classList.add('square');
+
+// add to as child
+// way 1 to add to document
+document.body.appendChild(img);
+
+// way 2
+ParentNode.prepend(); //add as first child
+ParentNode.append(); //add as last child
+```
+
+#### Sibing
+
+```javascript
+let h2 = document.createElement('h2');
+let h1 = document.querySelector('h1');
+// position can be
+// 'beforebegin': Before the targetElement itself.
+// 'afterbegin': Just inside the targetElement, before its first child.
+// 'beforeend': Just inside the targetElement, after its last child.
+// 'afterend': After the targetElement itself.
+h1.insertAdjacentElement(position, h2);
+
+// way 2
+h1.after(h2);
+h1.before(h2);
+```
+
+## Window
+
+The stype value of the html could not be found in document(the value queryis empty). We could use window object to access it.
+
+```javascript
+window.getComputedStyle(h1).color
+```
+
+## Event
+
+### Event Listener
+
+```javascript
+btn.addEventListener("click", function() {}, {once: true}); // can add multiple callback
+```
+
+### Click Event
+
+```javascript
+btn.addEventListener("click", function(event) { //event object is come with javascript
+  console.log(event)
+});
+```
+
+### Key Event
+
+```javascript
+btn.addEventListener("keydown", function(event) { //event object is come with javascript
+  console.log(event.key);  // value of the key value
+  console.log(event.code); // postion of the key
+});
+```
+
+### Form Event
+
+```javascript
+const form = document.querySelector("#form");
+form.addEventListener("submit", function (event) {
+  event.preventDefault(); // prevent default action of the submit form action
+   // username here is  the name attribute value of the element inside the form.
+  console.log(this.elements.username.value);
+})
+```
+
+### Change Event
+
+```javascript
+const input = document.querySelector('input');
+input.addEventListener('change', function (e) {
+  	// only fire when lose focus on cursor.
+})
+```
+
+### Input Event
+
+```javascript
+const input = document.querySelector('input');
+input.addEventListener('input', function (e) {
+  	 console.log(input.value);
+  	// every letter change counts
+})
+```
+
+### Event Bubbling
+
+The event will be bublle up to parent level and trigger same type parent event if any.To prevent such bahaviour, we use `stopPropagation()` to stop it.
+
+```javascript
+input.addEventListener('input', function (event) {
+	event.stopPropagation();
+})
+```
+
+### Event Delegation
+
+Elements were created dynamically by javascript does not have any **event listener**.To solve this issue, we can implement the event listener at their parent level and accessing them by `event.target`.
+
+```javascript
+// container is the parent of tag li
+container.addEventListener('click', function(event) {
+  // ensure the type is the one you are trying to remove
+   event.target.nodeName === "LI" && event.target.remove();
+})
 ```
 
