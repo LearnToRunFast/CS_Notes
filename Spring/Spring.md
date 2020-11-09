@@ -1,3 +1,7 @@
+[toc]
+
+
+
 # Spring
 
 Sprint is a dependency Injection framework.
@@ -25,13 +29,13 @@ class BinarySearch {
 
 With the code above, we consider use sort algorithm inside binarySearch class, we said that `BinarySearch` is dependent on `BubberSort`. In future, If we wanna use other other SortAlgo, we need to modify the `BinarySearch` class which is not a good practice. We said `BinarySearch` is **highly coupled** with `BubberSort`.
 
-**Note**:A good practice is we should follow `Open Close Princeple`, Open code for extension and close for modification. We should avoid modify existing class as most as possible.
+> **_Note:_** A good practice is we should follow `Open Close Princeple`, Open code for extension and close for modification. We should avoid modify existing class as most as possible.
 
 #### Loose Couling
 
 A better version is instead of hard coding the type inside method, we pass it as constructor argument. In this case, we can avoid modify `BinarySearch` if we decide to use different type of algorithm. See code below for more details.
 
-**Note**: `SortAlgo` here should be an interface, any algorithm classes should `implements` this interface so that they can be used by `BinarySearch` class.
+> **_Note:_** `SortAlgo` here should be an interface, any algorithm classes should `implements` this interface so that they can be used by `BinarySearch` class.
 
 ```java
 class BinarySearch {
@@ -74,6 +78,29 @@ on top of one class to change the scope of that bean to `prototype`
 ## Application Context
 
 Spring will create an application context to manage all the beans.
+
+### Component Scan
+
+Scan the package name for add bean into context.
+
+```java
+@SpringBootApplication() == @ComponentScan("Current_Package_name");
+
+@SpringBootApplication()  // include scan for current package
+@ComponentScan("Another_Package_name"); // add another scan to current package.
+```
+
+### Bean Life Cycle
+
+```java
+@PostConstruct
+public void PostConstrcut() {} // will be called after construction of the bean
+
+@PreDestroy
+public void preDestory() {} // before the instances get removed.
+```
+
+
 
 ## Dependency Injection
 
@@ -124,7 +151,7 @@ class BinarySearch {
 }
 ```
 
-**Note**: What happen if we use `@Primary` to `BubberSort` and use the naming method to `quickSort`? In this case, `@Primary` has higher priority win the game.
+> **_Note:_** What happen if we use `@Primary` to `BubberSort` and use the naming method to `quickSort`? In this case, `@Primary` has higher priority win the game.
 
 3. Add qualifier. Add a qualifier using `@Qualifier` for both sort algorithms and specify which sort algorithm to use by specify the qualifier.
 
@@ -143,4 +170,51 @@ class BinarySearch {
 	//...
 }
 ```
+
+### Dependencies Scope
+
+Normally the scope of a dependency will remain `Singleton` if it's dependent class is `Singleton`. To solve this issue, we need to add the proxy setting to the dependency.
+
+```java
+@Scope(value=ConfigurableBeanFactory.SCOPE_PROTOYPE,
+       proxyMode=ScopedProxyMode.TARGET_CLASS)
+```
+
+## Contexts and Dependency Injection(CDI)
+
+```java
+@Inject (@Autowired)
+@Named (@Component)
+@Singleton (Defines a scope of Singleton)
+@Qualifier (@Qualifier)
+```
+
+## Spring Native
+
+```java
+@Configuration
+@ComponentScan
+public class SpringBasicApplication {
+  public static void main(String[] args) {
+    ApplicationContext context = new AnnotationCOnfigApplicationContext(SpringBasicApplication.class);
+    //...
+    ((AnnotationCOnfigApplicationContext) content).close();
+  }
+}
+```
+
+## Read Value From External File
+
+```java
+// create a app.properties on resource folder
+external.service.url = "http://..."
+  
+// on dependency class
+@value(${external.service.url})
+  
+// on application context
+@PropertySource("classpath:app.properties")
+```
+
+## Test with Junit
 
