@@ -216,5 +216,62 @@ external.service.url = "http://..."
 @PropertySource("classpath:app.properties")
 ```
 
-## Test with Junit
+## Testing
+
+### Test with Junit
+
+Spring Boot projects with versions >= 2.2.0 use JUnit 5 by default.
+
+| Description                                                  | JUnit 4                                                      | JUnit 5                                                      |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Test Annotation Changes                                      | `@Before` `@After` `@BeforeClass` `@AfterClass` `@Ignore`    | `@BeforeEach` `@AfterEach` `@BeforeAll` `@AfterAll` `@Disabled` |
+| Use `@ExtendWith` instead of `@RunWith`                      | `@RunWith(SpringJUnit4ClassRunner.class)` `@RunWith(MockitoJUnitRunner.class)` | `@ExtendWith(SpringExtension.class)`  `@ExtendWith(MockitoExtension.class)` |
+| Package changes to `org.junit.jupiter`                       | `org.junit.Test;`  `org.junit.Assert.*;`                     | `org.junit.jupiter.api.Test;`  `org.junit.jupiter.api.Assertions.*;` |
+| `@RunWith` is NOT needed with `@SpringBootTest`, `@WebMvcTest`, `@DataJpaTest` | `@RunWith(SpringRunner.class)` `@SpringBootTest(classes = DemoApplication.class)` | `@SpringBootTest(classes = DemoApplication.class)`           |
+
+### Test using Mockito
+
+```java
+@RunWith(MockitoJUnitRunner.class) // add this to support @mock and @Inject
+public class SomeMockTest {
+  
+  @Mock
+  DataService dataServiceMock; // data that need to be mocked
+  
+  @Inject
+  SomeBusinessImpl  businessImpl; // business logic that depend on mocked object 
+  
+  // with no argument
+  @Test
+  public void testWithSth() {
+    when(dataServiceMock.getData()).thenReturn(new int{15});
+    int result = businessImpl.getMax();
+    assertEquals(15, result);
+  }
+  
+  // with interface
+  //multiple return value
+  @Test
+  public void testWithSize() {
+    List listMock = mock(List.class);
+    when(listMock.size()).thenReturn(10).thenReturn(20); //first call return 10, else return 20
+    assertEquals(10, listMock.size());
+    assertEquals(20, listMock.size());
+  }
+  
+  // one or more argument
+  @Test
+  public void testWithSize() {
+    List listMock = mock(List.class);
+    when(listMock.get(0)).thenReturn("someString");
+    assertEquals("someString", listMock.get(0));
+    assertEquals(null, listMock.get(1));
+    
+    when(listMock.get(Mockito.anyInt())).thenReturn("someString");
+    assertEquals("someString", listMock.get(5));
+    assertEquals("someString", listMock.get(10));
+    
+  }
+}
+```
 

@@ -38,6 +38,8 @@ export class AppComponent {}
 
 ## Module
 
+Run `ng generate module MODULE_NAME --routing`
+
 ```ts
 import { BrowserModule } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
@@ -55,10 +57,25 @@ import { AppComponent } from './app.component';
     FormsModule,
     HttpModule
   ],
-  providers: [],
+  providers: [], // old way to connect modules
   bootstrap: [AppComponent] // tell bootsrap to run the component when compile
 })
 export class AppModule { }
+```
+
+### Module Communication
+
+```ts
+// component needed to be used
+@NgModule({
+	exports: [Component_Name] // Component_Name should be replace by real component name
+})
+
+// app module
+import  {Module_Name } from "Module_Path"
+@NgModule({
+	imports: [Module_Name]
+})
 ```
 
 ## Data Binding
@@ -132,8 +149,6 @@ export class AppComponent {
 }
 ```
 
-
-
 ### Two Way Binding
 
 For Two-Way-Binding to work, need to enable the `ngModel directive` This is doen by adding `FormsModule` to the `imports[]` array in the AppModule, and import `{ FormsModule } from @angular/forms` at top.
@@ -145,25 +160,6 @@ Eg. `[(ngModel)]="serverName"`
 ## Directives
 
 Directives are instructions in the DOM.
-
-### Structure Directives
-
-Adds or removes HTML elements
-
-### Ng-if
-
-`*ngIf="isReal"`
-
-```ts
-<p *ngIf="isReal"; else notReal">
-<ng-template #notReal>
-<p></P>
-</ng-template>
-```
-
-### Ng-for
-
-`*ngFor="let server of servers; let i = index"`
 
 ### Attribute Directives
 
@@ -179,7 +175,153 @@ Change style dynamically.
 
 Change class dynamically.
 
-`[ngClass]="{online: status == 'online'}"`
+##### Single Class
+
+`[ngClass]="{online: status === 'online'}"`， if status is 'online', it will add `online` class to current element.
+
+##### Condition Class
+
+```ts
+// html
+<li [ngClass]="getClass()"> </li>
+// on ts
+getClass() {
+  if (condition) {
+    return "class1";
+  }
+  if (condition) {
+    return "class2";
+  }
+}
+```
+
+##### Multiple Class
+
+```java
+// html
+<li [ngClass]="getClass()"> </li>
+// on ts
+getClass() {
+  class = []
+  if (condition) {
+    class.push("class1");
+  }
+  if (condition) {
+    class.push("class2");
+  }
+  return class;
+}
+```
+
+#### Custom Attribute Directives
+
+Run `ng generate directive directive_name`
+
+```ts
+//first approach
+// html
+<h1 appClass [backgroundColor]= " 'orange' "> </h1>
+
+// ts
+import { Directive, ElementRef, Input } from '@angular/core';
+
+@Directive({
+  selector: '[appClass]'
+})
+export class ClassDirective {
+  constructor(private element: ElementRef) { // element here will the element that this directive use to.
+  }
+  
+  @Input() set backgroundColor(color: string) {
+    this.element.nativeElement.style.backgroundColor = color;
+  }
+}
+
+// below approach is equivalent to the approach above
+
+// html
+<h1 [appClass]= " {} "> </h1>
+
+// ts
+import { Directive, ElementRef, Input } from '@angular/core';
+
+@Directive({
+  selector: '[appClass]'
+})
+export class ClassDirective {
+  constructor(private element: ElementRef) { // element here will the element that this directive use to.
+  }
+  // @Input('appClass') tell the html to look for appClass attributes
+  // so the html will be <h1 appClass [appClass]= " 'orange' "> </h1>
+  // since appClass and [appClass] having same name we can combine it 
+  // <h1 [appClass]= " 'orange' "> </h1>
+  @Input('appClass') set classNames(classObj: any) {
+    for (let key in classObj) {
+      if (classObj[key]) {
+				this.element.nativeElement.classList.add(key);
+      } else {
+        this.element.nativeElement.classList.remove(key);
+      }
+    }
+  }
+}
+```
+
+### Structure Directives
+
+Adds or removes HTML elements
+
+#### Ng-if
+
+`*ngIf="isReal"`
+
+```ts
+<p *ngIf="isReal"; else notReal">
+<ng-template #notReal>
+<p></P>
+</ng-template>
+```
+
+#### Ng-for
+
+`*ngFor="let server of servers; let i = index"`
+
+#### Custom Structure Directives
+
+Run `ng generate directive directive_name`
+
+```ts
+//first approach
+// html
+<h1 *appTimes=5> </h1>
+
+// ts
+import { Directive, TemplateRef, ViewContainerRef, Input } from '@angular/core';
+
+@Directive({
+  selector: '[appTimes]'
+})
+export class ClassDirective {
+  constructor(
+  // ref to html element, viewcontainerRef provides more element control.
+  	private viewComtainer: ViewContainerRef, 
+     // ref to child element
+    private templateRef: TemplateRef<any>) {}
+  
+  @Input('appTimes') set render(times: number) {
+    this.viewContainer.clear(); //reset the child elements
+    // context object that are variables that can accessed by html
+    let contextObj = {
+        index: i  
+      }
+    for (let i = 0; i < times; i++) {
+      this.viewContainer.createEmbeddedView(this.templateRef, contextObj);
+    }
+  }
+}
+```
+
+
 
 ## Models
 
@@ -253,5 +395,67 @@ export class ConvertPipe implements PipeTransform {
     return null;
   }
 }
+```
+
+## Routing
+
+Run `ng new comps --routing`
+
+```ts
+
+import { NgModule } from '@angular/core';
+import { Routes, RouterModule } from '@angular/router';
+import { ElementsHomeComponent } from 'elements_path';
+
+const routes: Routes = [
+  // change the routing order by edit the imports modules in app.module.ts
+  { path: 'elements', component: ElementsHomeComponent },
+  { path: '**', component: NotFoundComponent}
+];
+
+@NgModule({
+  imports : [RouterModule.forChild(routes)],
+  exports: [RouterModule]
+})  
+export class ElementsRoutingModule {}
+
+
+// app.component.html
+<a routerLink="/elements" routerLinkActive="active">Elements</a> /// active is a class name  
+<a routerLink="/collections" routerLinkActive="active">Collections</a>
+<router-outlet></router-outlet>
+```
+
+## Lazy Loading
+
+```ts
+// app routing module
+const routes: Routes = [
+  // change the routing order by edit the imports modules in app.module.ts
+  { path: 'elements', 
+   loadChildren: () => 
+   		import('./elements/elements.module').then(m => m.ElementsModule)
+  }
+];
+
+
+```
+
+## NG-Content
+
+`<ng-content>` will use inside the reuse component
+
+```html
+<!-- reuse template -->
+<h1>
+<ng-content> </ng-content>
+</h1>
+
+<!-- main template -->
+<app-reuse>
+  Hello <!-- now, ng-content will has content Hello -->
+</app-reuse>
+
+
 ```
 
