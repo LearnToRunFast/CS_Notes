@@ -350,6 +350,17 @@ export class Recipe {
 
 Special selector `:host` to style own component.
 
+`:host:not(:first-of-type)` choose every element except for first one.
+
+```css
+# hide the element if it is empty.
+div.header:empty {
+	display: none;
+}
+```
+
+
+
 ## Pipe
 
 Pipe is a value formatter in Angular.
@@ -421,10 +432,28 @@ export class ElementsRoutingModule {}
 
 
 // app.component.html
+[routerLinkActiveOptions]="{ exact: true}" // only active if it is exact match
 <a routerLink="/elements" routerLinkActive="active">Elements</a> /// active is a class name  
 <a routerLink="/collections" routerLinkActive="active">Collections</a>
 <router-outlet></router-outlet>
 ```
+
+### Routing Children
+
+```ts
+const routes: Routes = [
+  {
+    path: '',
+    component: CollectionsHomeComponent,
+    children: [
+      { path: '', component: Child1Component},
+      { path: 'partners', component: Child2Component}
+    ]
+	}
+]
+```
+
+
 
 ## Lazy Loading
 
