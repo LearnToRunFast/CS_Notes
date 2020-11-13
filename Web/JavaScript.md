@@ -347,3 +347,61 @@ container.addEventListener('click', function(event) {
 })
 ```
 
+## Promises
+
+To reduce the complexity of callback function.
+
+```javascript
+const delayedColorChange = (color, delay) => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      document.body.style.backgroundColor = color;
+      resolve();
+    }, delay);
+  });
+}
+
+delayedColorChange('red', 1000)
+	.then(() => delayedColorChange('orange', 1000))
+	.then(() => {
+  		return delayedColorChange('blue', 1000)}) // this is same as one line return
+	.then(() => delayedColorChange('yellow', 1000))		
+```
+
+## Async & Await
+
+### Async
+
+Async function will always return a promise.
+
+```javascript
+// any error happened inside an async function will result to promise rejected status.
+const login = async (username, password) => {
+  if (!username || !password) throw "Miss Credentials";
+  if (password == "correctPassword") return "Welcome";
+  throw "Invalid Password"
+}
+
+login("fhjdksh", "correctPassword")
+	.then(msg => {
+  	console.log("Logged In");
+	})
+	.catch(err => {
+  	console.log("error");
+	})
+```
+
+### Await
+
+Wait for promise to be resolved.
+
+```javascript
+async function rainbow() {
+	await delayedColorChange('red', 1000);
+	await delayedColorChange('orange', 1000);
+  return "Done";
+}
+```
+
+## AJAX
+
