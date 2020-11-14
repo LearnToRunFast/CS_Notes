@@ -405,3 +405,34 @@ async function rainbow() {
 
 ## AJAX
 
+```javascript
+fetch('http://...')
+	.then(res => {
+		return res.json(); // promise object
+	})
+	.then(data => {
+		console.(data);
+	})
+	.catch(e => {
+		
+	})
+
+
+// second way
+const fetchPrice = async () => {
+  const res = await fetch("http://...");
+  const data = await.res.json();
+  console.log(data.ticker.price);
+}
+```
+
+## Axios
+
+```javascript
+const getJoke = async () => {
+  const config = { params: {q: "searchTerm"}, headers : { Accept: 'application/json'}};
+  const res = await axios.get("https://...");
+  console.log(res.data.joke);
+}
+```
+
