@@ -149,9 +149,9 @@ export class AppComponent {
 }
 ```
 
-### Two Way Binding
+### Two Way Binding(ngModel)
 
-For Two-Way-Binding to work, need to enable the `ngModel directive` This is doen by adding `FormsModule` to the `imports[]` array in the AppModule, and import `{ FormsModule } from @angular/forms` at top.
+For Two-Way-Binding to work, need to enable the `ngModel directive` This is done by adding `FormsModule` to the `imports[]` array in the AppModule, and import `{ FormsModule } from @angular/forms` at top.
 
 Use `[(ngModel)]` 
 
