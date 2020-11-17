@@ -438,3 +438,158 @@ const getJoke = async () => {
 
 # Node JS
 
+## Program Argument
+
+```js
+const args = process.argv;
+// first argument is the node path
+// second argument is current script location
+// third onwards are the arguments passed in.
+```
+
+## Module
+
+```js
+// DIY math library
+const add = (x, y) => x + y;
+const PI = 3.14159;
+const sqaure = x => x * x;
+module.exports.add = add;
+module.exports.PI = PI;
+module.exports.square = square;
+exports.add = add; // shortcut
+// other js file can use the DIY math library on top by
+const math = require("./math"); // assume the math library located on same folder.
+```
+
+### Index.js
+
+Index.js is the main file or entry file for Node JS.
+
+## NPM
+
+Node library management tool.
+
+### Some Fun Libraries
+
+- Colors: Color your text
+- Figlet: Making a 2D text
+
+### Create a Package.json
+
+```zsh
+npm init
+```
+
+### ^ and ~ in Package.json
+
+- `~version` **“Approximately equivalent to version”**, will update you to all future patch versions, without incrementing the minor version. `~1.2.3` will use releases from 1.2.3 to <1.3.0.
+
+- `^version` **“Compatible with version”**, will update you to all future minor/patch versions, without incrementing the major version. `^2.3.4` will use releases from 2.3.4 to <3.0.0.
+
+### Install Dependencies
+
+Install the dependencies of the project base on package.json file
+
+```zsh
+npm install
+```
+
+### Auto Restart Server
+
+```zsh
+npm install nodemon
+nodemob <node_app_name>
+```
+
+## Express
+
+```js
+const express = require("express")
+const app = express()
+
+// general method
+app.use((req, res) => {
+  console.log("...")
+  console.dir(req)
+})
+
+// set view engine
+app.set('view engine', 'ejs')
+
+// root route
+app.get('/', (req, res) => {
+  res.send("This is home page")
+})
+
+// match route
+app.get("/r/:subreddit", (req, res) => {
+  const { subreddit } = req.params;
+  res.send("this is match any thing with /r/...")
+})
+
+// query string
+app.get("/search", (req, res) => {
+	const { q } = req.query;
+  res.send("the query string is ${q}")
+})
+
+app.listen(8080, () => {
+  console.log("Listening on port 8080")
+})
+
+
+```
+
+## Templating With EJS
+
+```js
+const express = require("express")
+const path = require("path")
+const app = express()
+
+app.set('view engine', 'ejs')
+// relative path of template
+app.set('views', path.join(__dirname,'/views'))
+
+// with this, now template can access the file inside public folder
+app.use(express.static(path.join(__dirname,'/public'))) //static resource
+
+app.get('/', (req, res) => {
+  res.render('home') // home located at ./views/home.js
+})
+
+app.get('/rand', (req, res) => {
+  const num = Math.floor(Math.random() * 10 + 1)
+  res.render('random', {num}) // short form
+  res.render('random', {num: num}) // pass data to template
+})
+```
+
+### Template
+
+```ejs
+<!--ejs syntax -->
+
+<!-- render -->
+<%= num %>  
+
+<!-- if else -->
+ <% if (num % 2 === 0) { %>
+ <h2> This is Even</h2>
+<% } else { %>
+<h2>this is odd</h2>
+<% } %>
+
+<!-- ternary -->
+<h3>That number is: <%= num%2 === 0 ? 'even' : 'odd' %></h3>
+
+<!-- for -->
+<% for(let cat of cats) { %>
+<li><%= cat %></li>
+<% } %>
+
+<!-- include partial template(reusable parts) -->
+<%- include('partials/head') %>
+```
+
