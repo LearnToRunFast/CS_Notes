@@ -552,6 +552,10 @@ app.set('view engine', 'ejs')
 // relative path of template
 app.set('views', path.join(__dirname,'/views'))
 
+// enable access parammeter at req.body
+app.use(express.urlencoded({extended: true}))
+app.use(express.json())
+
 // with this, now template can access the file inside public folder
 app.use(express.static(path.join(__dirname,'/public'))) //static resource
 

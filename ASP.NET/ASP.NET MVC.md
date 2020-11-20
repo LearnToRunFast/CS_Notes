@@ -1,8 +1,12 @@
-## ASP.net MVC
+[toc]
 
-### MVC
+# ASP.net MVC
 
-**Model:**Data model
+## MVC
+
+### Model
+
+Data Model
 
 ```c#
 namespace xxx.Models {
@@ -13,9 +17,13 @@ namespace xxx.Models {
 }
 ```
 
-**View:**HTML markup that display to the user.
+### View
 
-**Controller:**Resposible to handling HTTP request which contains bunch of ActionResults.
+HTML markup that display to the user.
+
+### Controller
+
+Resposible to handling HTTP request which contains bunch of ActionResults.
 
 ```c#
 // code snippet of a movie controller
@@ -32,7 +40,11 @@ public class MoviesController : Controller
 }
 ```
 
-**ActionResult:**Generic type. Below are child types of action result.
+## Action
+
+### ActionResult
+
+Generic type. Below are child types of action result.
 
 |        Type        |   Helper Method   |
 | :----------------: | :---------------: |
@@ -45,13 +57,15 @@ public class MoviesController : Controller
 | HttpNotFoundResult |  HttpNotFound()   |
 |    EmptyResult     | new EmptyResult() |
 
-**Action Parameters:**
+### Action Parameters
 
 1. Embedded in the URL:/movie/edit/1
 2. In the query string: /movie/edit?id=1
 3. In the form data
 
-**Router:** Select the right controller to handle a request
+## Router
+
+Select the right controller to handle a request
 
 ```c#
 // example of custom route
@@ -62,7 +76,9 @@ routes.MapRoute("MoviesByReleaseDate",
                new {year = @"\d{4}", month = @"\d{2}"});// @ sign here to avoid double \\
 ```
 
-**Attribute Routing:** (better verion of routing)
+### Attribute Routing
+
+(better verion of routing)
 
 ```c#
 // on ROuteConfig.cs
@@ -76,7 +92,7 @@ routes.MapMvcAttributeRoutes();
 public ActionResult ByReleaseYear(int year, int month) { ... }
 ```
 
-**Passing data to view:**
+#### Passing data to view
 
 1. Normal way
 
@@ -132,9 +148,13 @@ TempData.Keep()
 TempData.Keep()
 ```
 
-**ViewModel:** Model specifically built for a view.It includes any data and rules specific to that view(usually combine two or more models together).
+## ViewModel
 
-**Razor sytax:** support html and C# on cshtml
+Model specifically built for a view.It includes any data and rules specific to that view(usually combine two or more models together).
+
+## Razor sytax
+
+support html and C# on cshtml
 
 ```c#
 // on cshtml
@@ -160,14 +180,18 @@ TempData.Keep()
 <h2 class="@className">... </h2>
 ```
 
-**Partial View:** Break View into different small pieces for better maintainability(by convention start naming with a "_").
+## Partial View
+
+Break View into different small pieces for better maintainability(by convention start naming with a "_").
 
 ```c#
 // after create a partial view, simple render it by using
 @Html.Partial("_NavBar", Model.Movie);// 2nd argument is optional Model passing
 ```
 
-**Link Creation:**There are various ways to create links
+## Link Creation
+
+There are various ways to create links
 
 1. ```html
    // raw html
@@ -183,5 +207,5 @@ TempData.Keep()
    @Html.ActionLink("View Movies", "Index", "Movies", new {id = 1}, null); 
    ```
 
-**Entity Framework(Oject Relational Mapper)**
+## Entity Framework(Oject Relational Mapper)
 
