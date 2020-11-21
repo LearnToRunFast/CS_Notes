@@ -1,7 +1,5 @@
 [toc]
 
-
-
 # Virtualizaiton of CPU
 
 ## Key CPU virtualization terms
