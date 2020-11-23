@@ -81,3 +81,118 @@ BSON simply stands for “Binary JSON,” and that’s exactly what it was inven
 | Encoding     | UTF-8 String                   | Binary                                                       |
 | Data Support | String, Boolean, Number, Array | String, Boolean, Number (Integer, Float, Long, Decimal128...), Array, Date, Raw Binary |
 | Readability  | Human and Machine              | Machine Only                                                 |
+
+## Mongoose
+
+```js
+const mongoose = require('mongoose');
+mongoose.connect('mongodb://localhost:27017/movieApp', {useNewUrlParser:true, useUnifiedTopology: true})
+				.then(() => {
+  				console.log("connection open");
+				})
+				.catch(err => {
+  				console.log(err);
+				})
+```
+
+### Schema
+
+```js
+// schema 1
+const movieSchema = new mongoose.Schema({
+	title: {
+    type: String,
+    required: true,
+    maxlength:20
+  },
+  year: {
+    type: Number,
+    required: false,
+    min:[0, "the year must be greater than 0"] // second argument is validattion msg
+  },
+  categories: [String],
+  isShowing: {
+    type: Boolean,
+    default: false
+  }
+});
+// schema 2
+const movieSchema = new mongoose.Schema({
+  title: String,
+  year: Number,
+  score: Number,
+  rating: String
+});
+```
+
+### Schema Function
+
+#### Instance Function
+
+```js
+// adding instance function to schema
+movieSchema.methods.updateYear = function (year) {
+  this.year = year;
+  console.log(`- from ${this.title}`);
+  return this.save();
+}
+```
+
+#### Static Function
+
+```js
+// adding static function to schema
+movieSchema.statics.nowShowing = function () {
+  return this.updateMany({}, {isShowing: true});
+}
+```
+
+#### Virtual
+
+```js
+// virtual
+personSchema.virtual('fullName').get(function() {
+  return `${this.firstName} ${this.lastName}`;
+})
+```
+
+### Model
+
+```js
+// model
+const Movie = mongoose.model('Movie', movieSchema);
+```
+
+### Insert
+
+```js
+// movie object
+const movie = new Movie({title: "name", year:1986, score:9.2, rating: "good"});
+// insert
+movie.save();
+// insert
+Movie.insertMany([
+  {}, //movie object 1
+  {} // movie object 2
+])
+```
+
+### Find
+
+```js
+// find
+Movie.find({rating: 'PG-13'}). then(data => console.log(data))
+```
+
+### Pre and Post Middleware
+
+```js
+var personSchema;
+personSchema.pre('save', async function() {
+  console.log("before save");
+})
+personSchema.post('save', async function() {
+  console.log("after save");
+})
+```
+
