@@ -1,22 +1,43 @@
 [toc]
 
-# Shell
+# MIT: missing-semesters(2020)
 
-## Shebang
+## Shell
+
+### Environment Path
+
+The environment path stores all the runnable command path of the system. Eg. `echo` is in the environment path so that we can use it directly inside the shell.
+
+To find out the location, type `which echo`.
+
+#### Environment Variable $PATH
+
+All environment paths is stored inside a global variable called `PATH` and all the paths are seperated by `:`. To see the content of the it by typing `$PATH`.
+
+#### Add Path
 
 ```bash
-#!/usr/bin/env python
+export PATH=$PATH:/place/with/the/file # add the new path to the tail of PATH
+# or
+export PATH=/place/with/the/file:$PATH # add the new path to the head of PATH
+```
+
+### Shebang
+
+```sh
+#!/usr/bin/env zsh #more dynamic
+#!/usr/bin/zsh  #Actual path
 ```
 
 By indicate the first line of this, we tell the shell the default Interpretor for this script.
 
-## Checking Scripts
+### Checking Scripts
 
 ```bash
 shellcheck mcd.sh	
 ```
 
-## Symbol
+### Symbol
 
 ```bash
 missing:~$ 
@@ -30,7 +51,7 @@ The `$` tells you that you are not the root user (more on that later).
 
 `$PATH` refer to environment path, any path inside it can be directly executed.
 
-## Navigation
+### Navigation
 
 `cd` change dirctory
 
@@ -40,7 +61,7 @@ The `$` tells you that you are not the root user (more on that later).
 
 `-` prev visited dictory
 
-## Common Commands
+### Common Commands
 
 `man` instruction manual page, eg `man ls` will show you how to use `ls`
 
@@ -61,7 +82,9 @@ The `$` tells you that you are not the root user (more on that later).
 
 `diff` check different between two files
 
-## Permission
+`Ctrl + l` clear the terminal
+
+### Permission
 
 ```bash
 missing:~$ ls -l /home
@@ -103,7 +126,7 @@ The next 9 letters break down into three parts, they are corresponding to perssm
 - `g` group of the owner
 - `o` anyone else
 
-## Redirection
+### Redirection
 
 `>` as output to, eg `echo hello > 1.txt`, the output of `echo hello` will store in `1.txt`
 
@@ -117,7 +140,7 @@ The next 9 letters break down into three parts, they are corresponding to perssm
 
 `>>` append instead overwrite
 
-## Assignment
+### Assignment
 
 `foo=bar` assign `bar` to variable `foo`, `echo $foo` will output `bar`
 
@@ -125,7 +148,7 @@ The next 9 letters break down into three parts, they are corresponding to perssm
 
 `foo=$(pwd)` store the pwd result into foo
 
-##  Quotation
+###  Quotation
 
 ` ''` echo 'value is $foo' will treat `$foo` as normal string
 
@@ -133,7 +156,7 @@ The next 9 letters break down into three parts, they are corresponding to perssm
 
 "``" will execute the content inside it
 
-## Function
+### Function
 
 ### Arguments And Special Variables
 
@@ -167,11 +190,11 @@ source mcd.sh
 mcd test
 ```
 
-## Output
+### Output
 
 `/dev/null` A magic place to write the useless thing to it, it will automatically discard it.
 
-## Globbing
+### Globbing
 
 `*` match everything
 
@@ -181,3 +204,4 @@ mcd test
 
 `{foo, bar}/{a..j}` expand to fooa to fooj and bara to barj
 
+## Vim
