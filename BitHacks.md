@@ -1,6 +1,6 @@
 # Bit Related Knowledge
 
-## Type of Bit Reprensentation 
+## Type of Bit Reprensentation
 
 #### One's Complement(unsign integer)
 
