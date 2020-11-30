@@ -153,6 +153,91 @@ console.log(language.log);
 // expected output: Array ["EN", "FA"]
 ```
 
+## Prototypes
+
+Prototypes are the mechanism by which JavaScript objects inherit features from one another.
+
+In JavaScript, every objects come with attributes called `__proto__` which refers to that object's prototype property.
+
+Protoypes of Array in JavaScript:
+
+```js
+Array.prototype  // are the list of functions that you can access it from any object of array
+
+const arr = [1,2,3]
+arr.push(4) // push is defined in Array.prototype
+
+// we can add method to Array object
+Array.prototype.yell = function() {
+  console.log("yell at you")
+}
+// now you can access it
+arr.yell();
+```
+
+## New Keyword
+
+```js
+function Car(make, model, year) {
+  this.make = make;
+  this.model = model;
+  this.year = year;
+}
+Car.prototype.getModel = function() {
+  const { model } = this; // deconstruct
+  return model; 
+}
+// the steps to new keyword
+// 1. Creates a blank, plain JavScript object
+// 2. link (sets the constructor of) this object to another object
+// 3. passes the newly created object from step 1 as the this context
+// 4. return this if the function doesn't return it's own object
+const newCar = new Car("China", "01", "2020");
+
+```
+
+## JavaScript Class
+
+```js
+class Car {
+  // constrcutor will run for every new keyword
+  constructor(make, model , year) {
+    this.make = make;
+    this.model = model;
+    this.year = year;
+  }
+  getModel() {
+    return this.model;
+  }
+}
+```
+
+## Super and Extend
+
+```js
+class Pet {
+  constructor(name, age) {
+    this.name = name;
+    this.age = age;
+  }
+  ear() {
+    return `${this.name} is eating`; 
+  }
+}
+// will extend the __proto__ from it's parent
+class Cat extends Pet {
+  constructor(name, age, livesLeft = 9) {
+    // will call the parent constructor
+    super(name, age);
+    this.livesLeft = livesLeft;
+  }
+	meow() {
+    return "MEOWWWW!";
+  }
+}
+
+```
+
 # Document Object Model(DOM)
 
 The `Document` object is the entry point of DOM. It contains representations of all the content on a page, plus tons of useful methods and properties.
@@ -509,6 +594,7 @@ const express = require("express")
 const app = express()
 
 // general method
+// this method will run for every request
 app.use((req, res) => {
   console.log("...")
   console.dir(req)
@@ -540,6 +626,60 @@ app.listen(8080, () => {
 
 
 ```
+
+### Express Middleware
+
+```js
+// app.use will be called for every request
+app.use((req, res, next) => {
+	consolo.log("this is my first middleware");
+  // now you can access req.requestTime for every request
+  req.requestTime = Date.now();
+  console.log(req.method, req.path);
+  
+  // if we dont return here, it will continue to run after invocation of next function
+  // next will be the routing method
+	return next();
+})
+```
+
+#### Specify Route with Middleware
+
+```js
+// this will get called for every same path
+app.get('/dogs', (req, res, next) => {
+  consolo.log("this will only run with same path")
+})
+```
+
+#### 404 Path
+
+```js
+// this should be place just before app.listen
+app.use((req, res) => {
+  res.status(404).send("NOT FOUND!");
+})
+```
+
+#### Multiple Callback
+
+```js
+const verifyPassword = (req, res, next) => {
+  	const { password } = req.query;
+  if (password === 'realpassword') {
+    next();
+  }
+  res.send("sorry, you have to enter correct passwordd");
+}
+const secondCallBack = (req, res) => {
+  res.send("My secrect is ...");
+}
+// now the next() in verify password refer to secondCallBack
+// the secondCallBack will only can be run if there is next() execution on firstCallBack
+app.get('/secrect', verifyPassword, secondCallBack);
+```
+
+
 
 ## Templating With EJS
 
