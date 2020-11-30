@@ -84,6 +84,50 @@ The `$` tells you that you are not the root user (more on that later).
 
 `Ctrl + l` clear the terminal
 
+`sed` find and replace text
+
+- `sed -E s/old/new` the `-E` will make `sed` support new sytax of regular expression
+
+  `uniq -c` collapse consecutive lines that are the same into a single line, prefixed with a count of the number of occurrences.
+
+`sort -nk1,1` `sort -n` will sort in numeric (instead of lexicographic) order. `-k1,1` means “sort by only the first whitespace-separated column”. The `,n` part says “sort until the `n`th field, where the default is the end of the line. 
+
+`head` `head -n10` take the top 10 lines
+
+`tail` `tail -n5` take the bottom 5 lines
+
+`wc` `wc -l` count the number of lines
+
+`paste` `paste -sd` combine lines (`-s`) by a given single-character delimiter (`-d`; `,` in this case).
+
+#### Awk
+
+`awk` programs take the form of an optional pattern plus a block saying what to do if the pattern matches a given line. 
+
+The default pattern (which we used above) matches all lines. Inside the block, `$0` is set to the entire line’s contents, and `$1` through `$n` are set to the `n`th *field* of that line, when separated by the `awk` field separator (whitespace by default, change with `-F`). Some example list on below
+
+```shell
+awk '{print $2}'
+```
+
+For every line, print out the second field of the line.
+
+```shell
+awk '$1 == 1 && $2 ~ /^c[^ ]*e$/ { print $2 }'
+```
+
+If first field equals `1` and second field match the regular expression, print it out.
+
+```shell
+BEGIN { rows = 0 }
+$1 == 1 && $2 ~ /^c[^ ]*e$/ { rows += $1 }
+END { print rows }
+```
+
+More detail, look out [here](https://backreference.org/2010/02/10/idiomatic-awk/).
+
+
+
 ### Permission
 
 ```bash
@@ -206,7 +250,7 @@ mcd test
 
 `{foo, bar}/{a..j}` expand to fooa to fooj and bara to barj
 
-## Using Output As Arguments
+### Using Output As Arguments
 
 `rm` will accept arguments only, so how to delete all the files in the current directory.
 
@@ -416,4 +460,32 @@ You can use `d` instead of `c` here
 `v` start virsual mode at current cursor
 
 `V` start it at linewise
+
+## Regular Expression
+
+### Common patterns
+
+`.` match any character
+
+`*` zero or more of the preceding match
+
+`?` one of the precceding match
+
+`+` one or more of the preceeding match
+
+`[abc]` any one character of `a` , `b` , `c`
+
+`(RX1|RX2)` capture group, match either something that matches `RX1` or `RX2`
+
+`^` Match start of the line
+
+`$` Match end of the line
+
+`\1` Accessing first group(first surrounded by `()`) match result in the regular expression
+
+`[^a]` not a
+
+`{}` quantifier, `a{3}` match aaa, `a{1,3}` more one and no more than 3 times.
+
+
 
