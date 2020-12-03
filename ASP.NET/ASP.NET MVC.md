@@ -1,10 +1,8 @@
-[toc]
-
 # ASP.net MVC
 
 ## MVC
-
 ### Model
+[[Go]]
 
 Data Model
 
@@ -41,7 +39,6 @@ public class MoviesController : Controller
 ```
 
 ## Action
-
 ### ActionResult
 
 Generic type. Below are child types of action result.
@@ -56,6 +53,7 @@ Generic type. Below are child types of action result.
 |     FileResult     |      File()       |
 | HttpNotFoundResult |  HttpNotFound()   |
 |    EmptyResult     | new EmptyResult() |
+
 
 ### Action Parameters
 
@@ -152,7 +150,7 @@ TempData.Keep()
 
 Model specifically built for a view.It includes any data and rules specific to that view(usually combine two or more models together).
 
-## Razor sytax
+## Razor syntax
 
 support html and C# on cshtml
 
