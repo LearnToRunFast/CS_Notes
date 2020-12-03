@@ -1,7 +1,5 @@
 # Golang
 
-[toc]
-
 Go is a **static type** language.
 
 Go code is grouped into packages, and packages are grouped into modules. Your package's module specifies the context Go needs to run the code, including the Go version the code is written for and the set of other modules it requires.
@@ -15,12 +13,12 @@ Go code is grouped into packages, and packages are grouped into modules. Your pa
 5. `go get` Downloads the raw source code of other's package.
 6. `go test` Runs any tests associated with the current project.
 
-## Pacakage
+## Package
 
 There are two types of packages.
 
 1. `Executable`: Generates a file that we can run, only`main` is the executable package
-2. `Resuable`: Code used as 'helpers'. It's a good place to put resuable logic. Excepted `main`, other self defined package name will be treated as resuable package
+2. `Resuable`: Code used as 'helpers'. It's a good place to put reusable logic. Excepted `main`, other self defined package name will be treated as reusable package
 
 ```go
 // simple go sample

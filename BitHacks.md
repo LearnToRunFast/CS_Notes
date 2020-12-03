@@ -30,7 +30,7 @@ x + ~x $=$ **1111 1111** $= -1 =>$ **-​x ​=  ~x + 1**
 
 where -x = **1000 0001**
 
-## Binary and Hexadecimal Reprensentation
+## Binary and Hexadecimal Representation
 
 | Decimal | Hex  | Binary | Decimal | Hex  | Binary |
 | :-----: | :--: | :----: | :-----: | :--: | :----: |
@@ -110,19 +110,19 @@ why is works:
 
 XOR is it's own inverse	(x ^ y) ^ y => x
 
-Performace:
+Performance:
 
 Poor at exploiting **Instruction-level parallelism(ILP)** (The code can not be run at parallel)
 
-#### 6. Minumum of Two Integers 
+#### 6. Minimum of Two Integers 
 
 If use normal if-else or ternary expression(? :) 
 
 **Performance:** A mispredicted branch empties the processor pipeline
 
-**Caveat:** The compuler is usually smart enough to optimize away the unpredictable branch, but maybe not.
+**Caveat:** The compiler is usually smart enough to optimize away the unpredictable branch, but maybe not.
 
-Bit way: minimum **r = y ^ ((x ^ y) & - (x < y))** 		（Branchless,  slower than branch version if complier optimised the code)
+Bit way: minimum **r = y ^ ((x ^ y) & - (x < y))** 		（Branchless,  slower than branch version if compiler optimized the code)
 
 Why it works:	In C, True = 1 and False = 0
 

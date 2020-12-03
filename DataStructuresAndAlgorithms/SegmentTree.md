@@ -23,7 +23,7 @@ Example of Sum Segment Tree:
 
 **Total size of segment tree:** Let n be the size of the array. 
 
-By obervation, number of parents node is n - 1.For any number n, the total size will be 2n - 1.If we start from index 1 instead of 0, then 2n is just nice to store the complete segments.
+By observation number of parents node is n - 1.For any number n, the total size will be 2n - 1.If we start from index 1 instead of 0, then 2n is just nice to store the complete segments.
 
 **Height of segment tree:** The height of segment tree is <img src="https://render.githubusercontent.com/render/math?math=\lceil \log_2{n} \rceil">.
 
@@ -39,9 +39,9 @@ Idea: create an lazy[] array with same size of tree array. Keep positive or nega
 
 **Implementation:**
 
-[Java Implementation of Segement Tree(recursive version)](./CodeImplementations/SegmentTree_R.java)
+[Java Implementation of Segment Tree(recursive version)](./CodeImplementations/SegmentTree_R.java)
 
-[Java Implementation of Segement Tree(iterative version)](./CodeImplementations/SegmentTree_I.java)
+[Java Implementation of Segment Tree(iterative version)](./CodeImplementations/SegmentTree_I.java)
 
 **References:**
 

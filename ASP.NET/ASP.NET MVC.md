@@ -2,7 +2,6 @@
 
 ## MVC
 ### Model
-[[Go]]
 
 Data Model
 
@@ -21,7 +20,7 @@ HTML markup that display to the user.
 
 ### Controller
 
-Resposible to handling HTTP request which contains bunch of ActionResults.
+Responsible to handling HTTP request which contains bunch of ActionResults.
 
 ```c#
 // code snippet of a movie controller

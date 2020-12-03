@@ -1,12 +1,10 @@
 # Docker & Kubenetes
 
-[toc]
-
 ## Docker
 
 **Docker Client:** Issuing commands
 
-**Dokcer Server:** Responsible for creating images, running containers
+**Docker Server:** Responsible for creating images, running containers
 
 **Image:** A snapshot of file system and a start command.
 
@@ -82,7 +80,7 @@ services:
 2. Create a temporary container from the base image and run the **commands from component step 2** on that container and create **new image** (will be cached at somewhere for future use). If the commands order of component step 2 is different, the cache will no longer works.
 3. Create a new temporary container from the **previous new image**, the **command from component step 3** will be store start up command. Create the final image.
 
-**Limiataion:** Host on Linux machine only, when they get install on windows or Mac, a linux Virtual Machine required to run docker.
+**Limitation:** Host on Linux machine only, when they get install on windows or Mac, a Linux Virtual Machine required to run docker.
 
 By running command `docker run hello-world`, docker will
 
@@ -165,7 +163,7 @@ eval $(minikube docker-env) # limited to current terminal window
 
 Use `---` to separate two object of configs in a single config file.
 
-### Strucutre
+### Structure
 
 For kubernetes, every container will be hosted in **Deployment** and A **Node** will contains more than one **Deployments**.
 
@@ -265,7 +263,7 @@ spec:
 - `logs` Check logs.
   - `kubectl logs <name of the object>` check logs for the specify object. 
 
-### Depolyment
+### Deployment
 
 A Deployment provides **declarative updates** for Pods and ReplicaSets.
 
@@ -294,9 +292,9 @@ spec:
 
 ### Update Pod with Latest Image
 
-As kubernetes does not provide a easy way to automatecally update the new image with asscoiated pods, we need to do some extra works to make it happen. Below are some work arounds:
+As kubernetes does not provide a easy way to automatically update the new image with associated pods, we need to do some extra works to make it happen. Below are some work around:
 
-1. Manually delete pods to get the deployment to recreate the mwith the latest version(Bad).
+1. Manually delete pods to get the deployment to recreate the with the latest version(Bad).
 2. Tag build images with a real version number and specify that version in the config file.
    - Update config file causing a update to the branch, it will trigger the whole deployment again.
 3. Use an **imperative command** to update the imgae version that the deployment should use.
@@ -306,7 +304,7 @@ As kubernetes does not provide a easy way to automatecally update the new image 
 
 ### Persistent Volume Claim
 
-A advertisement(claim) for peyersistent volume that can be provided to **pods**, but it may not be ready yet. It can be dynamically provisioned if necessary.
+A advertisement(claim) for persistent volume that can be provided to **pods**, but it may not be ready yet. It can be dynamically provisioned if necessary.
 
 **Problem**: The postgres database was created in a container and is located inside the virtual machine(Deployment object), any crash happened to the container will potentially destroy all the data.
 
@@ -353,7 +351,7 @@ Any sensitive information that need to be stored secretly in the kubernetes. Sec
 
 1. `create` Imperative command to create a new object.
 2. `secret` Type of object that we are going to create.
-3. `generic` Type of secret. othet types like`docker-registry` is refer to authentication with some custome docker registry and '`tls` is for http set-up.
+3. `generic` Type of secret. other types like`docker-registry` is refer to authentication with some custom docker registry and '`tls` is for http set-up.
 4. `--from-literal`Indicates we are going to add the secret information into this command.
 5. `key=value` Key value pair for the secret.
 
@@ -376,7 +374,7 @@ env:
 
 ### Ingress
 
-With **Ingress config file**, it will create an **Ingress controller** to make an load balancer service with additional deployment object(**nginx pod**) to handle the traffic. Addtional to that, it will create another pair of **ClusterIp Service** and Depolyment(**default-backend pod**) to handle health check in order to make sure everything is working correctly.
+With **Ingress config file**, it will create an **Ingress controller** to make an load balancer service with additional deployment object(**nginx pod**) to handle the traffic. Additional to that, it will create another pair of **ClusterIp Service** and Deployment(**default-backend pod**) to handle health check in order to make sure everything is working correctly.
 
 ```yaml
 # ingress services
@@ -565,9 +563,9 @@ spec:
 
 skafold watches the kubernetes application changes. Once it detects the changes, it will take certain action base on different modes.
 
-1. Rebuild client imahe from scratch(**rebuild image**), update K8S(kubernetes application).
+1. Rebuild client image from scratch(**rebuild image**), update K8S(kubernetes application).
 2. Inject updated files into the client pod, rely on react app to automatically update itself.
-   1. In this mode, make sure the client pod can automatelly update itself.
+   1. In this mode, make sure the client pod can automatically update itself.
 
 ```yaml
 apiVersion: skaffold/v1beta2

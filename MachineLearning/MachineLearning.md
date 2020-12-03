@@ -5,13 +5,13 @@
 - Supervised learning
 - Unsupervised learning
 - Reinforcement learning
-- Recommender systems
+- Recommended systems
 
 ## Supervised Learning
 
-### Model Reprensentaion
+### Model Representation
 
-We’ll use $x^{(i)}$ to denote the “input” variables, also called input features, and $y^{(i)}$ to denote the “output” or target variable that we are trying to predict. A pair $(x^{(i)}, y^{(i)})$ is called a training example, and the dataset that we’ll be using to learn—a list of m training examples $(x^{(i)}, y^{(i)}); i=1,...,m$ —is called a training set. 
+We’ll use $x^{(i)}$ to denote the “input” variables, also called input features, and $y^{(i)}$ to denote the “output” or target variable that we are trying to predict. A pair $(x^{(i)}, y^{(i)})$ is called a training example, and the datasets that we’ll be using to learn—a list of m training examples $(x^{(i)}, y^{(i)}); i=1,...,m$ —is called a training set. 
 
 > **_Note_**: The superscript `(i)` in the notation is simply an index into the training set, and has nothing to do with exponentiation. 
 
