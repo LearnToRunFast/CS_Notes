@@ -204,5 +204,5 @@ There are various ways to create links
    @Html.ActionLink("View Movies", "Index", "Movies", new {id = 1}, null); 
    ```
 
-## Entity Framework(Oject Relational Mapper)
+## Entity Framework(Object Relational Mapper)
 
