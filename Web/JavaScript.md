@@ -766,7 +766,52 @@ app.use(methodOverride('_method'))
 <form method="post" action"/comments/<%=comment.id%>?_method=PATCH">
 ```
 
+### Error Handling
 
+```js
+// construct error object
+class AppError extends Error {
+    constructor(message, status) {
+        super();
+        this.message = message;
+        this.status = status;
+    }
+}
+
+module.exports = AppError;
+
+// import it 
+const AppError = require("./errors/AppError")
+
+// wrapper for async function to avoid multiple try catch
+function wrapAsync(fn) {
+  return function (req, res, next) {
+    fn(req, res, next).catch((e) => next(e));
+  };
+}
+
+// wrap the async function with wrapper
+app.get(
+  "/campgrounds/:id",
+  wrapAsync(async (req, res, next) => {
+    const { id } = req.params;
+    const campground = await Campground.findById(id);
+    if (!campground) {
+      throw new AppError("Campground Not Found", 404);
+    }
+    res.render("campgrounds/show", { campground });
+  })
+);
+
+
+// error handling block, placed just before listen
+// error handling block
+app.use((err, req, res, next) => {
+  const { status = 500, message = "Something Went Wrong" } = err;
+  res.status(status).render("error", { status, message });
+});
+
+```
 
 
 
