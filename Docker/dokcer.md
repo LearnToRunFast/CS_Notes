@@ -604,7 +604,4 @@ deploy:
       - k8s/client-cluster-ip-service.yaml
 ```
 
-[go to](#common-flags)
-
-
 
