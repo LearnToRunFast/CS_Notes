@@ -196,3 +196,37 @@ personSchema.post('save', async function() {
 })
 ```
 
+### One to Many
+
+```js
+const { Schema } = mongoose;
+
+const productSchema = new Schema({
+  name: String,
+  price: Number,
+  season: {
+    type: String,
+    enum: ['Spring', 'Summer', 'Fall', 'Winter']
+  }
+});
+
+const farmSchema = new Schema({
+  name: String,
+  city: String,
+  products: [{ type: Schema.Types.ObjectId, ref: 'Product'}]
+})
+const Product = mongoose.model('Product', productSchema);
+const Farm = mongoose.model('Farm', farmSchema);
+const makeFarm = async () => {
+  const farm = new Farm({ name: 'Full Belly Farms', city: 'CA'});
+  const melon = await Product.findOne({ name: 'Goddess Melon'});
+  farm.products.push(melon);
+  await farm.save();
+}
+
+// populate
+Farm.findOne({ name: 'Full Belly  Farms' })
+		.populate('products')
+		.then(farm => console.log(farm));
+```
+
