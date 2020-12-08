@@ -679,6 +679,74 @@ const secondCallBack = (req, res) => {
 app.get('/secrect', verifyPassword, secondCallBack);
 ```
 
+#### Router
+
+```js
+const express = require('express');
+const app = express();
+const shelterRoutes = require('./routes/shelters');
+const dogRoutes = require('./routes/dogs');
+const adminRoutes = require('./routes/admin')
+
+app.use('/shelters', shelterRoutes);
+app.use('/dogs', dogRoutes);
+app.use('/admin', adminRoutes)
+
+app.listen(3000, () => {
+    console.log('Serving app on localhost:3000')
+})
+
+// ./routes/admin
+const express = require('express');
+const router = express.Router();
+
+router.use((req, res, next) => {
+    if (req.query.isAdmin) {
+        return next();
+    }
+    return res.send("SORRY NOT AN ADMIN!")
+})
+
+router.get('/topsecret', (req, res) => {
+    res.send('THIS IS TOP SECRET')
+})
+router.get('/deleteeverything', (req, res) => {
+    res.send('OK DELETED IT ALL!')
+})
+
+module.exports = router;
+
+```
+
+#### Cookie
+
+##### Set Cookie
+
+```js
+app.get('/setname', (req, res) => {
+    res.cookie('name', 'henrietta');
+    res.cookie('animal', 'harlequin shrimp')
+    res.send('OK SENT YOU A COOKIE!!!')
+})
+
+app.get('/getsignedcookie', (req, res) => {
+    res.cookie('fruit', 'grape', { signed: true })
+    res.send('OK SIGNED YOUR FRUIT COOKIE!')
+})
+```
+
+##### Read Cookie
+
+```js
+const cookieParser = require('cookie-parser');
+app.use(cookieParser('thisismysecret')); // signed make sure integrity
+
+app.get('/greet', (req, res) => {
+    const { name = 'No-name' } = req.cookies;
+    res.send(`Hey there, ${name}`)
+})
+```
+
 
 
 ## Templating With EJS
