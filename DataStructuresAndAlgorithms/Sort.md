@@ -4,7 +4,7 @@
 
 ## Properties
 
-### In-place
+### In-place	
 
 The sort algorithm is in-place if it uses $<= c~ log~ N$ extra memory.
 
@@ -499,13 +499,21 @@ public class QuickSort {
 		private static final CUTOFF = 7;
     // This class should not be instantiated.
     private QuickSort() { }
-
+  
+    public static void shuffle(Object[] a) {
+        int n = a.length;
+        for (int i = 0; i < n; i++) {
+            // choose index uniformly in [0, i]
+            int r = (int) (Math.random() * (i + 1));
+            swap(a, i, r);
+        }
+    }
     /**
      * Rearranges the array in ascending order, using the natural order.
      * @param a the array to be sorted
      */
     public static void sort(Comparable[] a) {
-        StdRandom.shuffle(a);
+        shuffle(a);
         sort(a, 0, a.length - 1);
     }
     private static void insertionSort(Comparable[] a, int lo, int hi) {
@@ -573,6 +581,14 @@ public class QuickSort {
 
 ```java
 public class QuickSelect {
+      public static void shuffle(Object[] a) {
+        int n = a.length;
+        for (int i = 0; i < n; i++) {
+            // choose index uniformly in [0, i]
+            int r = (int) (Math.random() * (i + 1));
+            swap(a, i, r);
+        }
+    }
       // partition the subarray a[lo..hi] so that a[lo..j-1] <= a[j] <= a[j+1..hi]
     // and return the index j.
     private static int partition(Comparable[] a, int lo, int hi){
@@ -617,7 +633,7 @@ public class QuickSelect {
         if (k < 0 || k >= a.length) {
             throw new IllegalArgumentException("index is not between 0 and " + a.length + ": " + k);
         }
-        StdRandom.shuffle(a);
+        shuffle(a);
         int lo = 0, hi = a.length - 1;
         while (hi > lo) {
             int i = partition(a, lo, hi);
@@ -632,9 +648,72 @@ public class QuickSelect {
 
 ### 3-Way Quick Sort
 
-3-way quick sort will place all the value of keys which equals to pivot at middle during partition phase.
+3-way quick sort is an enhancement quick sort for duplicate keys.
+
+Let v be partitioning item a[lo], lt = lo
+
+1. If (a[i] < v) exchange a[lt] with a[i] and increment both lt and i
+2. If (a[i] > v) exchange a[gt] with a[i] and decrement gt
+3. If (a[i] == v) increment i
 
 ```java
-	
+public class Quick3way {
+
+    // This class should not be instantiated.
+    private Quick3way() { }
+
+    /**
+     * Rearranges the array in ascending order, using the natural order.
+     * @param a the array to be sorted
+     */
+    public static void sort(Comparable[] a) {
+        shuffle(a);
+        sort(a, 0, a.length - 1);
+    }
+    public static void shuffle(Object[] a) {
+        int n = a.length;
+        for (int i = 0; i < n; i++) {
+            // choose index uniformly in [0, i]
+            int r = (int) (Math.random() * (i + 1));
+            swap(a, i, r);
+        }
+    }
+    // quicksort the subarray a[lo .. hi] using 3-way partitioning
+    private static void sort(Comparable[] a, int lo, int hi) { 
+        if (hi <= lo) return;
+        int lt = lo, gt = hi;
+        Comparable v = a[lo];
+        int i = lo + 1;
+        while (i <= gt) {
+            int cmp = a[i].compareTo(v);
+            if      (cmp < 0) swap(a, lt++, i++);
+            else if (cmp > 0) swap(a, i, gt--);
+            else              i++;
+        }
+
+        // a[lo..lt-1] < v = a[lt..gt] < a[gt+1..hi]. 
+        sort(a, lo, lt - 1);
+        sort(a, gt + 1, hi);
+    }
+    
+    // is v < w ?
+    private static boolean less(Comparable v, Comparable w) {
+        return v.compareTo(w) < 0;
+    }
+        
+    // exchange a[i] and a[j]
+    private static void swap(Object[] a, int i, int j) {
+        Object temp = a[i];
+        a[i] = a[j];
+        a[j] = temp;
+    }
+
+}
 ```
+
+### Better Version Quick Sort
+
+All the previous version we mentioned use first element of the array as pivot and one time shuffle required. We can use other approaches to choose better pivot to avoid shuffling.
+
+TODO.
 
