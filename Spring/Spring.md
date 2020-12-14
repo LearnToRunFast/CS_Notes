@@ -275,3 +275,172 @@ public class SomeMockTest {
 }
 ```
 
+## Spring Boot
+
+The goal of spring boot is to 
+
+1. enable building production ready applications quickly
+2. provide common non-functional features
+   1. embedded servers
+   2. metrices
+   3. health checks
+   4. externalised configuration 
+
+### Controller
+
+```java
+@RestController
+public class BoosController {
+  @GetMapping("/books")
+  public List<Book> getAllBooks() {
+    return Arrays.asList(new Book(1l, "book name", "author"));
+  }
+}
+```
+
+### Spring Boot Dev Tool
+
+Dev tools help to restart the application when necessary to to avoid restart the application manually.
+
+```xml
+<dependency>
+  <groupdId>
+    org.springframework.boot
+  </groupdId>
+  <artifactId>
+    spring-boot-devtools
+  </artifactId>
+</dependency>
+```
+
+### Aspect-Oriented Programming（AOP)
+
+```java
+@Aspect
+@Configuration
+public class UseAccessAspect {
+	// execution(* PACKAGE.*.*(..))
+  //* any return type .* any class .* any method (..) any arguments
+  @Bofre("execution(* com.aop.springaop.business.*.*(..))")
+  public void before(JoinPoint joinPoint) { }
+  
+  @AfterReturning(value = "execution(* com.aop.springaop.business.*.*(..))",
+                 returning = "result")
+  public void afterReturning(JoinPoint joinPoint, Object result) {
+    
+  }
+  @AfterThrowing(value="execution(* com.aop.springaop.business.*.*(..))", throwing="exception")
+  public void afterThrowing(JoinPoint joinPoint, Exception exception) {
+    
+  }
+  @After(value="execution(* com.aop.springaop.business.*.*(..))")
+  public void after(JoinPoint joinPoint) {
+    
+  }
+  
+  @Around("execution(* com.aop.springaop.business.*.*(..))")
+  public void around(ProceedingJoinPoint joinPoint) throws Throwable {
+    long startTime = System.currentTimeMillis();
+    
+    joinPoint.proceed();
+    
+    long timeTaken = System.currentTImeMillis() - startTime;
+  }
+}
+```
+
+#### PointCut
+
+```java
+public class CommonJoinPointConfig {
+  @Pointcut("execution(* com.aop.springaop.business.*.*(..))")
+  public void businessLayerExecution(){}
+  
+  @Pointcut("execution(* com.aop.springaop.data.*.*(..))")
+  public void dataLayerExecution(){}
+  @Pointcut("com.in28minutes.sprint.aop.springaop.aspect.CommonJoinPointConfig.dataLayerExecution() && com.in28minutes.sprint.aop.springaop.aspect.CommonJoinPointConfig.businessLayerExecution()")
+  public void allLayerExecution() {}
+  
+  @Pointcut("brean(*dao*)")
+  public void beanContainingDao(){}
+       @Pointcut("within(com.in28minutes.sprint.aop.springaop.data..*)")
+  public void dataLayerExecutionWithWithin(){}
+}
+```
+
+#### Custom Annotation
+
+Assume we have following Repository
+
+```java
+@Repository
+public class Dao {
+  @TrackTime // custom annotation
+  public String retrieveSomething() {
+    return "Dao";
+  }
+}
+```
+
+Custom Annotation class
+
+```java
+// apply in method only
+@Target(ElementType.METHOD)
+//runtime
+@Retention(RetentionPolicy.RUNTIME)
+public @interface TrackTime {
+  
+}
+```
+
+Define point cut for custom annotation class
+
+```java
+@Pointcut("@annotation(com.in28minutes.sprint.aop.springaop.aspect.TrackTime)")
+public void trackTimeAnnotation() {}
+```
+
+## Spring JDBC
+
+### H2
+
+Enable console mod for h2
+
+```java
+// in application.properties
+sprint.h2.console.enabled=true
+
+// on console localhost:8080/h2-console
+JDBC URL: jdbc:h2:mem:testdb
+username:sa
+password
+```
+
+#### Create Table
+
+create a `sql` file call `schema.sql` on `src/main/resources`, when the application is launched, it will automatically run the `sql`
+
+```sql
+create table person
+(
+  id integer not null,
+  name varchar(255) not null,
+  location varchar(255),
+  birth_date timestamp,
+  primary key(id)
+);
+```
+
+#### Insert Item
+
+create a `sql` file call `data.sql` on `src/main/resources`, when the application is launched, it will automatically run the `sql`
+
+```sql
+INSERT INTO PERSON (ID, NAME, LOCATION, BIRTH_DATE ) 
+VALUES(10001,  'Ranga', 'Hyderabad',sysdate());
+INSERT INTO PERSON (ID, NAME, LOCATION, BIRTH_DATE ) 
+VALUES(10002,  'James', 'New York',sysdate());
+INSERT INTO PERSON (ID, NAME, LOCATION, BIRTH_DATE ) 
+VALUES(10003,  'Pieter', 'Amsterdam',sysdate());
+```
