@@ -1,3 +1,5 @@
+[toc]
+
 # Tree
 
 A **tree** is a widely used abstract data type that simulates a hierarchical tree structure, with a root value and subtrees of children with a parent node, represented as a set of linked nodes.
@@ -82,6 +84,164 @@ For the four types of unbalance situation, we need four ways to restore the bala
 #### Implementation
 
 // TODO (Java version)
+
+### 2-3 Search Tree
+
+A 2-3 search tree is a tree that is either **empty** or
+
+- A 2-node, with one key (and associated value) and two links,
+  a left link to a 2-3 search tree with smaller keys, and a right
+  link to a 2-3 search tree with larger keys
+- A 3-node, with two keys (and associated values) and three
+  links, a left link to a 2-3 search tree with smaller keys, a middle link to a 2-3 search tree with keys between the node’s keys, and a right link to a 2-3 search tree with larger keys
+
+As usual, we refer to a link to an empty tree as a null link.
+
+2-3 search tree serves as the general idea for red black tree and B tree later.
+
+
+
+![image-20201214161043176](Asserts/Tree/image-20201214161043176.png)
+
+### Left Lean Red Black Tree
+
+Define red-black BSTs as BSTs having red and black links and satisfying the following three restrictions:
+
+- Red links lean left.
+- No node has two red links connected to it.
+- The tree has perfect black balance: every path from the root to a null link has the
+  same number of black links.
+
+We can treat Left-leaning red black BST as 2-3 tree as showing below:
+
+![image-20201214164014509](Asserts/Tree/image-20201214164014509.png)
+
+#### Representation
+
+```java
+private static final boolean RED = true;
+private static final boolean BLACK = false;
+
+private class Node {
+  Key key;
+  Value val;
+  Node left, right;
+  boolean color;
+}
+
+private boolean isRed(Node x) {
+  if (x == null) return false;
+  return x.color == RED;
+}
+```
+
+#### Search
+
+Search in red black tree is same as normal BST.
+
+```java
+public Value get(Key key) {
+  Node x = root;
+  while (x != null) {
+    int cmp = key.compareTo(x.key);
+    if (cmp < 0) x = x.left;
+    else if (cmp > 0) x = x.right;
+    else return x.val;
+  }
+  return null;
+}
+```
+
+#### Rotation
+
+To preserve the property of red black tree during insertion, we need to make sure the red link is always left leaning.
+
+##### Rotate Left
+
+| ![image-20201214165326645](Asserts/Tree/image-20201214165326645.png) | ![image-20201214170135737](Asserts/Tree/image-20201214170135737.png) |
+| :----------------------------------------------------------: | :----------------------------------------------------------: |
+|                  **Right-leaning red link**                  |                  **Left-leaning red link**                   |
+
+```java
+private Node rotateLeft(Node h) {
+  assert isRed(h.right);
+  Node x = h.right;
+  h.right = x.left;
+  x.left = h;
+  x.color = h.color;
+  h.color = RED;
+  return x;
+}
+
+```
+
+##### Rotate Right
+
+| ![image-20201214170640931](Asserts/Tree/image-20201214170640931.png) | ![image-20201214170657611](Asserts/Tree/image-20201214170657611.png) |
+| :----------------------------------------------------------: | :----------------------------------------------------------: |
+|                  **Left-leaning red link**                   |                  **Right-leaning red link**                  |
+
+```java
+private Node rotateRight(Node h) {
+  assert isRed(h.left);
+  Node x = h.left;
+  h.left = x.right;
+  x.right = h;
+  x.color = h.color;
+  h.color = RED;
+  return x;
+}
+```
+
+
+
+#### Flip Color
+
+Flip the color, change 4-node into 3-node.
+
+| ![image-20201214171623978](Asserts/Tree/image-20201214171623978.png) | ![image-20201214171633035](Asserts/Tree/image-20201214171633035.png) |
+| :----------------------------------------------------------: | :----------------------------------------------------------: |
+|                          **4-node**                          |                          **3-node**                          |
+
+```java
+private void flipColors(Node h) {
+  assert !isRed(h);
+  assert isRed(h.left);
+  assert isRed(h.right);
+  h.color = RED;
+  h.left.color = BLACK;
+  h.right.color = BLACK;
+}
+```
+
+#### Insertion
+
+##### Insert into a single node tree
+
+1. If the new node is less than current node, then it's fine
+
+   ![image-20201214172143840](Asserts/Tree/image-20201214172143840.png)
+
+2. If the new node is larger than current node(located at right side), do a rotate left.
+
+   ![image-20201214172204882](Asserts/Tree/image-20201214172204882.png)
+
+##### Insert into 2-node tree
+
+```java
+private Node put(Node h, Key key, Value val) {
+  if (h == null) return new Node(key, val, RED);
+  if cmp = key.compareTo(h.key);
+  if (cmp < 0) h.left = put(h.left, key, val);
+  else if (cmp > 0) h.right = put(h.right, key, val);
+  else h.val = val;
+  
+  if (isRed(h.right) && !isRed(h.left)) h =rotateLeft(h);
+  if (isRed(h.left) && isRed(h.left.left) h = rotateRight(h);
+  if (isRed(h.left) && isRed(h.right)) flipColors(h);
+  
+}
+```
 
 
 
