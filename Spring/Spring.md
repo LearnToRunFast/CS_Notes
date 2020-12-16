@@ -444,3 +444,219 @@ VALUES(10002,  'James', 'New York',sysdate());
 INSERT INTO PERSON (ID, NAME, LOCATION, BIRTH_DATE ) 
 VALUES(10003,  'Pieter', 'Amsterdam',sysdate());
 ```
+
+#### Query with DAO
+
+```java
+@Repository
+public class PersonJdbcDao {
+  @Autowired
+  JdbcTemplate jdbcTemplate;
+  
+   // new BeanPropertyRowMapper(Person.class)
+  // use this if db column is not match to Person object
+	class PersonMapper implements RowMapper<Person> {
+		@Override
+		public Person mapRow(ResultSet rs, int rowNum) throws SQLException {
+      Person person = new Person();
+      person.setId(rs.getInt("id"));
+      person.setName(rs.getString("name"));
+      person.setLocation(rs.getString("location"));
+      person.setBirthDate(rs.getTimestamp("birth_date"));
+			return person;
+		}
+	}
+  
+  public List<Person> findAll() {
+    return jdbcTemplate.query("select * from person",
+             new PersonMapper());
+  }
+  
+  public Person findById(int id) {
+    return jdbcTemplate.queryForObject("select * from person where id=?", 
+          new Object[]{id},
+          new BeanPropertyRowMapper<Person>(Person.class));
+  }
+
+  	public void insert(Person person) {
+		jdbcTemplate.update("insert into person(id, birth_date,location, name) values(?,?,?,?)", 
+        person.getId(),
+				new Timestamp(person.getBirthDate().getTime()),
+        person.getLocation(),
+        person.getName());
+	}
+
+	public void update(Person person) {
+		jdbcTemplate.update("Update person set name=?, location=?, birth_date=? where id=?", 
+        person.getName(),
+				person.getLocation(), 
+        new Timestamp(person.getBirthDate().getTime()),
+        person.getId());
+	}
+  
+  //return how many row get deleted
+	public void deleteById(int id) {
+		jdbcTemplate.update("delete from person where id=?", id);
+	}
+}
+```
+
+#### Java Persistence API(JPA)
+
+JPA defines a set of concepts that can be implemented by any tool or framework. While JPA's object-relational mapping (ORM) model was originally based on Hibernate, it has since evolved. Likewise, while JPA was originally intended for use with relational/SQL databases, some JPA implementations have been extended for use with NoSQL datastore. A popular framework that supports JPA with NoSQL is EclipseLink.
+
+##### Entity
+
+```java
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.NamedQuery;
+
+@Entity
+@NamedQuery(query = "select p from Person p", name = "find_all_persons_query")
+// only necessary if the class name is different from db table name, in this case, we can ignore it.
+@table(name="person") 
+public class Person {
+
+	@Id //primary key
+	@GeneratedValue // auto generated value
+	private int id;
+	// only necessary if the column name is different from db column name, in this case, we can ignore it.
+  @column(name="name")
+	private String name;
+
+	private String location;
+
+	private Date birthDate;
+
+	public Person(int id, String name, String location, Date birthDate) {
+		super();
+		this.id = id;
+		this.name = name;
+		this.location = location;
+		this.birthDate = birthDate;
+	}
+
+	public Person() {
+
+	}
+
+	public Person(String name, String location, Date birthDate) {
+		super();
+		this.id = id;
+		this.name = name;
+		this.location = location;
+		this.birthDate = birthDate;
+	}
+
+	public int getId() {
+		return id;
+	}
+
+	public void setId(int id) {
+		this.id = id;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getLocation() {
+		return location;
+	}
+
+	public void setLocation(String location) {
+		this.location = location;
+	}
+
+	public Date getBirthDate() {
+		return birthDate;
+	}
+
+	public void setBirthDate(Date birthDate) {
+		this.birthDate = birthDate;
+	}
+
+	@Override
+	public String toString() {
+		return String.format("\nPerson [id=%s, name=%s, location=%s, birthDate=%s]", id, name, location, birthDate);
+	}
+
+}
+```
+
+##### Repository
+
+```java
+import java.util.List;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+import javax.transaction.Transactional;
+
+import org.springframework.stereotype.Repository;
+
+@Repository
+// transaction, for multiple queries, you want all of them to be success or fail together
+// ideally the transaction is implemented around bussiness services
+@Transactional
+public class PersonJpaRepository {
+
+	@PersistenceContext
+	private EntityManager entityManager;
+
+	public List<Person> findAll() {
+		Query query = entityManager.createNamedQuery("find_all_persons_query", Person.class);
+		return query.getResultList();
+	}
+
+	public Person findById(int id) {
+		return entityManager.find(Person.class, id);
+	}
+
+	public void insert(Person person) {
+		entityManager.merge(person);
+	}
+
+	public void update(Person person) {
+		entityManager.merge(person);
+	}
+
+	public void deleteById(int id) {
+		Person person = findById(id);
+		entityManager.remove(person);
+	}
+}
+```
+
+##### Repository Interface
+
+We can see that there are still a lot of duplicate codes, to simplify further, we use build-in repository interface
+
+```java
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface PersonSpringDataRepository extends 
+  // <Entity, Primary Key>
+  JpaRepository<Person, Integer> {
+  
+}
+// other class
+
+public class businessLogic {
+  @Autowired
+  PersonSpringDataRepository repo;
+  repo.findById(1);
+  repo.save(new Person(...));
+  repo.deleteById(1);
+  repo.findAll();
+  
+}
+```
+
