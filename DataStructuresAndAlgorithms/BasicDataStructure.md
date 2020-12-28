@@ -447,3 +447,69 @@ public class Heap {
 }
 ```
 
+## Hash Table
+
+### Hash Function
+
+Standard rule for user-defined types
+
+- Set a prime number as hashcode first(eg. 17) 
+
+- Combine each significant field using the 31x + y rule where x is previous hashcode and y is the particular object hashcode
+- if the field is primitive type, use wrapper type hashcode()
+- if field is null, return 0
+- if field is a reference type, use hashcode()
+- if field is an array, apply to each entry.
+
+#### Modular hashing
+
+Hash code gives an `int` between $-2^{31}$ to $-2^{31} - 1$.
+
+Hash function gives an `int` between 0 and M - 1
+
+```java
+private int hash(Key key) {
+  // since hashcode can be negative, we make sure it's positive
+  // and simply use abs will lead to bug if it's -2^31
+  return (key.hashCode() & 0x7fffffff) % M)
+}
+```
+
+### Collision
+
+#### Separate Chaining
+
+Create an array of size M and build Linked List for every index of the array for collision.
+
+- Hash: map key to integer `i` between 0 to M - 1
+- Insert: put at front of $i^{th}$ chain
+- Search: need to search only $i^{th}$ chain
+
+```java
+private static class Node {
+  private Object key;
+  private Object val;
+  private Node next;
+  ...
+}
+public Value get(Key key) {
+  int i = hash(key);
+  for (Node x = st[i]; x != null; x = x.next) {
+    if (key.equals(x.key)) return (Value) x.val;
+  }
+  return null;
+}
+```
+
+##### Consequence
+
+Number of probes for search/insert is proportional to N / M
+
+Typical choice: M ~ N / 5,  constant-time operation.
+
+#### Linear Probing
+
+Linear Probing or Open addressing refers to when there is a collision, find next empty slot and put it there.
+
+> **_Note:_** Keep the array at least half full to achieve high performance
+
