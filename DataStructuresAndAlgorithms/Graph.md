@@ -744,6 +744,29 @@ public class Cycle {
 
 A directed graph (or digraph) is a set of vertices and a collection of directed edges. Each directed edge connects an ordered pair of vertices.
 
+### API
+
+```java
+import java.util.NoSuchElementException;
+
+public class Digraph {
+    Digraph(int V)
+    Digraph(In in)
+    Digraph(Digraph G)
+      
+    int V()
+    int E()
+    void addEdge(int v, int w)
+    Iterable<Integer> adj(int v)
+    int outdegree(int v)
+    int indegree(int v)
+    Digraph reverse()
+    String toString()
+}
+```
+
+### Implementation
+
 ```java
 import java.util.NoSuchElementException;
 
@@ -819,20 +842,10 @@ public class Digraph {
         }
     }
         
-    /**
-     * Returns the number of vertices in this digraph.
-     *
-     * @return the number of vertices in this digraph
-     */
     public int V() {
         return V;
     }
 
-    /**
-     * Returns the number of edges in this digraph.
-     *
-     * @return the number of edges in this digraph
-     */
     public int E() {
         return E;
     }
@@ -877,12 +890,6 @@ public class Digraph {
         return reverse;
     }
 
-    /**
-     * Returns a string representation of the graph.
-     *
-     * @return the number of vertices <em>V</em>, followed by the number of edges <em>E</em>,  
-     *         followed by the <em>V</em> adjacency lists
-     */
     public String toString() {
         StringBuilder s = new StringBuilder();
         s.append(V + " vertices, " + E + " edges " + NEWLINE);
@@ -895,24 +902,10 @@ public class Digraph {
         }
         return s.toString();
     }
-
-    /**
-     * Unit tests the {@code Digraph} data type.
-     *
-     * @param args the command-line arguments
-     */
-    public static void main(String[] args) {
-        In in = new In(args[0]);
-        Digraph G = new Digraph(in);
-        StdOut.println(G);
-    }
-
 }
 ```
 
-
-
-### Topological Sort
+## Topological Sort
 
 ```java
 public class DepthFirstOrder {
@@ -1013,18 +1006,10 @@ public class DepthFirstOrder {
         return postorder;
     }
 
-    /**
-     * Returns the vertices in preorder.
-     * @return the vertices in preorder, as an iterable of vertices
-     */
     public Iterable<Integer> pre() {
         return preorder;
     }
 
-    /**
-     * Returns the vertices in reverse postorder.
-     * @return the vertices in reverse postorder, as an iterable of vertices
-     */
     public Iterable<Integer> reversePost() {
         Stack<Integer> reverse = new Stack<Integer>();
         for (int v : postorder)
@@ -1069,7 +1054,7 @@ public class DepthFirstOrder {
 }
 ```
 
-### Strong Connectivity In Digraphs
+## Strong Connectivity In Digraphs
 
 Two vertices `v` and `w` are strongly connected if they are mutually reachable: that is, if there is a directed path from `v` to `w` and a directed path from `w` to `v`. A digraph is strongly connected if all its vertices are strongly connected to one another.
 
@@ -1084,7 +1069,7 @@ Two vertices `v` and `w` are strongly connected if they are mutually reachable: 
 
 ![image-20201227223048475](Asserts/Graph/image-20201227223048475.png)
 
-#### Kosaraju-Sharir
+### Kosaraju-Sharir
 
 Contract each strong component into a single vertex.
 
@@ -1186,5 +1171,1265 @@ public class KosarajuSharirSCC {
         }
     }
 }
+
 ```
+
+### Tarjan
+
+```java
+public class TarjanSCC {
+
+    private boolean[] marked;        // marked[v] = has v been visited?
+    private int[] id;                // id[v] = id of strong component containing v
+    private int[] low;               // low[v] = low number of v
+    private int pre;                 // preorder number counter
+    private int count;               // number of strongly-connected components
+    private Stack<Integer> stack;
+
+    public TarjanSCC(Digraph G) {
+        marked = new boolean[G.V()];
+        stack = new Stack<Integer>();
+        id = new int[G.V()]; 
+        low = new int[G.V()];
+        for (int v = 0; v < G.V(); v++) {
+            if (!marked[v]) dfs(G, v);
+        }
+
+        // check that id[] gives strong components
+        assert check(G);
+    }
+
+    private void dfs(Digraph G, int v) { 
+        marked[v] = true;
+        low[v] = pre++;
+        int min = low[v];
+        stack.push(v);
+        for (int w : G.adj(v)) {
+            if (!marked[w]) dfs(G, w);
+            if (low[w] < min) min = low[w];
+        }
+        if (min < low[v]) {
+            low[v] = min;
+            return;
+        }
+        int w;
+        do {
+            w = stack.pop();
+            id[w] = count;
+            low[w] = G.V();
+        } while (w != v);
+        count++;
+    }
+
+    public int count() {
+        return count;
+    }
+
+    public boolean stronglyConnected(int v, int w) {
+        validateVertex(v);
+        validateVertex(w);
+        return id[v] == id[w];
+    }
+
+    public int id(int v) {
+        validateVertex(v);
+        return id[v];
+    }
+
+    // does the id[] array contain the strongly connected components?
+    private boolean check(Digraph G) {
+        TransitiveClosure tc = new TransitiveClosure(G);
+        for (int v = 0; v < G.V(); v++) {
+            for (int w = 0; w < G.V(); w++) {
+                if (stronglyConnected(v, w) != (tc.reachable(v, w) && tc.reachable(w, v)))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    // throw an IllegalArgumentException unless {@code 0 <= v < V}
+    private void validateVertex(int v) {
+        int V = marked.length;
+        if (v < 0 || v >= V)
+            throw new IllegalArgumentException("vertex " + v + " is not between 0 and " + (V-1));
+    }
+
+    public static void main(String[] args) {
+        In in = new In(args[0]);
+        Digraph G = new Digraph(in);
+        TarjanSCC scc = new TarjanSCC(G);
+
+        // number of connected components
+        int m = scc.count();
+        StdOut.println(m + " components");
+
+        // compute list of vertices in each strong component
+        Queue<Integer>[] components = (Queue<Integer>[]) new Queue[m];
+        for (int i = 0; i < m; i++) {
+            components[i] = new Queue<Integer>();
+        }
+        for (int v = 0; v < G.V(); v++) {
+            components[scc.id(v)].enqueue(v);
+        }
+
+        // print results
+        for (int i = 0; i < m; i++) {
+            for (int v : components[i]) {
+                StdOut.print(v + " ");
+            }
+            StdOut.println();
+        }
+
+    }
+
+}
+```
+
+### Gabow
+
+```java
+public class GabowSCC {
+
+    private boolean[] marked;        // marked[v] = has v been visited?
+    private int[] id;                // id[v] = id of strong component containing v
+    private int[] preorder;          // preorder[v] = preorder of v
+    private int pre;                 // preorder number counter
+    private int count;               // number of strongly-connected components
+    private Stack<Integer> stack1;
+    private Stack<Integer> stack2;
+
+    public GabowSCC(Digraph G) {
+        marked = new boolean[G.V()];
+        stack1 = new Stack<Integer>();
+        stack2 = new Stack<Integer>();
+        id = new int[G.V()]; 
+        preorder = new int[G.V()];
+        for (int v = 0; v < G.V(); v++)
+            id[v] = -1;
+
+        for (int v = 0; v < G.V(); v++) {
+            if (!marked[v]) dfs(G, v);
+        }
+
+        // check that id[] gives strong components
+        assert check(G);
+    }
+
+    private void dfs(Digraph G, int v) { 
+        marked[v] = true;
+        preorder[v] = pre++;
+        stack1.push(v);
+        stack2.push(v);
+        for (int w : G.adj(v)) {
+            if (!marked[w]) dfs(G, w);
+            else if (id[w] == -1) {
+                while (preorder[stack2.peek()] > preorder[w])
+                    stack2.pop();
+            }
+        }
+
+        // found strong component containing v
+        if (stack2.peek() == v) {
+            stack2.pop();
+            int w;
+            do {
+                w = stack1.pop();
+                id[w] = count;
+            } while (w != v);
+            count++;
+        }
+    }
+
+    public int count() {
+        return count;
+    }
+
+    public boolean stronglyConnected(int v, int w) {
+        validateVertex(v);
+        validateVertex(w);
+        return id[v] == id[w];
+    }
+
+    public int id(int v) {
+        validateVertex(v);
+        return id[v];
+    }
+
+    // does the id[] array contain the strongly connected components?
+    private boolean check(Digraph G) {
+        TransitiveClosure tc = new TransitiveClosure(G);
+        for (int v = 0; v < G.V(); v++) {
+            for (int w = 0; w < G.V(); w++) {
+                if (stronglyConnected(v, w) != (tc.reachable(v, w) && tc.reachable(w, v)))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    // throw an IllegalArgumentException unless {@code 0 <= v < V}
+    private void validateVertex(int v) {
+        int V = marked.length;
+        if (v < 0 || v >= V)
+            throw new IllegalArgumentException("vertex " + v + " is not between 0 and " + (V-1));
+    }
+
+    public static void main(String[] args) {
+        In in = new In(args[0]);
+        Digraph G = new Digraph(in);
+        GabowSCC scc = new GabowSCC(G);
+
+        // number of connected components
+        int m = scc.count();
+        StdOut.println(m + " components");
+
+        // compute list of vertices in each strong component
+        Queue<Integer>[] components = (Queue<Integer>[]) new Queue[m];
+        for (int i = 0; i < m; i++) {
+            components[i] = new Queue<Integer>();
+        }
+        for (int v = 0; v < G.V(); v++) {
+            components[scc.id(v)].enqueue(v);
+        }
+
+        // print results
+        for (int i = 0; i < m; i++) {
+            for (int v : components[i]) {
+                StdOut.print(v + " ");
+            }
+            StdOut.println();
+        }
+
+    }
+}
+```
+
+## Weighted  Graph
+
+### Edge
+
+#### Edge API
+
+```java
+public class Edge implements Comparable<Edge> { 
+
+    Edge(int v, int w, double weight)
+      
+    double weight()
+    int either()
+    int other(int vertex)
+		int compareTo(Edge that)
+    String toString()
+}
+```
+
+#### Edge Implementation
+
+```java
+public class Edge implements Comparable<Edge> { 
+
+    private final int v;
+    private final int w;
+    private final double weight;
+
+    public Edge(int v, int w, double weight) {
+        if (v < 0) throw new IllegalArgumentException("vertex index must be a nonnegative integer");
+        if (w < 0) throw new IllegalArgumentException("vertex index must be a nonnegative integer");
+        if (Double.isNaN(weight)) throw new IllegalArgumentException("Weight is NaN");
+        this.v = v;
+        this.w = w;
+        this.weight = weight;
+    }
+
+    public double weight() {
+        return weight;
+    }
+
+    public int either() {
+        return v;
+    }
+
+    public int other(int vertex) {
+        if      (vertex == v) return w;
+        else if (vertex == w) return v;
+        else throw new IllegalArgumentException("Illegal endpoint");
+    }
+
+    @Override
+    public int compareTo(Edge that) {
+        return Double.compare(this.weight, that.weight);
+    }
+
+    public String toString() {
+        return String.format("%d-%d %.5f", v, w, weight);
+    }
+}
+```
+
+### Edge-Weighted Graph
+
+#### API
+
+```java
+public class EdgeWeightedGraph {
+    
+    EdgeWeightedGraph(int V)
+		EdgeWeightedGraph(int V, int E)
+    EdgeWeightedGraph(In in)
+	  EdgeWeightedGraph(EdgeWeightedGraph G)
+		
+    // number of vertexes
+    int V()
+    int E()
+    void addEdge(Edge e)
+    Iterable<Edge> adj(int v)
+		int degree(int v)
+		Iterable<Edge> edges()
+		String toString()
+}
+```
+
+#### Implementation
+
+```java
+public class EdgeWeightedGraph {
+    private static final String NEWLINE = System.getProperty("line.separator");
+
+    private final int V;
+    private int E;
+    private Bag<Edge>[] adj;
+    
+    public EdgeWeightedGraph(int V) {
+        if (V < 0) throw new IllegalArgumentException("Number of vertices must be nonnegative");
+        this.V = V;
+        this.E = 0;
+        adj = (Bag<Edge>[]) new Bag[V];
+        for (int v = 0; v < V; v++) {
+            adj[v] = new Bag<Edge>();
+        }
+    }
+
+    public EdgeWeightedGraph(int V, int E) {
+        this(V);
+        if (E < 0) throw new IllegalArgumentException("Number of edges must be nonnegative");
+        for (int i = 0; i < E; i++) {
+            int v = StdRandom.uniform(V);
+            int w = StdRandom.uniform(V);
+            double weight = Math.round(100 * StdRandom.uniform()) / 100.0;
+            Edge e = new Edge(v, w, weight);
+            addEdge(e);
+        }
+    }
+
+    public EdgeWeightedGraph(In in) {
+        if (in == null) throw new IllegalArgumentException("argument is null");
+
+        try {
+            V = in.readInt();
+            adj = (Bag<Edge>[]) new Bag[V];
+            for (int v = 0; v < V; v++) {
+                adj[v] = new Bag<Edge>();
+            }
+
+            int E = in.readInt();
+            if (E < 0) throw new IllegalArgumentException("Number of edges must be nonnegative");
+            for (int i = 0; i < E; i++) {
+                int v = in.readInt();
+                int w = in.readInt();
+                validateVertex(v);
+                validateVertex(w);
+                double weight = in.readDouble();
+                Edge e = new Edge(v, w, weight);
+                addEdge(e);
+            }
+        }   
+        catch (NoSuchElementException e) {
+            throw new IllegalArgumentException("invalid input format in EdgeWeightedGraph constructor", e);
+        }
+
+    }
+
+    public EdgeWeightedGraph(EdgeWeightedGraph G) {
+        this(G.V());
+        this.E = G.E();
+        for (int v = 0; v < G.V(); v++) {
+            // reverse so that adjacency list is in same order as original
+            Stack<Edge> reverse = new Stack<Edge>();
+            for (Edge e : G.adj[v]) {
+                reverse.push(e);
+            }
+            for (Edge e : reverse) {
+                adj[v].add(e);
+            }
+        }
+    }
+
+
+    public int V() {
+        return V;
+    }
+
+    public int E() {
+        return E;
+    }
+
+    // throw an IllegalArgumentException unless {@code 0 <= v < V}
+    private void validateVertex(int v) {
+        if (v < 0 || v >= V)
+            throw new IllegalArgumentException("vertex " + v + " is not between 0 and " + (V-1));
+    }
+
+    public void addEdge(Edge e) {
+        int v = e.either();
+        int w = e.other(v);
+        validateVertex(v);
+        validateVertex(w);
+        adj[v].add(e);
+        adj[w].add(e);
+        E++;
+    }
+
+    public Iterable<Edge> adj(int v) {
+        validateVertex(v);
+        return adj[v];
+    }
+
+    public int degree(int v) {
+        validateVertex(v);
+        return adj[v].size();
+    }
+
+    public Iterable<Edge> edges() {
+        Bag<Edge> list = new Bag<Edge>();
+        for (int v = 0; v < V; v++) {
+            int selfLoops = 0;
+            for (Edge e : adj(v)) {
+                if (e.other(v) > v) {
+                    list.add(e);
+                }
+                // add only one copy of each self loop (self loops will be consecutive)
+                else if (e.other(v) == v) {
+                    if (selfLoops % 2 == 0) list.add(e);
+                    selfLoops++;
+                }
+            }
+        }
+        return list;
+    }
+
+    public String toString() {
+        StringBuilder s = new StringBuilder();
+        s.append(V + " " + E + NEWLINE);
+        for (int v = 0; v < V; v++) {
+            s.append(v + ": ");
+            for (Edge e : adj[v]) {
+                s.append(e + "  ");
+            }
+            s.append(NEWLINE);
+        }
+        return s.toString();
+    }
+}
+```
+
+## Weighted  Digraph
+
+### Directed Edge
+
+#### API
+
+```java
+public class DirectedEdge { 
+    DirectedEdge(int v, int w, double weight)
+    int from()
+    int to()
+    double weight()
+    String toString()
+}
+```
+
+#### Implementation
+
+```java
+public class Edge implements Comparable<Edge> { 
+
+    private final int v;
+    private final int w;
+    private final double weight;
+
+    public Edge(int v, int w, double weight) {
+        if (v < 0) throw new IllegalArgumentException("vertex index must be a nonnegative integer");
+        if (w < 0) throw new IllegalArgumentException("vertex index must be a nonnegative integer");
+        if (Double.isNaN(weight)) throw new IllegalArgumentException("Weight is NaN");
+        this.v = v;
+        this.w = w;
+        this.weight = weight;
+    }
+
+    public double weight() {
+        return weight;
+    }
+
+    public int either() {
+        return v;
+    }
+
+    public int other(int vertex) {
+        if      (vertex == v) return w;
+        else if (vertex == w) return v;
+        else throw new IllegalArgumentException("Illegal endpoint");
+    }
+
+    @Override
+    public int compareTo(Edge that) {
+        return Double.compare(this.weight, that.weight);
+    }
+
+    public String toString() {
+        return String.format("%d-%d %.5f", v, w, weight);
+    }
+}
+```
+
+### Edge-Weighted Digraph
+
+#### API
+
+```java
+public class EdgeWeightedDigraph {
+    EdgeWeightedDigraph(int V)
+    EdgeWeightedDigraph(int V, int E)
+    EdgeWeightedDigraph(In in)
+    EdgeWeightedDigraph(EdgeWeightedDigraph G)
+      
+    int V()
+    int E()
+    void addEdge(DirectedEdge e)
+    int outdegree(int v)
+    int indegree(int v)
+    Iterable<DirectedEdge> edges()
+    String toString()
+}
+```
+
+#### Implementation
+
+```java
+public class EdgeWeightedDigraph {
+    private static final String NEWLINE = System.getProperty("line.separator");
+
+    private final int V;                // number of vertices in this digraph
+    private int E;                      // number of edges in this digraph
+    private Bag<DirectedEdge>[] adj;    // adj[v] = adjacency list for vertex v
+    private int[] indegree;             // indegree[v] = indegree of vertex v
+    
+    public EdgeWeightedDigraph(int V) {
+        if (V < 0) throw new IllegalArgumentException("Number of vertices in a Digraph must be nonnegative");
+        this.V = V;
+        this.E = 0;
+        this.indegree = new int[V];
+        adj = (Bag<DirectedEdge>[]) new Bag[V];
+        for (int v = 0; v < V; v++)
+            adj[v] = new Bag<DirectedEdge>();
+    }
+
+    public EdgeWeightedDigraph(int V, int E) {
+        this(V);
+        if (E < 0) throw new IllegalArgumentException("Number of edges in a Digraph must be nonnegative");
+        for (int i = 0; i < E; i++) {
+            int v = StdRandom.uniform(V);
+            int w = StdRandom.uniform(V);
+            double weight = 0.01 * StdRandom.uniform(100);
+            DirectedEdge e = new DirectedEdge(v, w, weight);
+            addEdge(e);
+        }
+    }
+
+    public EdgeWeightedDigraph(In in) {
+        if (in == null) throw new IllegalArgumentException("argument is null");
+        try {
+            this.V = in.readInt();
+            if (V < 0) throw new IllegalArgumentException("number of vertices in a Digraph must be nonnegative");
+            indegree = new int[V];
+            adj = (Bag<DirectedEdge>[]) new Bag[V];
+            for (int v = 0; v < V; v++) {
+                adj[v] = new Bag<DirectedEdge>();
+            }
+
+            int E = in.readInt();
+            if (E < 0) throw new IllegalArgumentException("Number of edges must be nonnegative");
+            for (int i = 0; i < E; i++) {
+                int v = in.readInt();
+                int w = in.readInt();
+                validateVertex(v);
+                validateVertex(w);
+                double weight = in.readDouble();
+                addEdge(new DirectedEdge(v, w, weight));
+            }
+        }   
+        catch (NoSuchElementException e) {
+            throw new IllegalArgumentException("invalid input format in EdgeWeightedDigraph constructor", e);
+        }
+    }
+
+    public EdgeWeightedDigraph(EdgeWeightedDigraph G) {
+        this(G.V());
+        this.E = G.E();
+        for (int v = 0; v < G.V(); v++)
+            this.indegree[v] = G.indegree(v);
+        for (int v = 0; v < G.V(); v++) {
+            // reverse so that adjacency list is in same order as original
+            Stack<DirectedEdge> reverse = new Stack<DirectedEdge>();
+            for (DirectedEdge e : G.adj[v]) {
+                reverse.push(e);
+            }
+            for (DirectedEdge e : reverse) {
+                adj[v].add(e);
+            }
+        }
+    }
+  
+    public int V() {
+        return V;
+    }
+
+    public int E() {
+        return E;
+    }
+
+    // throw an IllegalArgumentException unless {@code 0 <= v < V}
+    private void validateVertex(int v) {
+        if (v < 0 || v >= V)
+            throw new IllegalArgumentException("vertex " + v + " is not between 0 and " + (V-1));
+    }
+
+    public void addEdge(DirectedEdge e) {
+        int v = e.from();
+        int w = e.to();
+        validateVertex(v);
+        validateVertex(w);
+        adj[v].add(e);
+        indegree[w]++;
+        E++;
+    }
+
+    public Iterable<DirectedEdge> adj(int v) {
+        validateVertex(v);
+        return adj[v];
+    }
+
+    public int outdegree(int v) {
+        validateVertex(v);
+        return adj[v].size();
+    }
+
+    public int indegree(int v) {
+        validateVertex(v);
+        return indegree[v];
+    }
+
+    public Iterable<DirectedEdge> edges() {
+        Bag<DirectedEdge> list = new Bag<DirectedEdge>();
+        for (int v = 0; v < V; v++) {
+            for (DirectedEdge e : adj(v)) {
+                list.add(e);
+            }
+        }
+        return list;
+    } 
+
+    public String toString() {
+        StringBuilder s = new StringBuilder();
+        s.append(V + " " + E + NEWLINE);
+        for (int v = 0; v < V; v++) {
+            s.append(v + ": ");
+            for (DirectedEdge e : adj[v]) {
+                s.append(e + "  ");
+            }
+            s.append(NEWLINE);
+        }
+        return s.toString();
+    }
+}
+```
+
+## Spanning Tree
+
+Given an undirected graph `G`with positive edge weights, a spanning tree of G is a subgraph `T` that is both a tree(connected and acyclic) and spanning(includes all of the vertices).
+
+**Minimum Spanning Tree(MST):** is the spanning tree with smallest weight.
+
+**Cut:** A `cut` in a graph is a partition of its vertices into two(non-empty) sets.
+
+**Crossing Edge: **A `crossing edge` connects a vertex in one set with a vertex in the other.
+
+**Cut property: ** Given any `cut`, the `crossing edge` of min weight is in the MST.
+
+![image-20201231214723959](Asserts/Graph/image-20201231214723959.png)
+
+### Kruskal's Algorithm
+
+1. Sort the edges by weight in asc order.
+2. Pick the minimal weight that will not create a cycle.
+
+```java
+public class KruskalMST {
+    private static final double FLOATING_POINT_EPSILON = 1E-12;
+
+    private double weight;                        // weight of MST
+    private Queue<Edge> mst = new Queue<Edge>();  // edges in MST
+
+    public KruskalMST(EdgeWeightedGraph G) {
+        // more efficient to build heap by passing array of edges
+        MinPQ<Edge> pq = new MinPQ<Edge>();
+        for (Edge e : G.edges()) {
+            pq.insert(e);
+        }
+
+        // run greedy algorithm
+        UF uf = new UF(G.V());
+        while (!pq.isEmpty() && mst.size() < G.V() - 1) {
+            Edge e = pq.delMin();
+            int v = e.either();
+            int w = e.other(v);
+            if (uf.find(v) != uf.find(w)) { // v-w does not create a cycle
+                uf.union(v, w);  // merge v and w components
+                mst.enqueue(e);  // add edge e to mst
+                weight += e.weight();
+            }
+        }
+
+        // check optimality conditions
+        assert check(G);
+    }
+
+    public Iterable<Edge> edges() {
+        return mst;
+    }
+
+    public double weight() {
+        return weight;
+    }
+    
+    // check optimality conditions (takes time proportional to E V lg* V)
+    private boolean check(EdgeWeightedGraph G) {
+
+        // check total weight
+        double total = 0.0;
+        for (Edge e : edges()) {
+            total += e.weight();
+        }
+        if (Math.abs(total - weight()) > FLOATING_POINT_EPSILON) {
+            System.err.printf("Weight of edges does not equal weight(): %f vs. %f\n", total, weight());
+            return false;
+        }
+
+        // check that it is acyclic
+        UF uf = new UF(G.V());
+        for (Edge e : edges()) {
+            int v = e.either(), w = e.other(v);
+            if (uf.find(v) == uf.find(w)) {
+                System.err.println("Not a forest");
+                return false;
+            }
+            uf.union(v, w);
+        }
+
+        // check that it is a spanning forest
+        for (Edge e : G.edges()) {
+            int v = e.either(), w = e.other(v);
+            if (uf.find(v) != uf.find(w)) {
+                System.err.println("Not a spanning forest");
+                return false;
+            }
+        }
+
+        // check that it is a minimal spanning forest (cut optimality conditions)
+        for (Edge e : edges()) {
+
+            // all edges in MST except e
+            uf = new UF(G.V());
+            for (Edge f : mst) {
+                int x = f.either(), y = f.other(x);
+                if (f != e) uf.union(x, y);
+            }
+            
+            // check that e is min weight edge in crossing cut
+            for (Edge f : G.edges()) {
+                int x = f.either(), y = f.other(x);
+                if (uf.find(x) != uf.find(y)) {
+                    if (f.weight() < e.weight()) {
+                        System.err.println("Edge " + f + " violates cut optimality conditions");
+                        return false;
+                    }
+                }
+            }
+
+        }
+
+        return true;
+    }
+
+    public static void main(String[] args) {
+        In in = new In(args[0]);
+        EdgeWeightedGraph G = new EdgeWeightedGraph(in);
+        KruskalMST mst = new KruskalMST(G);
+        for (Edge e : mst.edges()) {
+            StdOut.println(e);
+        }
+        StdOut.printf("%.5f\n", mst.weight());
+    }
+
+}
+```
+
+### Prim's Algorithm
+
+1. Start from first edge, add all it's edges to the priority queue
+2. Find the minimal weight and make sure the vertex `w` is not already in the tree.
+3. Add `w` to the tree, and add all edges that connected to `w` but the vertex is not already in the tree to the priority queue.
+4. Repeat until V - 1 edges.
+
+#### Lazy Implementation
+
+Left the invalid edges in the priority queue and pop it off when necessary.
+
+```java
+public class LazyPrimMST {
+    private static final double FLOATING_POINT_EPSILON = 1E-12;
+
+    private double weight;       // total weight of MST
+    private Queue<Edge> mst;     // edges in the MST
+    private boolean[] marked;    // marked[v] = true iff v on tree
+    private MinPQ<Edge> pq;      // edges with one endpoint in tree
+    public LazyPrimMST(EdgeWeightedGraph G) {
+        mst = new Queue<Edge>();
+        pq = new MinPQ<Edge>();
+        marked = new boolean[G.V()];
+        for (int v = 0; v < G.V(); v++)     // run Prim from all vertices to
+            if (!marked[v]) prim(G, v);     // get a minimum spanning forest
+
+        // check optimality conditions
+        assert check(G);
+    }
+
+    // run Prim's algorithm
+    private void prim(EdgeWeightedGraph G, int s) {
+        scan(G, s);
+        while (!pq.isEmpty()) {                        // better to stop when mst has V-1 edges
+            Edge e = pq.delMin();                      // smallest edge on pq
+            int v = e.either(), w = e.other(v);        // two endpoints
+            assert marked[v] || marked[w];
+            if (marked[v] && marked[w]) continue;      // lazy, both v and w already scanned
+            mst.enqueue(e);                            // add e to MST
+            weight += e.weight();
+            if (!marked[v]) scan(G, v);               // v becomes part of tree
+            if (!marked[w]) scan(G, w);               // w becomes part of tree
+        }
+    }
+
+    // add all edges e incident to v onto pq if the other endpoint has not yet been scanned
+    private void scan(EdgeWeightedGraph G, int v) {
+        assert !marked[v];
+        marked[v] = true;
+        for (Edge e : G.adj(v))
+            if (!marked[e.other(v)]) pq.insert(e);
+    }
+        
+    public Iterable<Edge> edges() {
+        return mst;
+    }
+
+    public double weight() {
+        return weight;
+    }
+
+    // check optimality conditions (takes time proportional to E V lg* V)
+    private boolean check(EdgeWeightedGraph G) {
+
+        // check weight
+        double totalWeight = 0.0;
+        for (Edge e : edges()) {
+            totalWeight += e.weight();
+        }
+        if (Math.abs(totalWeight - weight()) > FLOATING_POINT_EPSILON) {
+            System.err.printf("Weight of edges does not equal weight(): %f vs. %f\n", totalWeight, weight());
+            return false;
+        }
+
+        // check that it is acyclic
+        UF uf = new UF(G.V());
+        for (Edge e : edges()) {
+            int v = e.either(), w = e.other(v);
+            if (uf.find(v) == uf.find(w)) {
+                System.err.println("Not a forest");
+                return false;
+            }
+            uf.union(v, w);
+        }
+
+        // check that it is a spanning forest
+        for (Edge e : G.edges()) {
+            int v = e.either(), w = e.other(v);
+            if (uf.find(v) != uf.find(w)) {
+                System.err.println("Not a spanning forest");
+                return false;
+            }
+        }
+
+        // check that it is a minimal spanning forest (cut optimality conditions)
+        for (Edge e : edges()) {
+
+            // all edges in MST except e
+            uf = new UF(G.V());
+            for (Edge f : mst) {
+                int x = f.either(), y = f.other(x);
+                if (f != e) uf.union(x, y);
+            }
+
+            // check that e is min weight edge in crossing cut
+            for (Edge f : G.edges()) {
+                int x = f.either(), y = f.other(x);
+                if (uf.find(x) != uf.find(y)) {
+                    if (f.weight() < e.weight()) {
+                        System.err.println("Edge " + f + " violates cut optimality conditions");
+                        return false;
+                    }
+                }
+            }
+
+        }
+
+        return true;
+    }
+    
+    
+    public static void main(String[] args) {
+        In in = new In(args[0]);
+        EdgeWeightedGraph G = new EdgeWeightedGraph(in);
+        LazyPrimMST mst = new LazyPrimMST(G);
+        for (Edge e : mst.edges()) {
+            StdOut.println(e);
+        }
+        StdOut.printf("%.5f\n", mst.weight());
+    }
+
+}
+
+```
+
+#### Eager Implementation
+
+```java
+public class PrimMST {
+    private static final double FLOATING_POINT_EPSILON = 1E-12;
+
+    private Edge[] edgeTo;        // edgeTo[v] = shortest edge from tree vertex to non-tree vertex
+    private double[] distTo;      // distTo[v] = weight of shortest such edge
+    private boolean[] marked;     // marked[v] = true if v on tree, false otherwise
+    private IndexMinPQ<Double> pq;
+
+    public PrimMST(EdgeWeightedGraph G) {
+        edgeTo = new Edge[G.V()];
+        distTo = new double[G.V()];
+        marked = new boolean[G.V()];
+        pq = new IndexMinPQ<Double>(G.V());
+        for (int v = 0; v < G.V(); v++)
+            distTo[v] = Double.POSITIVE_INFINITY;
+
+        for (int v = 0; v < G.V(); v++)      // run from each vertex to find
+            if (!marked[v]) prim(G, v);      // minimum spanning forest
+
+        // check optimality conditions
+        assert check(G);
+    }
+
+    // run Prim's algorithm in graph G, starting from vertex s
+    private void prim(EdgeWeightedGraph G, int s) {
+        distTo[s] = 0.0;
+        pq.insert(s, distTo[s]);
+        while (!pq.isEmpty()) {
+            int v = pq.delMin();
+            scan(G, v);
+        }
+    }
+
+    // scan vertex v
+    private void scan(EdgeWeightedGraph G, int v) {
+        marked[v] = true;
+        for (Edge e : G.adj(v)) {
+            int w = e.other(v);
+            if (marked[w]) continue;         // v-w is obsolete edge
+            if (e.weight() < distTo[w]) {
+                distTo[w] = e.weight();
+                edgeTo[w] = e;
+                if (pq.contains(w)) pq.decreaseKey(w, distTo[w]);
+                else                pq.insert(w, distTo[w]);
+            }
+        }
+    }
+
+    public Iterable<Edge> edges() {
+        Queue<Edge> mst = new Queue<Edge>();
+        for (int v = 0; v < edgeTo.length; v++) {
+            Edge e = edgeTo[v];
+            if (e != null) {
+                mst.enqueue(e);
+            }
+        }
+        return mst;
+    }
+
+    public double weight() {
+        double weight = 0.0;
+        for (Edge e : edges())
+            weight += e.weight();
+        return weight;
+    }
+
+
+    // check optimality conditions (takes time proportional to E V lg* V)
+    private boolean check(EdgeWeightedGraph G) {
+
+        // check weight
+        double totalWeight = 0.0;
+        for (Edge e : edges()) {
+            totalWeight += e.weight();
+        }
+        if (Math.abs(totalWeight - weight()) > FLOATING_POINT_EPSILON) {
+            System.err.printf("Weight of edges does not equal weight(): %f vs. %f\n", totalWeight, weight());
+            return false;
+        }
+
+        // check that it is acyclic
+        UF uf = new UF(G.V());
+        for (Edge e : edges()) {
+            int v = e.either(), w = e.other(v);
+            if (uf.find(v) == uf.find(w)) {
+                System.err.println("Not a forest");
+                return false;
+            }
+            uf.union(v, w);
+        }
+
+        // check that it is a spanning forest
+        for (Edge e : G.edges()) {
+            int v = e.either(), w = e.other(v);
+            if (uf.find(v) != uf.find(w)) {
+                System.err.println("Not a spanning forest");
+                return false;
+            }
+        }
+
+        // check that it is a minimal spanning forest (cut optimality conditions)
+        for (Edge e : edges()) {
+
+            // all edges in MST except e
+            uf = new UF(G.V());
+            for (Edge f : edges()) {
+                int x = f.either(), y = f.other(x);
+                if (f != e) uf.union(x, y);
+            }
+
+            // check that e is min weight edge in crossing cut
+            for (Edge f : G.edges()) {
+                int x = f.either(), y = f.other(x);
+                if (uf.find(x) != uf.find(y)) {
+                    if (f.weight() < e.weight()) {
+                        System.err.println("Edge " + f + " violates cut optimality conditions");
+                        return false;
+                    }
+                }
+            }
+
+        }
+
+        return true;
+    }
+
+    public static void main(String[] args) {
+        In in = new In(args[0]);
+        EdgeWeightedGraph G = new EdgeWeightedGraph(in);
+        PrimMST mst = new PrimMST(G);
+        for (Edge e : mst.edges()) {
+            StdOut.println(e);
+        }
+        StdOut.printf("%.5f\n", mst.weight());
+    }
+
+}
+```
+
+## Shortest path
+
+Like MST but the shortest path applied to digraph.
+
+> **_Optimality Condition:_** Let G be an edge-weighted digraph.
+>
+> The distTo[] are the shortest path distances from `s` iff:
+>
+> - dist[s] = 0
+> - For each vertex `v`, distTo[v] is the length of some path from `s` to `v`
+> - For each edge $e = v \rightarrow w, distTo[w] \le distTo[v] + e.weight().$ 
+
+### Dijkstra's algorithm (nonnegative weights)
+
+1. Initialize $distTo[s]= 0$ and $distTo[v] = \infty$ for all other vertices
+2. Repeat until optimality conditions are satisfied:
+   - Relax any edge
+
+```java
+public class DijkstraSP {
+    private double[] distTo;          // distTo[v] = distance  of shortest s->v path
+    private DirectedEdge[] edgeTo;    // edgeTo[v] = last edge on shortest s->v path
+    private IndexMinPQ<Double> pq;    // priority queue of vertices
+
+    public DijkstraSP(EdgeWeightedDigraph G, int s) {
+        for (DirectedEdge e : G.edges()) {
+            if (e.weight() < 0)
+                throw new IllegalArgumentException("edge " + e + " has negative weight");
+        }
+
+        distTo = new double[G.V()];
+        edgeTo = new DirectedEdge[G.V()];
+
+        validateVertex(s);
+
+        for (int v = 0; v < G.V(); v++)
+            distTo[v] = Double.POSITIVE_INFINITY;
+        distTo[s] = 0.0;
+
+        // relax vertices in order of distance from s
+        pq = new IndexMinPQ<Double>(G.V());
+        pq.insert(s, distTo[s]);
+        while (!pq.isEmpty()) {
+            int v = pq.delMin();
+            for (DirectedEdge e : G.adj(v))
+                relax(e);
+        }
+
+        // check optimality conditions
+        assert check(G, s);
+    }
+
+    // relax edge e and update pq if changed
+    private void relax(DirectedEdge e) {
+        int v = e.from(), w = e.to();
+        if (distTo[w] > distTo[v] + e.weight()) {
+            distTo[w] = distTo[v] + e.weight();
+            edgeTo[w] = e;
+            if (pq.contains(w)) pq.decreaseKey(w, distTo[w]);
+            else                pq.insert(w, distTo[w]);
+        }
+    }
+
+    public double distTo(int v) {
+        validateVertex(v);
+        return distTo[v];
+    }
+
+    public boolean hasPathTo(int v) {
+        validateVertex(v);
+        return distTo[v] < Double.POSITIVE_INFINITY;
+    }
+
+    public Iterable<DirectedEdge> pathTo(int v) {
+        validateVertex(v);
+        if (!hasPathTo(v)) return null;
+        Stack<DirectedEdge> path = new Stack<DirectedEdge>();
+        for (DirectedEdge e = edgeTo[v]; e != null; e = edgeTo[e.from()]) {
+            path.push(e);
+        }
+        return path;
+    }
+
+
+    // check optimality conditions:
+    // (i) for all edges e:            distTo[e.to()] <= distTo[e.from()] + e.weight()
+    // (ii) for all edge e on the SPT: distTo[e.to()] == distTo[e.from()] + e.weight()
+    private boolean check(EdgeWeightedDigraph G, int s) {
+
+        // check that edge weights are nonnegative
+        for (DirectedEdge e : G.edges()) {
+            if (e.weight() < 0) {
+                System.err.println("negative edge weight detected");
+                return false;
+            }
+        }
+
+        // check that distTo[v] and edgeTo[v] are consistent
+        if (distTo[s] != 0.0 || edgeTo[s] != null) {
+            System.err.println("distTo[s] and edgeTo[s] inconsistent");
+            return false;
+        }
+        for (int v = 0; v < G.V(); v++) {
+            if (v == s) continue;
+            if (edgeTo[v] == null && distTo[v] != Double.POSITIVE_INFINITY) {
+                System.err.println("distTo[] and edgeTo[] inconsistent");
+                return false;
+            }
+        }
+
+        // check that all edges e = v->w satisfy distTo[w] <= distTo[v] + e.weight()
+        for (int v = 0; v < G.V(); v++) {
+            for (DirectedEdge e : G.adj(v)) {
+                int w = e.to();
+                if (distTo[v] + e.weight() < distTo[w]) {
+                    System.err.println("edge " + e + " not relaxed");
+                    return false;
+                }
+            }
+        }
+
+        // check that all edges e = v->w on SPT satisfy distTo[w] == distTo[v] + e.weight()
+        for (int w = 0; w < G.V(); w++) {
+            if (edgeTo[w] == null) continue;
+            DirectedEdge e = edgeTo[w];
+            int v = e.from();
+            if (w != e.to()) return false;
+            if (distTo[v] + e.weight() != distTo[w]) {
+                System.err.println("edge " + e + " on shortest path not tight");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // throw an IllegalArgumentException unless {@code 0 <= v < V}
+    private void validateVertex(int v) {
+        int V = distTo.length;
+        if (v < 0 || v >= V)
+            throw new IllegalArgumentException("vertex " + v + " is not between 0 and " + (V-1));
+    }
+  
+    public static void main(String[] args) {
+        In in = new In(args[0]);
+        EdgeWeightedDigraph G = new EdgeWeightedDigraph(in);
+        int s = Integer.parseInt(args[1]);
+
+        // compute shortest paths
+        DijkstraSP sp = new DijkstraSP(G, s);
+
+
+        // print shortest path
+        for (int t = 0; t < G.V(); t++) {
+            if (sp.hasPathTo(t)) {
+                StdOut.printf("%d to %d (%.2f)  ", s, t, sp.distTo(t));
+                for (DirectedEdge e : sp.pathTo(t)) {
+                    StdOut.print(e + "   ");
+                }
+                StdOut.println();
+            }
+            else {
+                StdOut.printf("%d to %d         no path\n", s, t);
+            }
+        }
+    }
+}
+```
+
+### Topological sort algorithm(no directed cycles)
+
+### Bellman-Ford algorithm(no negative cycles)
 
