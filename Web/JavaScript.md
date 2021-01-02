@@ -747,7 +747,11 @@ app.get('/greet', (req, res) => {
 })
 ```
 
+#### Session
 
+Cookies stores information on client side,  but there are some limitations like size and number of cookies are allowed for single domain.
+
+Session, which store information on server side and user will store session id on cookies to reduce the cookies size.
 
 ## Templating With EJS
 
@@ -880,6 +884,8 @@ app.use((err, req, res, next) => {
 });
 
 ```
+
+## Authentication
 
 
 
