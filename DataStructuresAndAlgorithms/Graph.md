@@ -740,6 +740,148 @@ public class Cycle {
 }
 ```
 
+#### Directed Cycle
+
+```java
+public class EdgeWeightedDirectedCycle {
+    private boolean[] marked;             // marked[v] = has vertex v been marked?
+    private DirectedEdge[] edgeTo;        // edgeTo[v] = previous edge on path to v
+    private boolean[] onStack;            // onStack[v] = is vertex on the stack?
+    private Stack<DirectedEdge> cycle;    // directed cycle (or null if no such cycle)
+
+    public EdgeWeightedDirectedCycle(EdgeWeightedDigraph G) {
+        marked  = new boolean[G.V()];
+        onStack = new boolean[G.V()];
+        edgeTo  = new DirectedEdge[G.V()];
+        for (int v = 0; v < G.V(); v++)
+            if (!marked[v]) dfs(G, v);
+
+        // check that digraph has a cycle
+        assert check();
+    }
+
+    // check that algorithm computes either the topological order or finds a directed cycle
+    private void dfs(EdgeWeightedDigraph G, int v) {
+        onStack[v] = true;
+        marked[v] = true;
+        for (DirectedEdge e : G.adj(v)) {
+            int w = e.to();
+
+            // short circuit if directed cycle found
+            if (cycle != null) return;
+
+            // found new vertex, so recur
+            else if (!marked[w]) {
+                edgeTo[w] = e;
+                dfs(G, w);
+            }
+
+            // trace back directed cycle
+            else if (onStack[w]) {
+                cycle = new Stack<DirectedEdge>();
+
+                DirectedEdge f = e;
+                while (f.from() != w) {
+                    cycle.push(f);
+                    f = edgeTo[f.from()];
+                }
+                cycle.push(f);
+
+                return;
+            }
+        }
+
+        onStack[v] = false;
+    }
+
+    public boolean hasCycle() {
+        return cycle != null;
+    }
+
+    public Iterable<DirectedEdge> cycle() {
+        return cycle;
+    }
+
+
+    // certify that digraph is either acyclic or has a directed cycle
+    private boolean check() {
+
+        // edge-weighted digraph is cyclic
+        if (hasCycle()) {
+            // verify cycle
+            DirectedEdge first = null, last = null;
+            for (DirectedEdge e : cycle()) {
+                if (first == null) first = e;
+                if (last != null) {
+                    if (last.to() != e.from()) {
+                        System.err.printf("cycle edges %s and %s not incident\n", last, e);
+                        return false;
+                    }
+                }
+                last = e;
+            }
+
+            if (last.to() != first.from()) {
+                System.err.printf("cycle edges %s and %s not incident\n", last, first);
+                return false;
+            }
+        }
+
+
+        return true;
+    }
+
+    public static void main(String[] args) {
+
+        // create random DAG with V vertices and E edges; then add F random edges
+        int V = Integer.parseInt(args[0]);
+        int E = Integer.parseInt(args[1]);
+        int F = Integer.parseInt(args[2]);
+        EdgeWeightedDigraph G = new EdgeWeightedDigraph(V);
+        int[] vertices = new int[V];
+        for (int i = 0; i < V; i++)
+            vertices[i] = i;
+        StdRandom.shuffle(vertices);
+        for (int i = 0; i < E; i++) {
+            int v, w;
+            do {
+                v = StdRandom.uniform(V);
+                w = StdRandom.uniform(V);
+            } while (v >= w);
+            double weight = StdRandom.uniform();
+            G.addEdge(new DirectedEdge(v, w, weight));
+        }
+
+        // add F extra edges
+        for (int i = 0; i < F; i++) {
+            int v = StdRandom.uniform(V);
+            int w = StdRandom.uniform(V);
+            double weight = StdRandom.uniform(0.0, 1.0);
+            G.addEdge(new DirectedEdge(v, w, weight));
+        }
+
+        StdOut.println(G);
+
+        // find a directed cycle
+        EdgeWeightedDirectedCycle finder = new EdgeWeightedDirectedCycle(G);
+        if (finder.hasCycle()) {
+            StdOut.print("Cycle: ");
+            for (DirectedEdge e : finder.cycle()) {
+                StdOut.print(e + " ");
+            }
+            StdOut.println();
+        }
+
+        // or give topologial sort
+        else {
+            StdOut.println("No directed cycle");
+        }
+    }
+}
+```
+
+
+
 ## Directed Graphs
 
 A directed graph (or digraph) is a set of vertices and a collection of directed edges. Each directed edge connects an ordered pair of vertices.
@@ -907,6 +1049,8 @@ public class Digraph {
 
 ## Topological Sort
 
+### Depth First Order
+
 ```java
 public class DepthFirstOrder {
     private boolean[] marked;          // marked[v] = has v been marked in dfs?
@@ -1053,6 +1197,69 @@ public class DepthFirstOrder {
 
 }
 ```
+
+### Topological Sort
+
+```java
+public class Topological {
+    private Iterable<Integer> order;  // topological order
+    private int[] rank;               // rank[v] = rank of vertex v in order
+
+    public Topological(Digraph G) {
+        DirectedCycle finder = new DirectedCycle(G);
+        if (!finder.hasCycle()) {
+            DepthFirstOrder dfs = new DepthFirstOrder(G);
+            order = dfs.reversePost();
+            rank = new int[G.V()];
+            int i = 0;
+            for (int v : order)
+                rank[v] = i++;
+        }
+    }
+
+    public Topological(EdgeWeightedDigraph G) {
+        EdgeWeightedDirectedCycle finder = new EdgeWeightedDirectedCycle(G);
+        if (!finder.hasCycle()) {
+            DepthFirstOrder dfs = new DepthFirstOrder(G);
+            order = dfs.reversePost();
+        }
+    }
+
+    public Iterable<Integer> order() {
+        return order;
+    }
+
+    public boolean hasOrder() {
+        return order != null;
+    }
+
+    public int rank(int v) {
+        validateVertex(v);
+        if (hasOrder()) return rank[v];
+        else            return -1;
+    }
+
+    // throw an IllegalArgumentException unless {@code 0 <= v < V}
+    private void validateVertex(int v) {
+        int V = rank.length;
+        if (v < 0 || v >= V)
+            throw new IllegalArgumentException("vertex " + v + " is not between 0 and " + (V-1));
+    }
+  
+    public static void main(String[] args) {
+        String filename  = args[0];
+        String delimiter = args[1];
+        SymbolDigraph sg = new SymbolDigraph(filename, delimiter);
+        Topological topological = new Topological(sg.digraph());
+        for (int v : topological.order()) {
+            StdOut.println(sg.nameOf(v));
+        }
+    }
+
+}
+```
+
+
 
 ## Strong Connectivity In Digraphs
 
@@ -2431,5 +2638,288 @@ public class DijkstraSP {
 
 ### Topological sort algorithm(no directed cycles)
 
+```java
+public class AcyclicSP {
+    private double[] distTo;         // distTo[v] = distance  of shortest s->v path
+    private DirectedEdge[] edgeTo;   // edgeTo[v] = last edge on shortest s->v path
+
+    public AcyclicSP(EdgeWeightedDigraph G, int s) {
+        distTo = new double[G.V()];
+        edgeTo = new DirectedEdge[G.V()];
+
+        validateVertex(s);
+
+        for (int v = 0; v < G.V(); v++)
+            distTo[v] = Double.POSITIVE_INFINITY;
+        distTo[s] = 0.0;
+
+        // visit vertices in topological order
+        Topological topological = new Topological(G);
+        if (!topological.hasOrder())
+            throw new IllegalArgumentException("Digraph is not acyclic.");
+        for (int v : topological.order()) {
+            for (DirectedEdge e : G.adj(v))
+                relax(e);
+        }
+    }
+
+    // relax edge e
+    private void relax(DirectedEdge e) {
+        int v = e.from(), w = e.to();
+        if (distTo[w] > distTo[v] + e.weight()) {
+            distTo[w] = distTo[v] + e.weight();
+            edgeTo[w] = e;
+        }       
+    }
+
+    public double distTo(int v) {
+        validateVertex(v);
+        return distTo[v];
+    }
+
+    public boolean hasPathTo(int v) {
+        validateVertex(v);
+        return distTo[v] < Double.POSITIVE_INFINITY;
+    }
+
+    public Iterable<DirectedEdge> pathTo(int v) {
+        validateVertex(v);
+        if (!hasPathTo(v)) return null;
+        Stack<DirectedEdge> path = new Stack<DirectedEdge>();
+        for (DirectedEdge e = edgeTo[v]; e != null; e = edgeTo[e.from()]) {
+            path.push(e);
+        }
+        return path;
+    }
+
+    // throw an IllegalArgumentException unless {@code 0 <= v < V}
+    private void validateVertex(int v) {
+        int V = distTo.length;
+        if (v < 0 || v >= V)
+            throw new IllegalArgumentException("vertex " + v + " is not between 0 and " + (V-1));
+    }
+
+    public static void main(String[] args) {
+        In in = new In(args[0]);
+        int s = Integer.parseInt(args[1]);
+        EdgeWeightedDigraph G = new EdgeWeightedDigraph(in);
+
+        // find shortest path from s to each other vertex in DAG
+        AcyclicSP sp = new AcyclicSP(G, s);
+        for (int v = 0; v < G.V(); v++) {
+            if (sp.hasPathTo(v)) {
+                StdOut.printf("%d to %d (%.2f)  ", s, v, sp.distTo(v));
+                for (DirectedEdge e : sp.pathTo(v)) {
+                    StdOut.print(e + "   ");
+                }
+                StdOut.println();
+            }
+            else {
+                StdOut.printf("%d to %d         no path\n", s, v);
+            }
+        }
+    }
+}
+```
+
 ### Bellman-Ford algorithm(no negative cycles)
+
+```java
+public class BellmanFordSP {
+    // for floating-point precision issues
+    private static final double EPSILON = 1E-14;
+
+    private double[] distTo;               // distTo[v] = distance  of shortest s->v path
+    private DirectedEdge[] edgeTo;         // edgeTo[v] = last edge on shortest s->v path
+    private boolean[] onQueue;             // onQueue[v] = is v currently on the queue?
+    private Queue<Integer> queue;          // queue of vertices to relax
+    private int cost;                      // number of calls to relax()
+    private Iterable<DirectedEdge> cycle;  // negative cycle (or null if no such cycle)
+
+    public BellmanFordSP(EdgeWeightedDigraph G, int s) {
+        distTo  = new double[G.V()];
+        edgeTo  = new DirectedEdge[G.V()];
+        onQueue = new boolean[G.V()];
+        for (int v = 0; v < G.V(); v++)
+            distTo[v] = Double.POSITIVE_INFINITY;
+        distTo[s] = 0.0;
+
+        // Bellman-Ford algorithm
+        queue = new Queue<Integer>();
+        queue.enqueue(s);
+        onQueue[s] = true;
+        while (!queue.isEmpty() && !hasNegativeCycle()) {
+            int v = queue.dequeue();
+            onQueue[v] = false;
+            relax(G, v);
+        }
+
+        assert check(G, s);
+    }
+
+    // relax vertex v and put other endpoints on queue if changed
+    private void relax(EdgeWeightedDigraph G, int v) {
+        for (DirectedEdge e : G.adj(v)) {
+            int w = e.to();
+            if (distTo[w] > distTo[v] + e.weight() + EPSILON) {
+                distTo[w] = distTo[v] + e.weight();
+                edgeTo[w] = e;
+                if (!onQueue[w]) {
+                    queue.enqueue(w);
+                    onQueue[w] = true;
+                }
+            }
+            if (++cost % G.V() == 0) {
+                findNegativeCycle();
+                if (hasNegativeCycle()) return;  // found a negative cycle
+            }
+        }
+    }
+
+    public boolean hasNegativeCycle() {
+        return cycle != null;
+    }
+
+    public Iterable<DirectedEdge> negativeCycle() {
+        return cycle;
+    }
+
+    // by finding a cycle in predecessor graph
+    private void findNegativeCycle() {
+        int V = edgeTo.length;
+        EdgeWeightedDigraph spt = new EdgeWeightedDigraph(V);
+        for (int v = 0; v < V; v++)
+            if (edgeTo[v] != null)
+                spt.addEdge(edgeTo[v]);
+
+        EdgeWeightedDirectedCycle finder = new EdgeWeightedDirectedCycle(spt);
+        cycle = finder.cycle();
+    }
+
+    public double distTo(int v) {
+        validateVertex(v);
+        if (hasNegativeCycle())
+            throw new UnsupportedOperationException("Negative cost cycle exists");
+        return distTo[v];
+    }
+
+    public boolean hasPathTo(int v) {
+        validateVertex(v);
+        return distTo[v] < Double.POSITIVE_INFINITY;
+    }
+
+    public Iterable<DirectedEdge> pathTo(int v) {
+        validateVertex(v);
+        if (hasNegativeCycle())
+            throw new UnsupportedOperationException("Negative cost cycle exists");
+        if (!hasPathTo(v)) return null;
+        Stack<DirectedEdge> path = new Stack<DirectedEdge>();
+        for (DirectedEdge e = edgeTo[v]; e != null; e = edgeTo[e.from()]) {
+            path.push(e);
+        }
+        return path;
+    }
+
+    // check optimality conditions: either 
+    // (i) there exists a negative cycle reacheable from s
+    //     or 
+    // (ii)  for all edges e = v->w:            distTo[w] <= distTo[v] + e.weight()
+    // (ii') for all edges e = v->w on the SPT: distTo[w] == distTo[v] + e.weight()
+    private boolean check(EdgeWeightedDigraph G, int s) {
+
+        // has a negative cycle
+        if (hasNegativeCycle()) {
+            double weight = 0.0;
+            for (DirectedEdge e : negativeCycle()) {
+                weight += e.weight();
+            }
+            if (weight >= 0.0) {
+                System.err.println("error: weight of negative cycle = " + weight);
+                return false;
+            }
+        }
+
+        // no negative cycle reachable from source
+        else {
+
+            // check that distTo[v] and edgeTo[v] are consistent
+            if (distTo[s] != 0.0 || edgeTo[s] != null) {
+                System.err.println("distanceTo[s] and edgeTo[s] inconsistent");
+                return false;
+            }
+            for (int v = 0; v < G.V(); v++) {
+                if (v == s) continue;
+                if (edgeTo[v] == null && distTo[v] != Double.POSITIVE_INFINITY) {
+                    System.err.println("distTo[] and edgeTo[] inconsistent");
+                    return false;
+                }
+            }
+
+            // check that all edges e = v->w satisfy distTo[w] <= distTo[v] + e.weight()
+            for (int v = 0; v < G.V(); v++) {
+                for (DirectedEdge e : G.adj(v)) {
+                    int w = e.to();
+                    if (distTo[v] + e.weight() < distTo[w]) {
+                        System.err.println("edge " + e + " not relaxed");
+                        return false;
+                    }
+                }
+            }
+
+            // check that all edges e = v->w on SPT satisfy distTo[w] == distTo[v] + e.weight()
+            for (int w = 0; w < G.V(); w++) {
+                if (edgeTo[w] == null) continue;
+                DirectedEdge e = edgeTo[w];
+                int v = e.from();
+                if (w != e.to()) return false;
+                if (distTo[v] + e.weight() != distTo[w]) {
+                    System.err.println("edge " + e + " on shortest path not tight");
+                    return false;
+                }
+            }
+        }
+
+        StdOut.println("Satisfies optimality conditions");
+        StdOut.println();
+        return true;
+    }
+
+    // throw an IllegalArgumentException unless {@code 0 <= v < V}
+    private void validateVertex(int v) {
+        int V = distTo.length;
+        if (v < 0 || v >= V)
+            throw new IllegalArgumentException("vertex " + v + " is not between 0 and " + (V-1));
+    }
+
+    public static void main(String[] args) {
+        In in = new In(args[0]);
+        int s = Integer.parseInt(args[1]);
+        EdgeWeightedDigraph G = new EdgeWeightedDigraph(in);
+
+        BellmanFordSP sp = new BellmanFordSP(G, s);
+
+        // print negative cycle
+        if (sp.hasNegativeCycle()) {
+            for (DirectedEdge e : sp.negativeCycle())
+                StdOut.println(e);
+        }
+
+        // print shortest paths
+        else {
+            for (int v = 0; v < G.V(); v++) {
+                if (sp.hasPathTo(v)) {
+                    StdOut.printf("%d to %d (%5.2f)  ", s, v, sp.distTo(v));
+                    for (DirectedEdge e : sp.pathTo(v)) {
+                        StdOut.print(e + "   ");
+                    }
+                    StdOut.println();
+                }
+                else {
+                    StdOut.printf("%d to %d           no path\n", s, v);
+                }
+            }
+        }
+    }
+}
+```
 
