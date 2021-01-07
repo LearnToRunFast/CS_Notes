@@ -887,5 +887,9 @@ app.use((err, req, res, next) => {
 
 ## Authentication
 
+### Salt
+
+To prevent  different users have same hash code, we add different salt for different user to prevent brute force guess from common password.
+
 
 
