@@ -1,3 +1,5 @@
+[toc]
+
 # Virtualizaiton of CPU
 
 ## Key CPU virtualization terms
@@ -227,3 +229,67 @@ With address translation, the OS can control each and every memory access from a
 
 - **Internal fragmentation**: The space between two process maybe wasted(if it is too small to fit one process)
 
+# Segmentation
+
+With the **Dynamic relocation** we mentioned above, there is one issue.As you can imagine from Figure 16.1, although the space between the stack and heap is not being used by the process, it is still taking up physical memory when we relocate the entire address space somewhere in physical memory; thus, the simple approach of using a base and bounds register pair to virtualise memory is wasteful.
+
+![image-20210109191938298](Asserts/OS/image-20210109191938298.png)
+
+To solve this problem, an idea was born, and it is called `segmentation`.
+
+The idea is simple: instead of having just one base and bounds pair in our MMU, why not have a base and bounds pair per logical segment of the address space. A `segment` is just a contiguous portion of the address space of a particular length, and in our canonical address space, we have three logically-different segments: `code`, `stack`, and `heap`.
+
+What segmentation allows the OS to do is to place each one of those segments in different parts of physical memory, and thus avoid filling physical memory with unused virtual address space.
+
+![image-20210109192347092](Asserts/OS/image-20210109192347092.png)
+
+![image-20210109192702890](Asserts/OS/image-20210109192702890.png)
+
+> _**Note:**_ **Segmentation fault** arises from a memory access on a segmented machine to an illegal address.
+
+## Segmentation Referring
+
+### Use Top Bit
+
+If we use the top two bits of our 14-bit virtual address to select the segment, our virtual address.Let’s take our example heap virtual address from above (4200) and translate it, just to make sure this is clear. The virtual address 4200, in binary form, can be seen here:
+
+![image-20210109193818692](Asserts/OS/image-20210109193818692.png)
+
+**Issue of such approach**:
+
+1. We use two bits to holds three segments(code, heap , stack)
+2. It limits use of t he virtual address space.
+
+### Implicit Approach
+
+The hardware determines the segment by noticing how the address was formed. 
+
+If, for example, the address was generated from the program counter (i.e., it was an instruction fetch), then the address is within the code segment; if the address is based off of the stack or base pointer, it must be in the stack segment; any other address must be in the heap.
+
+### Backward Growing Stack
+
+The stack is grows backwards, it must be handle differently.We meed hardware support to know the segment grow direction.
+
+![image-20210109211224863](Asserts/OS/image-20210109211224863.png)
+
+## Support For Sharing
+
+It is useful to share certain memory segments between address spaces. In particular, code sharing is common and still in use in systems today.
+
+we need a little extra support from the hardware, in the form of `protection bits`. Basic support adds a few bits per segment, indicating whether or not a program can read or write a segment, or perhaps execute code that lies within the segment.
+
+![image-20210109212121051](Asserts/OS/image-20210109212121051.png)
+
+By setting a code segment to read-only, the same code can be shared across multiple processes, without worry of harming isolation.
+
+## OS Support
+
+Segmentation raises a number of new issues for the operating system. 
+
+1. what should the OS do on a context switch?The segment registers must be saved and restored. Clearly, each process has its own virtual address space, and the OS must make sure to set up these registers correctly before letting the process run again.
+2. OS interaction when segments grow (or perhaps shrink).Malloc for variables or maybe the heap itself need grows.
+3. Managing free space in physical memory. We have a number of segments per process, and each segment might be a different size.
+
+> _**Note:**_ The general problem that arises is that physical memory quickly becomes full of little holes of free space, making it difficult to allocate new segments, or to grow existing ones. We call this problem **external fragmentation**.
+
+A simple approach to `external fragmentation` is to use algorithm to choose the free spaces. Such as the `best-fit`(the closest free spaces in size that satisfies the desired allocation) free spaces, `worst-fit`, `first-fit` or more complex schemes like `buddy algorithm`.Unfortunately, though, no matter how smart the algorithm, external fragmentation will still exist; thus, a good algorithm simply attempts to minimize it.
