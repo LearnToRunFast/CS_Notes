@@ -445,12 +445,46 @@ const delayedColorChange = (color, delay) => {
     }, delay);
   });
 }
-
+// return the promise object, then you can chain with .then()
 delayedColorChange('red', 1000)
 	.then(() => delayedColorChange('orange', 1000))
 	.then(() => {
   		return delayedColorChange('blue', 1000)}) // this is same as one line return
-	.then(() => delayedColorChange('yellow', 1000))		
+	.then(() => delayedColorChange('yellow', 1000))	
+
+// run in parallel
+// will fail if either of the request failed
+Promise.all([
+  axios.get("url1"),
+  axios.get("url2")
+]).then(res => {
+  
+}).catch(err => {
+  
+})
+
+// run in parallel better version
+// get back with a status attr
+// if that specify request is failed
+// the status will be status: "rejected"
+// otherwise status:"fulfiled"
+Promise.allSettled([
+  axios.get("url1"),
+  axios.get("url2")
+]).then(res => {
+  
+}).catch(err => {
+  
+})
+// the result of the first promise to settle first devides the result of the Promise.race
+Promise.race([
+  axios.get("url1"),
+  axios.get("url2")
+]).then(res => {
+  
+}).catch(err => {
+  
+})
 ```
 
 ## Async & Await
@@ -545,6 +579,7 @@ module.exports.square = square;
 exports.add = add; // shortcut
 // other js file can use the DIY math library on top by
 const math = require("./math"); // assume the math library located on same folder.
+math.add(1 + 1);
 ```
 
 ### Index.js
