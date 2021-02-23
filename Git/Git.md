@@ -20,6 +20,8 @@ With `commit history`, we can execute `git push <upstream>` to push the changes 
 
 `Git stash apply` After you merge the upstream code into your current branch, you can run this command to put back the untracked files. 
 
+`Git stash pop`: Same as `apply`, but it remove the top stashed element from the stash stack.
+
 `Git branch -a` List both remote-tracking branches and local branches. 
 
 `git reset --hard` Resets the index and working tree. Any changes to tracked files in the working tree since `<commit>` are discarded.
@@ -42,3 +44,20 @@ With `commit history`, we can execute `git push <upstream>` to push the changes 
 
 `git rebase –continue` when there is a conflict during rebase, we need to solve the conflict and add it to stage, finally run this command.
 
+`git cat-file -p <hash_code>`: Gives the information about the specify commit.
+
+`git log`: show the log 
+
+`git log --all --graph --decorate --oneline` : Show the log with with indentation.
+
+`git diff <file_name>` : show the change history
+
+`git diff <hash> <file_name>`: Show the change history from \<hash\> until current HEAD.
+
+`git clone --shallow <url>`: clone the project without git history.
+
+`git add -p <file_name>` : select specify area to stage the file.
+
+`git blame <file_name>`: check commit detail for specify file.
+
+`git bisect`: Use to find last commit that one specify unit test passed.
