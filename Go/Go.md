@@ -4,6 +4,16 @@ Go is a **static type** language.
 
 Go code is grouped into packages, and packages are grouped into modules. Your package's module specifies the context Go needs to run the code, including the Go version the code is written for and the set of other modules it requires.
 
+Go does not require semicolons at the ends of statements or declarations, except where two or more appear on the same line. In effect, newlines following certain tokens are converted into semicolons, so where newlines are placed matters to proper parsing of Go code. For instance, the opening brace { of the function must be on the same line as the end of the func declaration, not on a line by itself, and in the expression x + y, a newline is permitted after but not before the + operator.
+
+It is implicitly initialized to the *zero value* for its type, which is 0 for numeric types and the empty string "" for strings.
+
+## Go Tools
+
+`goimports`: manages the insertion and removal of import declarations as needed.
+
+`gofmt`: Format the code automatically.
+
 ## GO CLI
 
 1. `go build` Compiles a bunch of go source code files.
@@ -14,6 +24,32 @@ Go code is grouped into packages, and packages are grouped into modules. Your pa
 6. `go test` Runs any tests associated with the current project.
 
 ## Package
+
+Packages in Go serve the same purposes as libraries or modules in other languages, supporting modularity, encapsulation, separate compilation, and reuse.
+
+Package-level names like the types and constants declared in one file of a package are visible to all the other files of the package, as if the source code were all in a single file. 
+
+The *doc comment*  immediately preceding the package declaration documents the package as a whole. Conventionally, it should start with a summary sentence in the style illustrated. Only one file in each package should have a package doc comment. Extensive doc comments are often placed in a file of their own, conventionally called doc.go.
+
+### Public & private
+
+Every function in the packages we've seen start with a capital letter. In Go if something starts with a capital letter that means other packages (and programs) are able to see it. If we had named the function `average` instead of `Average` our `main` program would not have been able to see it.
+
+### Alias
+
+we  use an alias for an imported math: `m` is the alias.
+
+```go
+import m "golang-book/chapter11/math"
+
+func main() {
+  xs := []float64{1,2,3,4}
+  avg := m.Average(xs)
+  fmt.Println(avg)
+}
+```
+
+### Type of Package
 
 There are two types of packages.
 
@@ -32,6 +68,19 @@ import "fmt" // coming from standard library of GO
 func main() {
   fmt.Println("Hello!")
 }
+```
+
+### Import Packages
+
+```go
+import "fmt"
+import "golang-book/chapter11/math"
+
+// or as a parenthesized list rather than as individual import declarations.
+import (
+  "fmt"
+  "os"
+)
 ```
 
 ### Creating Packages
@@ -67,25 +116,25 @@ func Average(xs []float64) float64 {
 
 Using a terminal in the `math` folder you just created run `go install`. This will compile the `math.go` program and create a linkable object file: `~/pkg/os_arch/golang-book/chapter11/math.a`.Now go back to the `chapter11` folder and run `go run main.go`. You should see `2.5`. 
 
-### Alias
+### Package Initialization
 
-we  use an alias for an imported math:
+Package initialization begins by initializing package-level variables in the order in which they are declared, except that dependencies are resolved first:
 
 ```go
-import m "golang-book/chapter11/math"
+var a = b + c // a initialized third, to 3
+var b = f() // b initialized second, to 2, by calling f
+var c = 1 // c initialized first, to 1
 
-func main() {
-  xs := []float64{1,2,3,4}
-  avg := m.Average(xs)
-  fmt.Println(avg)
-}
+func f() int { return c + 1 }
 ```
 
-`m` is the alias.
+#### Init Function
 
-### Public & private
+```go
+   func init() { /* ... */ }
+```
 
-Every function in the packages we've seen start with a capital letter. In Go if something starts with a capital letter that means other packages (and programs) are able to see it. If we had named the function `average` instead of `Average` our `main` program would not have been able to see it.
+Within each file, init functions are automatically executed when the program starts, in the order in which they are declared.
 
 ## Documentation
 
@@ -116,57 +165,185 @@ http://localhost:6060/pkg/
 
 You should be able to browse through all of the packages installed on your system.
 
-## Variable
+## Printf 
 
-### Types
+### Printf Verbs
 
-#### Integer
+Printf has over a dozen such conversions, which Go programmers call *verbs*. The verbs:
 
-Go's integer types are: `uint8`, `uint16`, `uint32`, `uint64`, `int8`, `int16`, `int32` and `int64.` 8, 16, 32 and 64 tell us how many bits each of the types use. 
-
-`uint` means “unsigned integer” while `int` means “signed integer”.  
-
-Generally if you are working with integers you should just use the `int` type.
-
-**Max and Min**:`math.MaxInt32` and `math.MinInt32`
-
-#### Floating Point Numbers
-
-Go has two floating point types: `float32` and `float64` (also often referred to as single precision and double precision respectively) as well as two additional types for representing complex numbers (numbers with imaginary parts): `complex64` and `complex128`. Generally we should stick with `float64` when working with floating point numbers.
-
-In addition to numbers there are several other values which can be represented: “not a number” (`NaN`, for things like `0/0`) and positive and negative infinity. (`+∞` and `−∞`)
-
-**Max**:`math.MaxFloat32`
-
-#### String
-
-Go strings are made up of individual bytes, usually one for each character. (Characters from other languages like Chinese are represented by more than one byte)
-
-##### String Format
-
-`%d` for decimal
-
-`%b` for binary
-
-`%x` for non-cap hex, `%X` for cap hex, `%#x` with `0x`prefix and non-cap, `%#X` with `0x`prefix and cap
-
-#### Boolean
-
-A boolean value (named after George Boole) is a special 1 bit integer type used to represent true and false (or on and off). Three logical operators are used with boolean values:
-
-| &&   | and  |
-| ---- | ---- |
-| \|\| | or   |
-| !    | not  |
-
-### Declaration
-
-There are few way to declare a variable.
+General:
 
 ```go
-var card string = "a" // specify card is string, but it is not necessary
-var card = "a" // which is equal to above , but you can't change card to other type.
-card := "a" // all the three assignment are equivalent 
+%v	the value in a default format
+	when printing structs, the plus flag (%+v) adds field names
+%#v	a Go-syntax representation of the value
+%T	a Go-syntax representation of the type of the value
+%%	a literal percent sign; consumes no value
+```
+
+Boolean:
+
+```go
+%t	the word true or false
+```
+
+Integer:
+
+```go
+%b	base 2
+%c	the character represented by the corresponding Unicode code point
+%d	base 10
+%o	base 8
+%O	base 8 with 0o prefix
+%q	a single-quoted character literal safely escaped with Go syntax.
+%x	base 16, with lower-case letters for a-f
+%X	base 16, with upper-case letters for A-F
+%U	Unicode format: U+1234; same as "U+%04X"
+```
+
+Floating-point and complex constituents:
+
+```go
+%b	decimalless scientific notation with exponent a power of two,
+	in the manner of strconv.FormatFloat with the 'b' format,
+	e.g. -123456p-78
+%e	scientific notation, e.g. -1.234456e+78
+%E	scientific notation, e.g. -1.234456E+78
+%f	decimal point but no exponent, e.g. 123.456
+%F	synonym for %f
+%g	%e for large exponents, %f otherwise. Precision is discussed below.
+%G	%E for large exponents, %F otherwise
+%x	hexadecimal notation (with decimal power of two exponent), e.g. -0x1.23abcp+20
+%X	upper-case hexadecimal notation, e.g. -0X1.23ABCP+20
+```
+
+String and slice of bytes (treated equivalently with these verbs):
+
+```go
+%s	the uninterpreted bytes of the string or slice
+%q	a double-quoted string safely escaped with Go syntax
+%x	base 16, lower-case, two characters per byte
+%X	base 16, upper-case, two characters per byte
+```
+
+Slice:
+
+```go
+%p	address of 0th element in base 16 notation, with leading 0x
+```
+
+Pointer:
+
+```go
+%p	base 16 notation, with leading 0x
+The %b, %d, %o, %x and %X verbs also work with pointers,
+formatting the value exactly as if it were an integer.
+```
+
+The default format for %v is:
+
+```go
+bool:                    %t
+int, int8 etc.:          %d
+uint, uint8 etc.:        %d, %#x if printed with %#v
+float32, complex64, etc: %g
+string:                  %s
+chan:                    %p
+pointer:                 %p
+```
+
+For compound objects, the elements are printed using these rules, recursively, laid out like this:
+
+```go
+struct:             {field0 field1 ...}
+array, slice:       [elem0 elem1 ...]
+maps:               map[key1:value1 key2:value2 ...]
+pointer to above:   &{}, &[], &map[]
+```
+
+Width is specified by an optional decimal number immediately preceding the verb. If absent, the width is whatever is necessary to represent the value. Precision is specified after the (optional) width by a period followed by a decimal number. If no period is present, a default precision is used. A period with no following number specifies a precision of zero. Examples:
+
+```go
+%f     default width, default precision
+%9f    width 9, default precision
+%.2f   default width, precision 2
+%9.2f  width 9, precision 2
+%9.f   width 9, precision 0
+```
+
+### Operand Selector
+
+You can select the variable to print in printf
+
+```go
+o := 0666
+fmt.Printf("%d %[1]o %#[1]o\n", o) // "438 666 0666"
+```
+
+### Other Verbs
+
+- `+` always print a sign for numeric values;
+  guarantee ASCII-only output for %q (%+q)
+- `-` pad with spaces on the right rather than the left (left-justify the field)
+- `#` alternate format: 
+  - add leading 0b for binary (%#b), 0 for octal (%#o),0x or 0X for hex (%#x or %#X); suppress 0x for %p (%#p);
+  - for %q, print a raw (backquoted) string if strconv.CanBackquote
+    returns true;
+  - always print a decimal point for %e, %E, %f, %F, %g and %G;
+  - do not remove trailing zeros for %g and %G;
+  - write e.g. U+0078 'x' if the character is printable for %U (%#U).
+- `' '`(space) leave a space for elided sign in numbers (% d); put spaces between bytes printing strings or slices in hex (% x, % X)
+- `0`	pad with leading zeros rather than spaces; for numbers, this moves the padding after the sign
+
+## Program Structure
+
+### General Structure
+
+A Go program is stored in one or more files whose names end in .go. Each file begins with a package declaration that says what package the file is part of. The package declaration is followed by any import declarations, and then a sequence of *package-level* declarations of types, variables, constants, and functions, in any order. 
+
+### Names
+
+The names of Go functions, variables, constants, types, statement labels, and packages follow a simple rule: a name begins with a letter (that is, anything that Unicode deems a letter) or an underscore and may have any number of additional letters, digits, and underscores, case matters.
+
+Go has 25 *keywords* like if and switch that may be used only where the syntax permits; they can’t be used as names.
+
+```go
+break default func interface select
+case defer go map struct
+chan else goto package switch
+const fallthrough if range type
+continue for import return var
+```
+
+In addition, there are about three dozen *predeclared* names like int and true for built-in constants, types, and functions:
+
+**Constants**: Types: true, false, iota, nil
+
+**Types**: int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64 uintptr float32 float64 complex128 complex64 bool byte rune string error
+
+**Functions**: make len cap new append copy close delete complex real imag
+ panic recover
+
+These names are not reserved, so you may use them in declarations.
+
+### Visibility
+
+If the name begins with an upper-case letter, it is *exported*, which means that it is visible and accessible outside of its own package and may be referred to by other parts of the program, as with Printf in the fmt package. Package names themselves are always in lower case.
+
+### Declarations
+
+A *declaration* names a program entity and specifies some or all of its properties. There are four major kinds of declarations: **var**, **const**, **type**, and **func**.
+
+### Variable
+
+#### Declaration
+
+```go
+// these are all equivalent:
+s := "" // most compact but not for package level variables
+var s string //  implicit declaration
+var s = "" // rarely used except when declaring multiple variables.
+var s string = "" // explicit about the variable’s type, which is redundant 
 
 // declare a group of variable
 var (
@@ -176,126 +353,1762 @@ var (
 )
 ```
 
+In practice, you should generally use one of the first two forms, with explicit initialization to say that the initial value is important and implicit initialization to say that the initial value doesn’t matter.
+
+##### Unnamed Variable
+
+The expression new(T) creates an *unnamed variable* of type T, initializes it to the zero value of T, and returns its address, which is a value of type *T.
+
+```go
+p := new(int)   // p, of type *int, points to an unnamed int variable
+fmt.Println(*p) // "0"
+*p = 2          // sets the unnamed int to 2
+fmt.Println(*p) // "2"
+```
+
+#### Lifetime of Variables
+
+The *lifetime* of a variable is the interval of time during which it exists as the program executes. The lifetime of a package-level variable is the entire execution of the program. By contrast, local variables have dynamic lifetimes: a new instance is created each time the declaration statement is executed, and the variable lives on until it becomes *unreachable*, at which point its storage may be recycled. Function parameters and results are local variables too; they are created each time their enclosing function is called.
+
+A compiler may choose to allocate local variables on the heap or on the stack but, perhaps surprisingly, this choice is not determined by whether var or new was used to declare the variable.
+
+```go
+var global *int
+func f() {
+  var x int
+  x = 1
+  global = &x
+}
+```
+
+x must be heap-allocated because it is still reachable from the variable global after f has returned, despite being declared as a local variable; we say x *escapes from* f. Note that, each variable that escapes requires an extra memory allocation.
+
+```go
+func g() {
+	y := new(int)
+	*y = 1
+}
+```
+
+Conversely, when g returns, the variable *y becomes unreachable and can be recycled. Since *y does not escape from g, it’s safe for the compiler to allocate *y on the stack, even though it was allocated with new.
+
+To write efficient programs you still need to be aware of the lifetime of variables. For example, keeping unnecessary pointers to short-lived objects within long-lived objects, especially global variables, will prevent the garbage collector from reclaiming the short-lived objects.
+
+### Assignment
+
+The value held by a variable is updated by an assignment statement.
+
+```go
+x = 1
+*p = true
+person.name = "bob"
+count[x] = count[x] * scale
+count[x] *= scale
+v := 1
+++v
+v++
+v--
+--v
+```
+
+#### Tuple Assignment
+
+```go
+x, y = y, x
+a[i], a[j] = a[j], a[i]
+```
+
+### Type Declarations
+
+A type declaration defines a new *named type* that has the same *underlying type* as an existing type. The named type provides a way to separate different and perhaps incompatible uses of the underlying type so that they can’t be mixed unintentionally.
+
+```go
+type name underlying_type
+```
+
+Type declarations most often appear at package level, where the named type is visible through- out the package, and if the name is exported (it starts with an upper-case letter), it’s accessible from other packages as well.
+
+### Scope
+
+The *scope* of a declaration is the part of the source code where a use of the declared name refers to that declaration.
+
+A **syntactic *block*** is a sequence of statements enclosed in braces like those that surround the body of a function or loop. A name declared inside a **syntactic block** is not visible outside that block. The block encloses its declarations and determines their scope. We can generalize this notion of blocks to include other groupings of declarations that are not explicitly surrounded by braces in the source code; we’ll call them all ***lexical blocks***. There is a lexical block for the entire source code, called the ***universe block***; for each package; for each file; for each for, if, and switch statement; for each case in a switch or select statement; and, of course, for each explicit syntactic block.
+
+The scope of a control-flow label, as used by break, continue, and goto statements, is the entire enclosing function. A program may contain multiple declarations of the same name so long as each declaration is in a different lexical block. 
+
+When the compiler encounters a reference to a name, it looks for a declaration, starting with the innermost enclosing lexical block and working up to the universe block. If the compiler finds no declaration, it reports an ‘‘undeclared name’’ error. If a name is declared in both an outer block and an inner block, the inner declaration will be found first. In that case, the inner declaration is said to *shadow* or *hide* the outer one, making it inaccessible:
+
+```go
+
+func f() {}
+var g = "g"
+func main() {
+  f := "f"
+  fmt.Println(f) // "f"; local var f shadows package-level func   
+  fmt.Println(g) // "g"; package level var
+  fmt.Println(h) // compile error: undefined: h
+ }
+```
+
+The example below also has three variables named x, each declared in a different block—one in the function body, one in the for statement’s block, and one in the loop body—but only two of the blocks are explicit:
+
+```go
+func main() {
+  x := "hello"
+  for _, x := range x {
+    x := x + 'A' - 'a'
+    fmt.Printf("%c", x) // "HELLO" (one letter per iteration)
+  } 
+}
+```
+
+Like for loops, if statements and switch statements also create implicit blocks in addition to their body blocks. The code in the following if-else chain shows the scope of x and y:
+
+```go
+if x := f(); x == 0 {
+  fmt.Println(x)
+} else if y := g(x); x == y {
+  fmt.Println(x, y)
+} else {
+  fmt.Println(x, y)
+}
+fmt.Println(x, y) // compile error: x and y are not visible here
+```
+
+The second if statement is nested within the first, so variables declared within the first statement’s initializer are visible within the second. Similar rules apply to each case of a switch statement: there is a block for the condition and a block for each case body.
+
+### Binary Operators
+
+Go’s binary operators for arithmetic, logic, and comparison are listed here in order of decreasing precedence:
+
+```go
+* / % << >> & &^ 
++ - | ^
+== != < <= > >=
+&&
+||
+```
+
+There are only five levels of precedence for binary operators. Operators at the same level associate to the left, so parentheses may be required for clarity, or to make the operators evaluate in the intended order in an expression like mask & (1 << 28).
+
+#### Binary comparison operators
+
+```go
+== equal to
+!= not equal to
+< less than
+<= less than or equal to
+> greater than
+>= greater than or equal to
+```
+
+#### Unary addition and subtraction operators
+
+```go
++ unary positive (no effect)
+- unary negation
+```
+
+####  Bitwise binary operators
+
+```go
+& bitwise AND
+| bitwise OR
+^ bitwise XOR
+&^ bit clear (AND NOT) << left shift
+>> right shift
+```
+
+The &^ operator is bit clear (AND NOT): in the expression z = x &^ y, each bit of z is 0 if the corresponding bit of y is 1; otherwise it equals the corresponding bit of x.
+
+Left shifts fill the vacated bits with zeros, as do right shifts of unsigned numbers, but right shifts of signed numbers fill the vacated bits with copies of the sign bit. For this reason, **it is important to use unsigned arithmetic when you’re treating an integer as a bit pattern.**
+
+Unsigned numbers tend to be used only when their bitwise operators or peculiar arithmetic operators are required, as when implementing bit sets, parsing binary file formats, or for hashing and cryptography. They are typically not used for merely non-negative quantities.
+
+### Type Casting
+
+In general, an explicit conversion is required to convert a value from one type to another, and binary operators for arithmetic and logic (except shifts) must have operands of the same type. Consider this sequence:
+
+```go
+var apples int32 = 1
+var oranges int16 = 2
+var compote int = apples + oranges // compile error
+```
+
+This type mismatch can be fixed in several ways, most directly by converting everything to a common type:
+
+```go
+var compote = int(apples) + int(oranges)
+```
+
+For every type T, the conversion operation T(x) converts the value x to type T if the conversion is allowed. **Many integer-to-integer conversions do not entail any change in value; they just tell the compiler how to interpret a value.** But a conversion that narrows a big integer into a smaller one, or a conversion from integer to floating-point or vice versa, may change the value or lose precision:
+
+```go
+f := 3.141 // a float64
+i := int(f)
+fmt.Println(f, i)   // "3.141 3"
+f = 1.99
+fmt.Println(int(f)) // "1"
+```
+
+## Basic Data Types
+
+Go’s types fall into four categories: ***basic types***, ***aggregate types***, ***reference types***, and ***interface types***. Basic types include numbers, strings, and booleans. Aggregate types—arrays and structs —form more complicated data types by combining values of several simpler ones. Reference types are a diverse group that includes pointers, slices, maps , functions, and channels, but what they have in common is that they all refer to program variables or state *indirectly*, so that the effect of an operation applied to one reference is observed by all copies of that reference.
+
+### Integer
+
+Go provides both signed and unsigned integer arithmetic. There are four distinct sizes of signed integers—8, 16, 32, and 64 bits—represented by the types int8, int16, int32, and int64, and corresponding unsigned versions uint8, uint16, uint32, and uint64. Signed numbers are represented in 2’s-complement form.
+
+Generally if you are working with integers you should just use the `int` type.
+
+#### Max and Min
+
+```go
+// in math library
+// accessing it like math.MaxInt8
+const (
+    MaxInt8   = 1<<7 - 1
+    MinInt8   = -1 << 7
+    MaxInt16  = 1<<15 - 1
+    MinInt16  = -1 << 15
+    MaxInt32  = 1<<31 - 1
+    MinInt32  = -1 << 31
+    MaxInt64  = 1<<63 - 1
+    MinInt64  = -1 << 63
+    MaxUint8  = 1<<8 - 1
+    MaxUint16 = 1<<16 - 1
+    MaxUint32 = 1<<32 - 1
+    MaxUint64 = 1<<64 - 1
+)
+```
+
+### Floating Point Numbers
+
+Go has two floating point types: `float32` and `float64` (also often referred to as single precision and double precision respectively). Their arithmetic properties are governed by the IEEE 754 standard implemented by all modern CPUs.
+
+A float32 provides approximately six decimal digits of precision, whereas a float64 provides about 15 digits; float64 should be preferred for most purposes because float32 computations accumulate error rapidly unless one is quite careful, and the smallest positive integer that cannot be exactly represented as a float32 is not large.
+
+Floating-point numbers can be written literally using decimals, like this:
+
+```go
+const e = 2.71828 // (approximately)
+```
+
+Digits may be omitted before the decimal point (.707) or after it (1.). Very small or very large numbers are better written in scientific notation, with the letter e or E preceding the decimal exponent:
+
+```go
+const Avogadro = 6.02214129e23
+const Planck   = 6.62606957e-34
+```
+
+In addition to numbers there are several other values which can be represented: “not a number” (`NaN`, for things like `0/0`) and positive and negative infinity. (`+∞` and `−∞`)
+
+```go
+var z float64
+fmt.Println(z, -z, 1/z, -1/z, z/z) //  "0 -0 +Inf -Inf NaN"
+```
+
+#### NaN
+
+The function math.IsNaN tests whether its argument is a not-a-number value, and math.NaN returns such a value. It’s tempting to use NaN as a sentinel value in a numeric computation, but testing whether a specific computational result is equal to NaN is fraught with peril because any comparison with NaN *always* yields false (except !=, which is always the negation of ==) :
+
+```go
+nan := math.NaN()
+fmt.Println(nan == nan, nan < nan, nan > nan) // "false false false"
+
+// check for is NaN
+fmt.Println(math.IsNaN(nan)) // true
+```
+
+#### Max and Min
+
+```go
+const (
+    MaxFloat32             = 3.40282346638528859811704183484516925440e+38  // 2**127 * (2**24 - 1) / 2**23
+    SmallestNonzeroFloat32 = 1.401298464324817070923729583289916131280e-45 // 1 / 2**(127 - 1 + 23)
+
+    MaxFloat64             = 1.797693134862315708145274237317043567981e+308 // 2**1023 * (2**53 - 1) / 2**52
+    SmallestNonzeroFloat64 = 4.940656458412465441765687928682213723651e-324 // 1 / 2**(1023 - 1 + 52)
+)
+```
+
+### Complex Numbers
+
+Go provides two sizes of complex numbers, complex64 and complex128, whose components are float32 and float64 respectively. The built-in function complex creates a complex number from its real and imaginary components, and the built-in real and imag functions extract those components:
+
+```go
+var x complex128 = complex(1, 2) // 1+2i
+var y complex128 = complex(3, 4) // 3+4i
+fmt.Println(x*y) // "(-5+10i)"
+fmt.Println(real(x*y)) // "-5"
+fmt.Println(imag(x*y)) // "10"
+```
+
+If a floating-point literal or decimal integer literal is immediately followed by i, such as 3.141592i or 2i, it becomes an *imaginary literal*, denoting a complex number with a zero real component:
+
+```go
+fmt.Println(1i * 1i) // "(-1+0i)", i^2 = -1
+```
+
+Under the rules for constant arithmetic, complex constants can be added to other constants (integer or floating point, real or imaginary), allowing us to write complex numbers naturally, like 1+2i, or equivalently, 2i+1. The declarations of x and y above can be simplified:
+
+```go
+x := 1 + 2i
+y := 3 + 4i
+```
+
+Complex numbers may be compared for equality with == and !=. Two complex numbers are equal if their real parts are equal and their imaginary parts are equal.
+
+### String
+
+A string is an immutable sequence of bytes. Strings may contain arbitrary data, including bytes with value 0, but usually they contain human-readable text. Text strings are conventionally interpreted as UTF-8-encoded sequences of Unicode code points (runes).
+
+The built-in len function returns the number of bytes (not runes) in a string, and the *index* operation s[i] retrieves the *i*-th byte of string s, where 0 ≤ i < len(s).
+
+```go
+s := "hello, world"
+fmt.Println(len(s))     // "12"
+fmt.Println(s[0], s[7]) // "104 119"  ('h' and 'w')
+```
+
+The *i*-th byte of a string is not necessarily the *i*-th *character* of a string, because the UTF-8 encoding of a non-ASCII code point requires two or more bytes.
+
+The *substring* operation s[i:j] yields a new string consisting of the bytes of the original string starting at index i and continuing up to, but not including, the byte at index j. The result contains j-i bytes.
+
+```go
+s := "hello, world"
+fmt.Println(s[0:5]) // "hello"
+```
+
+#### Comparison
+
+Strings may be compared with comparison operators like == and <; the comparison is done byte by byte, so the result is the natural lexicographic ordering.
+
+#### Immutable
+
+Since strings are immutable, constructions that try to modify a string’s data in place are not allowed:
+
+```go
+     s[0] = 'L' // compile error: cannot assign to s[0]
+```
+
+#### String Literals
+
+A string value can be written as a *string literal*, a sequence of bytes enclosed in double quotes: "Hello, 世界"
+
+![image-20210224134634768](Asserts/Go/image-20210224134634768.png)
+
+Because Go source files are always encoded in UTF-8 and Go text strings are conventionally interpreted as UTF-8, we can include Unicode code points in string literals.
+
+#### Raw String
+
+A *raw string literal* is written``` `...` ```, using backquotes instead of double quotes. Within a raw string literal, no escape sequences are processed; the contents are taken literally, including backslashes and newlines, so a raw string literal may spread over several lines in the program source. The only processing is that carriage returns are deleted so that the value of the string is the same on all platforms, including those that conventionally put carriage returns in text files.
+
+Raw string literals are a convenient way to write regular expressions, which tend to have lots of backslashes. They are also useful for HTML templates, JSON literals, command usage messages, and the like, which often extend over multiple lines.
+
+#### UTF-8
+
+UTF-8 is a variable-length encoding of Unicode code points as bytes. 
+
+```
+0xxxxxxx 																runes 0−127 (ASCII)
+110xxxxx	10xxxxxx		128−2047					(values <128 unused)
+1110xxxx	10xxxxxx 	10xxxxxx		2048−65535 (values <2048 unused) 
+11110xxx	10xxxxxx 	10xxxxxx 	10xxxxxx 65536−0x10ffff	(other values unused)
+
+```
+
+Thanks to the nice properties of UTF-8, many string operations don’t require decoding. We can test whether one string contains another as a prefix:
+
+```go
+// prefix
+func HasPrefix(s, prefix string) bool {
+  return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+// suffix
+func HasSuffix(s, suffix string) bool {
+         return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
+}
+//substring
+func Contains(s, substr string) bool {
+  for i := 0; i < len(s); i++ {
+    if HasPrefix(s[i:], substr) {
+      return true
+    }
+  }
+  return false
+}
+```
+
+using the same logic for UTF-8-encoded text as for raw bytes. This is not true for other encodings. (The functions above are drawn from the strings package, though its implementation of Contains uses a hashing technique to search more efficiently.)
+
+On the other hand, if we really care about the individual Unicode characters, we have to use other mechanisms. Consider the string from our very first example, which includes two East Asian characters. Figure 3.5 illustrates its representation in memory. The string contains 13 bytes, but interpreted as UTF-8, it encodes only nine code points or runes:
+
+```go
+import "unicode/utf8"
+s := "Hello, BF"
+fmt.Println(len(s)) // "13" 
+fmt.Println(utf8.RuneCountInString(s)) // "9"
+```
+
+To process those characters, we need a UTF-8 decoder. The unicode/utf8 package provides one that we can use like this:
+
+```go
+for i := 0; i < len(s); {
+	r, size := utf8.DecodeRuneInString(s[i:])
+	fmt.Printf("%d\t%c\n", i, r)
+	i += size
+}
+for i, r := range s {
+  fmt.Printf("%d\t%q\t%d\n", i, r, r)
+}
+```
+
+Each call to DecodeRuneInString returns r, the rune itself, and size, the number of bytes occupied by the UTF-8 encoding of r. The size is used to update the byte index i of the next rune in the string. But this is clumsy, and we need loops of this kind all the time. Fortunately, Go’s range loop, when applied to a string, performs UTF-8 decoding implicitly.
+
+##### Invalid Rune
+
+Each time a UTF-8 decoder, whether explicit in a call to utf8.DecodeRuneInString or implicit in a range loop, consumes an unexpected input byte, it generates a special Unicode *replacement character*, '\uFFFD', which is usually printed as a white question mark inside a black hexagonal or diamond-like shape. When a program encounters this rune value, it’s often a sign that some upstream part of the system that generated the string data has been careless in its treatment of text encodings.
+
+#### Strings and Byte Slices
+
+Four standard packages are particularly important for manipulating strings: bytes, strings, strconv, and unicode. 
+
+- The strings package provides many functions for searching, replacing, comparing, trimming, splitting, and joining strings.
+- The bytes package has similar functions for manipulating slices of bytes, of type []byte, which share some properties with strings. Because strings are immutable, building up strings incrementally can involve a lot of allocation and copying. In such cases, it’s more efficient to use the bytes.Buffer.
+- The strconv package provides functions for converting boolean, integer, and floating-point values to and from their string representations, and functions for quoting and unquoting strings.
+- The unicode package provides functions like IsDigit, IsLetter, IsUpper, and IsLower for classifying runes. Each function takes a single rune argument and returns a boolean. Conversion functions like ToUpper and ToLower convert a rune into the given case if it is a letter. All these functions use the Unicode standard categories for letters, digits, and so on.
+
+The strings package has similar functions, also called ToUpper and ToLower, that return a new string with the specified transformation applied to each character of the original string. If you try to avoid copy the string over and over again, use byte[].
+
+Strings can be converted to byte slices and back again:
+
+```go
+s := "abc"
+b := []byte(s)
+s2 := string(b)
+```
+
+Conceptually, **the []byte(s) conversion allocates a new byte array holding a copy of the bytes of s, and yields a slice that references the entirety of that array.** An optimizing compiler may be able to avoid the allocation and copying in some cases, but in general copying is required to ensure that the bytes of s remain unchanged even if those of b are subsequently modified. The conversion from byte slice back to string with string(b) also makes a copy, to ensure immutability of the resulting string s2.
+
+> _**Note**_: Use strings.Builder over bytes.Buffer if you want more efficient code as string convert to []bytes will allocates a new byte array holding a copy of the bytes version.
+
+The bytes package provides the Buffer type for efficient manipulation of byte slices. A Buffer starts out empty but grows as data of types like string, byte, and []byte are written to it. As the example below shows, a bytes.Buffer variable requires no initialization because its zero value is usable:
+
+```go
+ // intsToString is like fmt.Sprint(values) but adds commas.
+func intsToString(values []int) string {
+  var buf bytes.Buffer
+  buf.WriteByte('[')
+	for i, v := range values {
+		if i > 0 {
+        buf.WriteString(", ")
+    }
+    fmt.Fprintf(&buf, "%d", v)
+	}
+	buf.WriteByte(']')
+	return buf.String()
+}
+func main() {
+  fmt.Println(intsToString([]int{1, 2, 3})) // "[1, 2, 3]"
+}
+```
+
+#### ReadRune
+
+The ReadRune method performs UTF-8 decoding and returns three values: the decoded rune, the length in bytes of its UTF-8 encoding, and an error value. The only error we expect is end- of-file. If the input was not a legal UTF-8 encoding of a rune, the returned rune is uni- code.ReplacementChar and the length is 1.
+
+```go
+package main
+import (
+  "bufio"
+  "fmt"
+  "io"
+  "os"
+  "unicode"
+  "unicode/utf8"
+)
+func main() {
+  in := bufio.NewReader(os.Stdin)
+  for {
+    r, n, err := in.ReadRune() // returns rune, nbytes, error
+    if err == io.EOF {
+      break
+    }
+    if err != nil {
+      fmt.Fprintf(os.Stderr, "charcount: %v\n", err)
+      os.Exit(1)
+    }
+    if r == unicode.ReplacementChar && n == 1 {
+      invalid++
+      continue
+    }
+    counts[r]++
+    utflen[n]++
+  }
+}
+```
+
+#### Conversions between Strings and Numbers
+
+To convert an integer to a string, one option is to use fmt.Sprintf; another is to use the function strconv.Itoa (‘‘integer to ASCII’’):
+
+```go
+x := 123
+y := fmt.Sprintf("%d", x)
+fmt.Println(y, strconv.Itoa(x)) // "123 123"
+```
+
+FormatInt and FormatUint can be used to format numbers in a different base: 
+
+```go
+fmt.Println(strconv.FormatInt(int64(x), 2)) // "1111011"
+```
+
+The fmt.Printf verbs %b, %d, %o, and %x are often more convenient than Format functions, especially if we want to include additional information besides the number:
+
+```go
+     s := fmt.Sprintf("x=%b", x) // "x=1111011"
+```
+
+To parse a string representing an integer, use the strconv functions Atoi or ParseInt, or ParseUint for unsigned integers:
+
+```go
+x, err := strconv.Atoi("123")             // x is an int
+y, err := strconv.ParseInt("123", 10, 64) // base 10, up to 64 bits
+```
+
+The third argument of ParseInt gives the size of the integer type that the result must fit into; for example, 16 implies int16, and the special value of 0 implies int. In any case, the type of the result y is always int64, which you can then convert to a smaller type.
+
+Sometimes fmt.Scanf is useful for parsing input that consists of orderly mixtures of strings and numbers all on a single line, but it can be inflexible, especially when handling incomplete or irregular input.
+
+### Boolean
+
+A value of type bool, or *boolean*, has only two possible values, true and false. The conditions in if and for statements are booleans, and comparison operators like == and < produce a boolean result. The unary operator ! is logical negation, so !true is false, or, one might say, (!true == false) == true, although as a matter of style, we always simplify redundant boolean expressions like x==true to x. Three logical operators are used with boolean values:
+
+| &&   | and  |
+| ---- | ---- |
+| \|\| | or   |
+| !    | not  |
+
+Boolean values can be combined with the && (AND) and || (OR) operators, which have *short- circuit* behavior: if the answer is already determined by the value of the left operand, the right operand is not evaluated, making it safe to write expressions like this:
+
+```go
+     s != "" && s[0] == 'x'
+```
+
+where s[0] would panic if applied to an empty string.
+
 ### Constant
 
-```go
-const x string = "Hello World"
-```
-
-## Control Structures
-
-### For
+Constants are expressions whose value is known to the compiler and whose evaluation is guaranteed to occur at compile time, not at run time. The underlying type of every constant is a basic type: boolean, string, or number.
 
 ```go
-// for loop
-// every variable declared need to be used inside the loop
-// type 1
-for i, card := range cards {
-  fmt.Println(i, card)
-}
-
-// type 2
-for i := 0; i < 100; i++ {
-  fmt.Printf(i)
-}
-
-// inifite loop
-for {
-  
-}
+const pi = 3.14159 // approximately; math.Pi is a better approximation
+const (
+  e  = 2.71828182845904523536028747135266249775724709369995957496696763
+  pi = 3.14159265358979323846264338327950288419716939937510582097494459
+)
 ```
 
-### If
+When a sequence of constants is declared as a group, the right-hand side expression may be omitted for all but the first of the group, implying that the previous expression and its type should be used again. For example:
 
 ```go
-if i % 2 == 0 {
-  // divisible by 2
-} else if i % 3 == 0 {
-  // divisible by 3
-} else if i % 4 == 0 {
-  // divisible by 4
-}
-
-// is ok is true then it will print out 
-if name, ok := elements["Un"]; ok {
-  fmt.Println(name, ok)
-}
+const ( 
+	a	= 1
+  b 
+  c = 2 
+  d
+)
+fmt.Println(a, b, c, d) // "1 1 2 2"
 ```
 
-### Switch
+This is not very useful if the implicitly copied right-hand side expression always evaluates to the same thing. But what if it could vary? This brings us to iota.
+
+#### The Constant Generator iota
+
+A const declaration may use the *constant generator* iota, which is used to create a sequence of related values without spelling out each one explicitly. In a const declaration, the value of iota begins at zero and increments by one for each item in the sequence.
+
+Here’s an example from the time package, which defines named constants of type Weekday for the days of the week, starting with zero for Sunday. Types of this kind are often called *enu- merations*, or *enums* for short.
 
 ```go
-switch i {
-case 0: fmt.Println("Zero")
-case 1: fmt.Println("One")
-case 2: fmt.Println("Two")
-case 3: fmt.Println("Three")
-case 4: fmt.Println("Four")
-case 5: fmt.Println("Five")
-default: fmt.Println("Unknown Number")
-}
+type Weekday int
+const (
+  Sunday Weekday = iota
+  Monday
+  Tuesday
+  Wednesday
+  Thursday
+  Friday
+  Saturday
+)
 ```
 
-## Arrays, Slices and Maps
+This declares Sunday to be 0, Monday to be 1, and so on.
 
-Array has fixed length in Go but slice is an array that can grow and shrink.
+We can use iota in more complex expressions too, as in this example from the net package where each of the lowest 5 bits of an unsigned integer is given a distinct name and boolean interpretation:
+
+```go
+type Flags uint
+const (
+  FlagUp Flags = 1 << iota // is up
+	FlagBroadcast				// supports broadcast access capability
+	FlagLoopback			// is a loopback interface
+	FlagPointToPoint // belongs to a point-to-point link
+	FlagMulticast // supports multicast access capability
+)
+```
+
+As iota increments, each constant is assigned the value of 1 << iota, which evaluates to successive powers of two, each corresponding to a single bit. We can use these constants within functions that test, set, or clear one or more of these bits:
+
+```go
+
+func IsUp(v Flags) bool     { return v&FlagUp == FlagUp }
+func TurnDown(v *Flags)     { *v &^= FlagUp }
+func SetBroadcast(v *Flags) { *v |= FlagBroadcast }
+func IsCast(v Flags) bool   { return v&(FlagBroadcast|FlagMulticast) != 0 }
+
+func main() {
+         var v Flags = FlagMulticast | FlagUp
+         fmt.Printf("%b %t\n", v, IsUp(v)) // "10001 true"
+         TurnDown(&v)
+         fmt.Printf("%b %t\n", v, IsUp(v)) // "10000 false"
+         SetBroadcast(&v)
+         fmt.Printf("%b %t\n", v, IsUp(v))   // "10010 false"
+         fmt.Printf("%b %t\n", v, IsCast(v)) // "10010 true"
+}
+
+```
+
+As a more complex example of iota, this declaration names the powers of 1024:
+
+```go
+const (
+  _ = 1 << (10 * iota)
+  KiB // 1024
+  MiB // 1048576
+  GiB // 1073741824
+  TiB // 1099511627776 (exceeds 1 << 32)
+  PiB // 1125899906842624
+  EiB // 1152921504606846976
+  ZiB // 1180591620717411303424 (exceeds 1 << 64)
+  YiB // 1208925819614629174706176
+)
+```
+
+The iota mechanism has its limits. For example, it’s not possible to generate the more familiar powers of 1000 (KB, MB, and so on) because there is no exponentiation operator.
+
+#### Untyped Constants
+
+Constants in Go are a bit unusual. Although a constant can have any of the basic data types like int or float64, including named basic types like time.Duration, many constants are not committed to a particular type. The compiler represents **these uncommitted constants with much greater numeric precision than values of basic types, and arithmetic on them is more precise than machine arithmetic;** you may assume at least 256 bits of precision. There are six flavors of these uncommitted constants, called *untyped* boolean, untyped integer, untyped rune, untyped floating-point, untyped complex, and untyped string.
+
+By deferring this commitment, untyped constants not only retain their higher precision until later, but they can participate in many more expressions than committed constants without requiring conversions. For example, the values ZiB and YiB in the example above are too big to store in any integer variable, but they are legitimate constants that may be used in expres- sions like this one:
+
+```go
+fmt.Println(YiB/ZiB) // "1024"
+```
+
+In a variable declaration without an explicit type (including short variable declarations), the flavor of the untyped constant implicitly determines the default type of the variable, as in these examples:
+
+```go
+i := 0      // untyped integer;        implicit int(0)
+r := '\000' // untyped rune;           implicit rune('\000')
+f := 0.0    // untyped floating-point; implicit float64(0.0)
+c := 0i     // untyped complex;        implicit complex128(0i)
+```
+
+**Note the asymmetry: untyped integers are converted to int, whose size is not guaranteed**, but untyped floating-point and complex numbers are converted to the explicitly sized types float64 and complex128. The language has no unsized float and complex types analogous to unsized int, because it is very difficult to write correct numerical algorithms without knowing the size of one’s floating-point data types.
+
+To give the variable a different type, we must explicitly convert the untyped constant to the desired type or state the desired type in the variable declaration, as in these examples:
+
+```go
+var i = int8(0)
+var i int8 = 0
+```
+
+These defaults are particularly important when converting an untyped constant to an interface value since they determine its dynamic type.
+
+```go
+fmt.Printf("%T\n", 0) // "int"
+fmt.Printf("%T\n", 0.0) // "float64"
+fmt.Printf("%T\n", 0i)  // "complex128"
+fmt.Printf("%T\n", '\000') // "int32" (rune)
+```
+
+## Composite Types
+
+Composite types by combining the basic types in various ways. We’ll talk about four such types—**arrays**, **slices**, **maps**, and **structs**.
+
+Arrays and structs are *aggregate* types; their values are concatenations of other values in memory. Arrays are **homogeneous**—their elements all have the same type—whereas structs are **heterogeneous**. Both arrays and structs are fixed size. In contrast, slices and maps are dynamic data structures that grow as values are added.
 
 ### Arrays
 
+An array is a fixed-length sequence of zero or more elements of a particular type. Because of their fixed length, arrays are rarely used directly in Go. Slices, which can grow and shrink, are much more versatile, but to understand slices we must understand arrays first.
+
 ```go
-// type 1
-var x [5]float64
-x[0] = 98
-x[1] = 93
-x[2] = 77
-x[3] = 82
-x[4] = 83
- 
-// type 2
-cards := []string{"1", "2"} // array declaration 
+var a [3]int             // array of 3 integers
+fmt.Println(a[0])        // print the first element
+fmt.Println(a[len(a)-1]) // print the last element, a[2]
+```
+
+By default, the elements of a new array variable are initially set to the zero value for the ele- ment type, which is 0 for numbers. We can use an *array literal* to initialize an array with a list of values:
+
+```go
+var q [3]int = [3]int{1, 2, 3}
+var r [3]int = [3]int{1, 2}
+fmt.Println(r[2]) // "0"
+```
+
+In an array literal, if an ellipsis ‘‘...’’ appears in place of the length, the array length is deter- mined by the number of initializers. The definition of q can be simplified to
+
+```go
+q := [...]int{1, 2, 3}
+fmt.Printf("%T\n", q) // "[3]int"
+```
+
+As we’ll see, the literal syntax is similar for arrays, slices, maps, and structs. The specific form above is a list of values in order, but it is also possible to specify a list of index and value pairs, like this:
+
+```go
+type Currency int
+const (
+  USD Currency = iota
+  EUR
+  GBP
+  RMB
+)
+symbol := [...]string{USD: "$", EUR: "E", GBP: "G", RMB: "R"}
+fmt.Println(RMB, symbol[RMB]) // "R"
+```
+
+In this form, indices can appear in any order and some may be omitted; as before, unspecified values take on the zero value for the element type. For instance,
+
+```go
+r := [...]int{99: -1}
+```
+
+defines an array r with 100 elements, all zero except for the last, which has value −1.
+
+#### Comparison
+
+If an array’s element type is *comparable* then the array type is comparable too, so we may directly compare two arrays of that type using the == operator, which reports whether all corresponding elements are equal. The != operator is its negation.
+
+```go
+a := [2]int{1, 2}
+b := [...]int{1, 2}
+c := [2]int{1, 3}
+fmt.Println(a == b, a == c, b == c) // "true false false"
+d := [3]int{1, 2}
+fmt.Println(a == d) // compile error: cannot compare [2]int == [3]int
+
 ```
 
 ### Slices
 
+Slices represent variable-length sequences whose elements all have the same type. A slice type is written []T, where the elements have type T; it looks like an array type without a size.
+
+A slice has three components: a pointer, a length, and a capacity. 
+
+- The **pointer** points to the first element of the array that is reachable through the slice, which is not necessarily the array’s first element. 
+- The length is the number of slice elements; it can’t exceed the capacity.
+- **Capacity** is the number of elements between the start of the slice and the end of the underlying array. 
+
+The built-in functions len and cap return those values.
+
+Multiple slices can share the same underlying array and may refer to overlapping parts of that array. Figure 4.1 shows an array of strings for the months of the year, and two overlapping slices of it. The array is declared as
+
 ```go
-x := make([]float64, 5)  // declare slice
+months := [...]string{1: "January", /* ... */, 12: "December"}
+```
 
-//10 represents the capacity of the underlying array which the slice points to
-x := make([]float64, 5, 10)
+The *slice operator* s[i:j], where 0 ≤ i ≤ j ≤ cap(s), creates a new slice that refers to elements `i` through `j-1` of the sequence s, which may be an array variable, a pointer to an array, or another slice. The resulting slice has `j-i` elements. If i is omitted, it’s 0, and if `j` is omitted, it’s len(s). Thus the slice months[1:13] refers to the whole range of valid months, as does the slice months[1:]; the slice months[:] refers to the whole array. Let’s define overlapping slices for the second quarter and the northern summer:
 
-arr := [5]float64{1,2,3,4,5} //array
-x := arr[0:5] // slice
+```go
+Q2 := months[4:7]
+summer := months[6:9]
+fmt.Println(Q2)     // ["April" "May" "June"]
+fmt.Println(summer) // ["June" "July" "August"]
+```
 
-// append will create a new array and assign back to cards.
-cards = append(cards, "new string") 
+![image-20210224153818544](Asserts/Go/image-20210224153818544.png)
 
 
-slice1 := []int{1,2,3}
-slice2 := make([]int, 2)
-copy(slice2, slice1)  // slice 2 will only has 1 and 2
 
-cards[0:1] // from 0 up to 1 but not include 1
+Since a slice contains a pointer to an element of an array, passing a slice to a function permits the function to modify the underlying array elements. In other words, copying a slice creates an *alias*  for the underlying array. The function reverse reverses the elements of an []int slice in place, and it may be applied to slices of any length.
+
+```go
+// reverse reverses a slice of ints in place.
+     func reverse(s []int) {
+         for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+             s[i], s[j] = s[j], s[i]
+} }
+```
+
+A simple way to *rotate* a slice left by *n* elements is to apply the reverse function three times, first to the leading *n* elements, then to the remaining elements, and finally to the whole slice. (To rotate to the right, make the third call first.)
+
+```go
+s := []int{0, 1, 2, 3, 4, 5}
+// Rotate s left by two positions.
+reverse(s[:2])
+reverse(s[2:])
+reverse(s)
+fmt.Println(s) // "[2 3 4 5 0 1]"
+```
+
+#### Comparison
+
+Unlike arrays, slices are not comparable, so we cannot use == to test whether two slices contain the same elements. The standard library provides the highly optimized bytes.Equal function for comparing two slices of bytes ([]byte), but for other types of slice, we must do the comparison ourselves:
+
+```go
+func equal(x, y []string) bool {
+  if len(x) != len(y) {
+  	return false
+  }
+  for i := range x {
+    if x[i] != y[i] {
+      return false
+    } 
+  }
+  return true
+}
+```
+
+Given how natural this ‘‘deep’’ equality test is, and that it is no more costly at run time than the == operator for arrays of strings, it may be puzzling that slice comparisons do not also work this way. There are two reasons why deep equivalence is problematic. First, unlike array ele- ments, the elements of a slice are indirect, making it possible for a slice to contain itself. Although there are ways to deal with such cases, none is simple, efficient, and most importantly, obvious.
+
+#### Slice of Nil
+
+The zero value of a slice type is nil. A nil slice has no underlying array. The nil slice has length and capacity zero, but there are also non-nil slices of length and capacity zero, such as `[]int{}` or `make([]int, 3)[3:]`. As with any type that can have nil values, the nil value of a particular slice type can be written using a conversion expression such as `[]int(nil)`.
+
+```go
+var s []int    // len(s) == 0, s == nil
+s = nil        // len(s) == 0, s == nil
+s = []int(nil) // len(s) == 0, s == nil
+s = []int{}    // len(s) == 0, s != nil
+```
+
+So, if you need to test whether a slice is empty, use `len(s) == 0`, not s == nil. Other than comparing equal to nil, a nil slice behaves like any other zero-length slice; reverse(nil) is perfectly safe, for example. Unless clearly documented to the contrary, Go functions should treat all zero-length slices the same way, whether nil or non-nil.
+
+#### Create of Slice Using Make
+
+The built-in function make creates a slice of a specified element type, length, and capacity. The capacity argument may be omitted, in which case the capacity equals the length.
+
+```go
+make([]T, len)
+make([]T, len, cap) // same as make([]T, cap)[:len]
+```
+
+Under the hood, make creates an unnamed array variable and returns a slice of it; the array is accessible only through the returned slice. In the first form, the slice is a view of the entire array. In the second, the slice is a view of only the array’s first len elements, but its capacity includes the entire array. The additional elements are set aside for future growth.
+
+#### The Append Function
+
+The built-in append function appends items to slices:
+
+```go
+var runes []rune
+for _, r := range "Hello, 世界" {
+  runes = append(runes, r)
+}
+fmt.Printf("%q\n", runes) // "['H' 'e' 'l' 'l' 'o' ',' ' ' '世' '界']"
+```
+
+The append function is crucial to understanding how slices work, so let’s take a look at what is going on. Here’s a version called appendInt that is specialized for []int slices:
+
+```go
+func appendInt(x []int, y int) []int {
+  var z []int
+  zlen := len(x) + 1
+  if zlen <= cap(x) {
+    // There is room to grow.  Extend the slice.
+    z = x[:zlen]
+  } else {
+    // There is insufficient space.  Allocate a new array.
+    // Grow by doubling, for amortized linear complexity.
+    zcap := zlen
+    if zcap < 2*len(x) {
+      zcap = 2 * len(x)
+    }
+    z = make([]int, zlen, zcap)
+    copy(z, x) // a built-in function; copy(dest, source) return num of elements copied
+  }
+  z[len(x)] = y
+  return z
+}
+```
+
+If there is insufficient space for growth, appendInt must allocate a new array big enough to hold the result, copy the values from x into it, then append the new element y. The result z now refers to a different underlying array than the array that x refers to. It would be straightforward to copy the elements with explicit loops, but it’s easier to use the built-in function copy, which copies elements from one slice to another of the same type. Its first argument is the destination and its second is the source, resembling the order of operands in an assignment like dst = src. The slices may refer to the same underlying array; they may even overlap. Although we don’t use it here, copy returns the number of elements actually copied, which is the smaller of the two slice lengths, so there is no danger of running off the end or overwriting something out of range.
+
+Expanding the array by doubling its size at each expansion avoids an excessive number of allocations and ensures that appending a single element takes constant time on average. This program demonstrates the effect:
+
+```go
+func main() {
+  var x, y []int
+  for i := 0; i < 10; i++ {
+  	y = appendInt(x, i)
+  	fmt.Printf("%d cap=%d\t%v\n", i, cap(y), y) 
+    x = y
+	} 
+}
+```
+
+Each change in capacity indicates an allocation and a copy:
+
+```go
+0 cap=1 [0]
+1 cap=2 [01]
+2 cap=4 [012]
+3 cap=4 [0123]
+4 cap=8 [01234]
+5 cap=8 [012345]
+6 cap=8 [0123456]
+7 cap=8 [01234567]
+8 cap=16 [012345678]
+9 cap=16 [0123456789]
+```
+
+Let’s take a closer look at the `i=3` iteration. The slice x contains the three elements [012] but has capacity 4, so there is a single element of slack at the end, and appendInt of the element 3 may proceed without reallocating. The resulting slice y has length and capacity 4, and has the same underlying array as the original slice x, as Figure 4.2 shows.
+
+![image-20210224162924570](Asserts/Go/image-20210224162924570.png)
+
+On the next iteration,` i=4`, there is no slack at all, so appendInt allocates a new array of size 8, copies the four elements [0 1 2 3] of x, and appends 4, the value of i. The resulting slice y has a length of 5 but a capacity of 8; the slack of 3 will save the next three iterations from the need to reallocate. The slices y and x are views of different arrays. This operation is depicted in Figure 4.3.
+
+![image-20210224163000016](Asserts/Go/image-20210224163000016.png)
+
+The built-in append function may use a more sophisticated growth strategy than appendInt’s simplistic one. Usually we don’t know whether a given call to append will cause a reallocation, so we can’t assume that the original slice refers to the same array as the resulting slice, nor that it refers to a different one. Similarly, we must not assume that operations on elements of the old slice will (or will not) be reflected in the new slice. As a result, it’s usual to assign the result of a call to append to the same slice variable whose value we passed to append:
+
+```go
+runes = append(runes, r)
+```
+
+#### In-Place Slice Techniques
+
+Given a list of strings, the nonempty function returns the non-empty ones:
+
+```go
+import "fmt"
+// nonempty returns a slice holding only the non-empty strings.
+// The underlying array is modified during the call.
+func nonempty(strings []string) []string {
+  i := 0
+  for _, s := range strings {
+    if s != "" {
+        strings[i] = s
+    		i++ 
+    }
+  }
+  return strings[:i]
+}
+
+
+data := []string{"one", "", "three"}
+fmt.Printf("%q\n", nonempty(data)) // `["one" "three"]`
+fmt.Printf("%q\n", data)           // `["one" "three" "three"]`
+data = nonempty(data) 
+
+```
+
+Use slice as stack:
+
+```go
+stack = append(stack, v) // push v
+top := stack[len(stack)-1] // top of stack
+stack = stack[:len(stack)-1] // pop
+```
+
+To remove an element from the middle of a slice, preserving the order of the remaining elements, use copy to slide the higher-numbered elements down by one to fill the gap:
+
+```go
+func remove(slice []int, i int) []int {
+  copy(slice[i:], slice[i+1:])
+  return slice[:len(slice)-1]
+}
+func main() {
+  s := []int{5, 6, 7, 8, 9}
+  fmt.Println(remove(s, 2)) // "[5 6 8 9]"
+}
 ```
 
 ### Maps
 
-A map is an unordered collection of key-value pairs. Also known as an associative array, a hash table or a dictionary, maps are used to look up a value by its associated key. 
+The hash table is one of the most ingenious and versatile of all data structures. It is an unordered collection of key/value pairs in which all the keys are distinct, and the value associated with a given key can be retrieved, updated, or removed using a constant number of key comparisons on the average, no matter how large the hash table.
+
+In Go, a *map* is a reference to a hash table, and a map type is written map[K]V, where K and V are the types of its keys and values. All of the keys in a given map are of the same type, and all of the values are of the same type, but the keys need not be of the same type as the values. **The key type K must be comparable using ==, so that the map can test whether a given key is equal to one already within it.** Though floating-point numbers are comparable, it’s a bad idea to compare floats for equality.
+
+The built-in function make can be used to create a map:
 
 ```go
-var x map[string]int // declare  // key is type of string and value is type of int
-elements := map[string]map[string]string // map[map[string]]
+ages := make(map[string]int) // mapping from strings to ints
+```
 
-x := make(map[string]int) // initialization
-x["key"] = 10 // assign
+We can also use a *map literal* to create a new map populated with some initial key/value pairs:
 
-delete(x, 1) // delete 1 from x
+```go
+ages := map[string]int{
+  "alice":   31,
+  "charlie": 34,
+}
+```
 
-name, ok := elements["Un"] // check for existance
+This is equivalent to
+
+```go
+ages := make(map[string]int)
+ages["alice"] = 31
+ages["charlie"] = 34
+```
+
+so an alternative expression for a new empty map is `map[string]int{}`. Map elements are accessed through the usual subscript notation:
+
+```go
+ages["alice"] = 32
+fmt.Println(ages["alice"]) // "32"
+```
+
+ Removed with the built-in function delete:
+
+```go
+delete(ages, "alice") // remove element ages["alice"]
+```
+
+**All of these operations are safe even if the element isn’t in the map;** a map lookup using a key that isn’t present returns the zero value for its type, so, for instance, the following works even when "bob" is not yet a key in the map because the value of ages["bob"] will be 0.
+
+```go
+ages["bob"] = ages["bob"] + 1 // happy birthday!
+
+ages["bob"] += 1 // or
+ages["bob"]++ // or
+```
+
+But a map element is not a variable, and we cannot take its address:
+
+```go
+_ = &ages["bob"] // compile error: cannot take address of map element
+```
+
+One reason that we can’t take the address of a map element is that growing a map might cause rehashing of existing elements into new storage locations, thus potentially invalidating the address.
+
+To enumerate all the key/value pairs in the map, we use a range-based for loop similar to those we saw for slices. Successive iterations of the loop cause the name and age variables to be set to the next key/value pair:
+
+```go
+for name, age := range ages {
+  fmt.Printf("%s\t%d\n", name, age)
+}
+```
+
+**The order of map iteration is unspecified, and different implementations might use a different hash function, leading to a different ordering.** This is intentional; making the sequence vary helps force programs to be robust across implementations. To enumerate the key/value pairs in order, we must sort the keys explicitly, for instance, using the Strings function from the sort package if the keys are strings. This is a common pattern:
+
+```go
+import "sort"
+//var names []string version 1
+names := make([]string, 0, len(ages)) //more efficient to allocate an array of the required size up front.
+for name := range ages {
+	names = append(names, name)
+}
+sort.Strings(names)
+for _, name := range names {
+	fmt.Printf("%s\t%d\n", name, ages[name])
+}
+```
+
+In the first range loop above, we require only the keys of the ages map, so we omit the second loop variable. In the second loop, we require only the elements of the names slice, so we use the blank identifier _ to ignore the first variable, the index.
+
+#### Map of Nil
+
+The zero value for a map type is nil, that is, a reference to no hash table at all.
+
+```go
+var ages map[string]int
+fmt.Println(ages == nil)    // "true"
+fmt.Println(len(ages) == 0) // "true"
+```
+
+Most operations on maps, including lookup, delete, len, and range loops, are safe to per- form on a nil map reference, since it behaves like an empty map. But storing to a nil map causes a panic:
+
+```go
+ages["carol"] = 21 // panic: assignment to entry in nil map
+```
+
+You must allocate the map before you can store into it.
+
+
+
+Accessing a map element by subscripting always yields a value. If the key is present in the map, you get the corresponding value; if not, you get the zero value for the element type, as we saw with ages["bob"]. For many purposes that’s fine, but sometimes you need to know whether the element was really there or not. For example, if the element type is numeric, you might have to distinguish between a nonexistent element and an element that happens to have the value zero, using a test like this:
+
+```go
+age, ok := ages["bob"]
+if !ok { /* "bob" is not a key in this map; age == 0. */ }
+
+```
+
+You’ll often see these two statements combined, like this:
+
+```go
+if age, ok := ages["bob"]; !ok { /* ... */ }
+```
+
+#### Comparison
+
+As with slices, maps cannot be compared to each other; the only legal comparison is with nil. To test whether two maps contain the same keys and the same associated values, we must write a loop:
+
+```go
+func equal(x, y map[string]int) bool {
+  if len(x) != len(y) {
+      return false
+  }
+
+	for k, xv := range x {
+  	if yv, ok := y[k]; !ok || yv != xv {
+    	return false
+  	} 
+  }
+  return true
+}
+```
+
+#### Map As Set
+
+Go does not provide a set type, but since the keys of a map are distinct, a map can serve this purpose. 
+
+```go
+seen := make(map[string]bool) // a set of strings
+```
+
+#### Non-comparable Object As Key
+
+Sometimes we need a map or set whose keys are slices, but because a map’s keys must be comparable, this cannot be expressed directly. However, it can be done in two steps. First we define a helper function k that maps each key to a string, with the property that k(x) == k(y) if and only if we consider x and y equivalent. Then we create a map whose keys are strings, applying the helper function to each key before we access the map.
+
+We can uses `fmt.Sprintf` to convert a slice of strings into a single string that is a suitable map key, quoting each slice element with %q to record string boundaries faithfully:
+
+```go
+var m = make(map[string]int)
+func k(list []string) string { return fmt.Sprintf("%q", list) }
+func Add(list []string)       { m[k(list)]++ }
+func Count(list []string) int { return m[k(list)] }
+```
+
+The same approach can be used for any non-comparable key type, not just slices. It’s even useful for comparable key types when you want a definition of equality other than ==, such as case-insensitive comparisons for strings. And the type of k(x) needn’t be a string; any comparable type with the desired equivalence property will do, such as integers, arrays, or structs.
+
+#### Map of Map
+
+The value type of a map can itself be a composite type, such as a map or slice. In the following code, the key type of graph is string and the value type is map[string]bool, representing a set of strings. Conceptually, graph maps a string to a set of related strings, its successors in a directed graph.
+
+```go
+
+var graph = make(map[string]map[string]bool)
+func addEdge(from, to string) {
+  edges := graph[from]
+  if edges == nil {
+    edges = make(map[string]bool)
+    graph[from] = edges
+  }
+  edges[to] = true
+}
+func hasEdge(from, to string) bool {
+  return graph[from][to]
+}
+         
+```
+
+The addEdge function shows the idiomatic way to populate a map lazily, that is, to initialize each value as its key appears for the first time. The hasEdge function shows how the zero value of a missing map entry is often put to work: even if neither from nor to is present, `graph[from][to]` will always give a meaningful result.
+
+### Structs
+
+A *struct* is an aggregate data type that groups together zero or more named values of arbitrary types as a single entity. Each value is called a *field*. 
+
+Example of Employee struct:
+
+```go
+type Employee struct {
+  ID        int
+  Name      string
+  Address   string
+  DoB       time.Time
+  Position  string
+  Salary    int
+  ManagerID int
+}
+var dilbert Employee
+```
+
+The individual fields of dilbert are accessed using dot notation like `dilbert.Name` and `dilbert.DoB`. Because dilbert is a variable, its fields are variables too, so we may assign to a field:
+
+```go
+ dilbert.Salary -= 5000 // demoted, for writing too few lines of code
+```
+
+or take its address and access it through a pointer:
+
+```go
+position := &dilbert.Position
+*position = "Senior " + *position // promoted, for outsourcing to Elbonia
+```
+
+The dot notation also works with a pointer to a struct:
+
+```go
+var employeeOfTheMonth *Employee = &dilbert
+employeeOfTheMonth.Position += " (proactive team player)" // option1
+
+(*employeeOfTheMonth).Position += " (proactive team player)" // option2
+
+```
+
+Given an employee’s unique ID, the function EmployeeByID returns a pointer to an Employee struct. We can use the dot notation to access its fields:
+
+```go
+func EmployeeByID(id int) *Employee { /* ... */ }
+fmt.Println(EmployeeByID(dilbert.ManagerID).Position) // "Pointy-haired boss"
+id := dilbert.ID
+EmployeeByID(id).Salary = 0 // fired for... no real reason
+```
+
+Fields are usually written one per line, with the field’s name preceding its type, but consecutive fields of the same type may be combined, as with Name and Address here:
+
+```go
+type Employee struct {
+  ID            int
+  Name, Address string
+  DoB time.Time
+  Position string
+  Salary int
+  ManagerID     int
+}
+```
+
+Field order is significant to type identity. Had we also combined the declaration of the Position field (also a string), or interchanged Name and Address, we would be defining a different struct type. Typically we only combine the declarations of related fields.
+
+The name of a struct field is exported if it begins with a capital letter; this is Go’s main access control mechanism. A struct type may contain a mixture of exported and unexported fields.
+
+#### Struct of Struct
+
+A named struct type S can’t declare a field of the same type S: an aggregate value cannot contain itself. (An analogous restriction applies to arrays.) But S may declare a field of the pointer type *S, which lets us create recursive data structures like linked lists and trees.
+
+```go
+type tree struct {
+  value       int
+  left, right *tree
+}
+```
+
+#### Empty Struct
+
+The struct type with no fields is called the *empty struct*, written struct{}. It has size zero and carries no information but may be useful nonetheless. Some Go programmers use it instead of bool as the value type of a map that represents a set, to emphasize that only the keys are significant, but the space saving is marginal and the syntax more cumbersome, so we generally avoid it.
+
+```go
+seen := make(map[string]struct{}) // set of strings
+// ...
+if _, ok := seen[s]; !ok {
+  seen[s] = struct{}{}
+  // ...first time seeing s...
+}
+```
+
+#### Struct Literals
+
+There are two forms of struct literal.
+
+1. A value of a struct type can be written using a *struct literal* that specifies values for its fields. 
+
+   ```go
+   type Point struct{ X, Y int }
+   p := Point{1, 2}
+   ```
+
+   It burdens the writer (and reader) with remembering exactly what the fields are, and it makes the code fragile should the set of fields later grow or be reordered. Accordingly, this form tends to be used only within the package that defines the struct type, or with smaller struct types for which there is an obvious field ordering convention, like `image.Point{x, y}` or `color.RGBA{red, green, blue, alpha}`
+
+2. A struct value is initialized by listing some or all of the field names and their corresponding values:
+
+   ```go
+   type Point struct{ X, Y int }
+   p := Point{Y:1, X:2}
+   ```
+
+#### Pointer For Struct
+
+For efficiency, larger struct types are usually passed to or returned from functions indirectly using a pointer,
+
+```go
+func AwardAnnualRaise(e *Employee) {
+  e.Salary = e.Salary * 105 / 100
+}
+```
+
+Because structs are so commonly dealt with through pointers, it’s possible to use this shorthand notation to create and initialize a struct variable and obtain its address:
+
+```go
+// option 1
+pp := &Point{1, 2} 
+
+// option 2
+pp := new(Point)
+*pp = Point{1, 2} 
+
+```
+
+#### Comparison
+
+If all the fields of a struct are comparable, the struct itself is comparable, so two expressions of that type may be compared using == or !=. The == operation compares the corresponding fields of the two structs in order, so the two printed expressions below are equivalent:
+
+```go
+type Point struct{ X, Y int }
+p := Point{1, 2}
+q := Point{2, 1}
+fmt.Println(p.X == q.X && p.Y == q.Y) // "false"
+fmt.Println(p == q)                   // "false"
+
+a := Point{Y: 2, X: 1}
+fmt.Println(a.X == p.X && a.Y == p.Y) //true
+fmt.Println(a == p) //true
+```
+
+Comparable struct types, like other comparable types, may be used as the key type of a map.
+
+```go
+type address struct {
+  hostname string
+  port int
+}
+
+hits := make(map[address]int)
+hits[address{"golang.org", 443}]++
+```
+
+#### Struct Embedding and Anonymous Fields
+
+In this section, we’ll see how Go’s unusual *struct embedding* mechanism lets us use one named struct type as an *anonymous field* of another struct type, providing a convenient syntactic shortcut so that a simple dot expression like `x.f` can stand for a chain of fields like `x.d.e.f`.
+
+```go
+type Point struct {
+  X, Y int
+}
+type Circle struct {
+  Center Point
+  Radius int
+}
+type Wheel struct {
+  Circle Circle
+  Spokes int
+}
+```
+
+ This change makes accessing the fields of a Wheel more verbose:
+
+```go
+var w Wheel
+w.Circle.Center.X = 8
+w.Circle.Center.Y = 8
+w.Circle.Radius = 5
+w.Spokes = 20
+```
+
+Go lets us declare a field with a type but no name; such fields are called *anonymous fields*. The type of the field must be a named type or a pointer to a named type. Below, Circle and Wheel have one anonymous field each. We say that a Point is *embedded* within Circle, and a Circle is embedded within Wheel.
+
+```go
+type Circle struct {
+  Point
+  Radius int
+}
+type Wheel struct {
+  Circle
+  Spokes int
+}
+```
+
+Thanks to embedding, we can refer to the names at the leaves of the implicit tree without giving the intervening names:
+
+```go
+var w Wheel
+w.X = 8 // equivalent to w.Circle.Point.X = 8
+w.Y = 8 // equivalent to w.Circle.Point.Y = 8
+w.Radius = 5 // equivalent to w.Circle.Radius = 5
+w.Spokes = 20
+```
+
+Unfortunately, there’s no corresponding shorthand for the struct literal syntax, so neither of these will compile:
+
+```go
+w = Wheel{8, 8, 5, 20}     // compile error: unknown fields
+w = Wheel{X: 8, Y: 8, Radius: 5, Spokes: 20} // compile error: unknown fields
+
+
+// instead
+w = Wheel{Circle{Point{8, 8}, 5}, 20}
+w = Wheel{
+  Circle: Circle{
+    Point:  Point{X: 8, Y: 8},
+    Radius: 5,
+  },
+	Spokes: 20, // NOTE: trailing comma necessary here (and at Radius)
+}
+
+fmt.Printf("%#v\n", w)
+// Output:
+// Wheel{Circle:Circle{Point:Point{X:8, Y:8}, Radius:5}, Spokes:20}
+w.X = 42
+fmt.Printf("%#v\n", w)
+// Output:
+// Wheel{Circle:Circle{Point:Point{X:42, Y:8}, Radius:5}, Spokes:20}
+```
+
+Because ‘‘anonymous’’ fields do have implicit names, **you can’t have two anonymous fields of the same type since their names would conflict**. And because the name of the field is implicitly determined by its type, so too is the visibility of the field. In the examples above, the Point and Circle anonymous fields are exported. Had they been unexported (point and circle), we could still use the shorthand form
+
+```go
+w.X = 8 // equivalent to w.circle.point.X = 8
+```
+
+but the explicit long form shown in the comment would be forbidden outside the declaring package because circle and point would be inaccessible.
+
+### JSON
+
+JavaScript Object Notation (JSON) is a standard notation for sending and receiving structured information.
+
+Go has excellent support for encoding and decoding these formats, provided by the standard library packages `encoding/json`, `encoding/xml`, `encoding/asn1`, and so on, and these packages all have similar APIs.
+
+JSON is an encoding of JavaScript values—**strings**, **numbers**, booleans, **arrays**, and **objects**—as Unicode text.
+
+The basic JSON types are numbers (in decimal or scientific notation), booleans (true or false), and strings, which are sequences of Unicode code points enclosed in double quotes, with backslash escapes using a similar notation to Go, though JSON’s \u*hhhh* numeric escapes denote UTF-16 codes, not runes.
+
+These basic types may be combined recursively using JSON arrays and objects. A JSON array is an ordered sequence of values, written as a comma-separated list enclosed in square brackets; JSON arrays are used to encode Go arrays and slices. A JSON object is a mapping from strings to values, written as a sequence of name:value pairs separated by commas and sur- rounded by braces; JSON objects are used to encode Go maps (with string keys) and structs. For example:
+
+```go
+boolean true
+number -273.15
+string "She said \"Hello, BF\""
+array  ["gold", "silver", "bronze"]
+object  {"year": 1980,
+         "event": "archery",
+         "medals": ["gold", "silver", "bronze"]}
+
 
 
 ```
 
+#### From Go Object To JSON
+
+Example of Movie Object in Go:
+
+```go
+type Movie struct {
+  Title  string
+  Year   int  `json:"released"`
+  Color  bool `json:"color,omitempty"`
+  Actors []string
+}
+var movies = []Movie{
+  {Title: "Casablanca", Year: 1942, Color: false,
+   Actors: []string{"Humphrey Bogart", "Ingrid Bergman"}},
+
+  {Title: "Cool Hand Luke", Year: 1967, Color: true,
+   Actors: []string{"Paul Newman"}},
+  {Title: "Bullitt", Year: 1968, Color: true,
+   Actors: []string{"Steve McQueen", "Jacqueline Bisset"}},
+  // ...
+}
+```
+
+> _**Note**_: A *field tag* is a string of metadata associated at compile time with the field of a struct:
+>
+> ```go
+>      Year  int  `json:"released"`
+>      Color bool `json:"color,omitempty"`
+> ```
+>
+> *omitempty* which indicates that no JSON output should be produced if the field has the zero value for its type (false, here) or is otherwise empty.
+
+Converting a Go data structure like movies to JSON is called *marshaling*. Marshaling is done by `json.Marshal`:
+
+```go
+data, err := json.Marshal(movies)
+if err != nil {
+  log.Fatalf("JSON marshaling failed: %s", err)
+}
+fmt.Printf("%s\n", data)
+```
+
+Marshal produces a `byte slice` containing a very long string with no extraneous white space; we’ve folded the lines so it fits:
+
+```go
+[{"Title":"Casablanca","released":1942,"Actors":["Humphrey Bogart",
+"Ingrid Bergman"]},{"Title":"Cool Hand Luke","released":1967,"color":
+true,"Actors":["Paul Newman"]},{"Title":"Bullitt","released":1968,
+"color":true,"Actors":["Steve McQueen","Jacqueline Bisset"]}]
+```
+
+For human consumption, a variant called `json.MarshalIndent` produces neatly indented output. Two additional arguments define a prefix for each line of output and a string for each level of indentation:
+
+```go
+data, err := json.MarshalIndent(movies, "", "    ")
+if err != nil {
+  log.Fatalf("JSON marshaling failed: %s", err)
+}
+fmt.Printf("%s\n", data)
+
+```
+
+Marshaling uses the Go struct field names as the field names for the JSON objects (through *reflection*). **Only exported fields are marshaled, which is why we chose capitalized names for all the Go field names.**
+
+#### From JSON  To Go Object
+
+The inverse operation to marshaling, decoding JSON and populating a Go data structure, is called *unmarshaling*, and it is done by `json.Unmarshal`.
+
+The code below unmarshals the JSON movie data into a slice of structs whose only field is Title. **By defining suitable Go data structures in this way, we can select which parts of the JSON input to decode and which to discard**. When Unmarshal returns, it has filled in the slice with the Title information; other names in the JSON are ignored.
+
+```go
+var titles []struct{ Title string }
+if err := json.Unmarshal(data, &titles); err != nil {
+  log.Fatalf("JSON unmarshaling failed: %s", err)
+}
+fmt.Println(titles) // "[{Casablanca} {Cool Hand Luke} {Bullitt}]"
+```
+
+To illustrate, let’s query the GitHub issue tracker using its web-service interface. First we’ll define the necessary types and constants:
+
+```go
+package github
+import "time"
+const IssuesURL = "https://api.github.com/search/issues"
+
+type IssuesSearchResult struct {
+  TotalCount int `json:"total_count"`
+  Items      []*Issue
+}
+
+type Issue struct {
+  Number    int
+  HTMLURL   string `json:"html_url"`
+  Title     string
+  State     string
+  User      *User
+  CreatedAt time.Time `json:"created_at"`
+  Body      string    // in Markdown format
+}
+
+type User struct {
+  Login   string
+  HTMLURL string `json:"html_url"`
+}
+```
+
+The names of all the struct fields must be capitalized even if their JSON names are not. However, the matching process that associates JSON names with Go struct names during unmarshaling is case-insensitive, so it’s only necessary to use a field tag when there’s an underscore in the JSON name but not in the Go name.
+
+
+
+The SearchIssues function makes an HTTP request and decodes the result as JSON. Since the query terms presented by a user could contain characters like ? and & that have special meaning in a URL, we use url.QueryEscape to ensure that they are taken literally.
+
+For variety, this example uses the *streaming* decoder, `json.Decoder`, which allows several JSON entities to be decoded in sequence from the same stream, although we don’t need that feature here. As you might expect, there is a corresponding streaming encoder called `json.Encoder`.
+
+```go
+import (
+  "encoding/json"
+  "fmt"
+  "net/http"
+  "net/url"
+  "strings"
+)
+// SearchIssues queries the GitHub issue tracker.
+func SearchIssues(terms []string) (*IssuesSearchResult, error) {
+  q := url.QueryEscape(strings.Join(terms, " "))
+  resp, err := http.Get(IssuesURL + "?q=" + q)
+  if err != nil {
+    return nil, err
+  }
+  // We must close resp.Body on all execution paths.
+  // (Chapter 5 presents 'defer', which makes this simpler.)
+  if resp.StatusCode != http.StatusOK {
+    resp.Body.Close()
+    return nil, fmt.Errorf("search query failed: %s", resp.Status)
+  }
+  var result IssuesSearchResult
+  if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+    resp.Body.Close()
+    return nil, err
+  }
+  resp.Body.Close()
+  return &result, nil
+}
+```
+
+The call to Decode populates the variable result. There are various ways we can format its value nicely. The simplest, demonstrated by the issues command below, is as a text table with fixed-width columns.
+
+```go
+package main
+import (
+  "fmt"
+  "log"
+  "os"
+  "gopl.io/ch4/github"
+)
+func main() {
+  result, err := github.SearchIssues(os.Args[1:])
+  if err != nil {
+    log.Fatal(err)
+  }
+  fmt.Printf("%d issues:\n", result.TotalCount)
+  for _, item := range result.Items {
+    fmt.Printf("#%-5d %9.9s %.55s\n",
+               item.Number, item.User.Login, item.Title)
+  } 
+}
+
+```
+
+### Text and HTML Templates
+
+#### Text Templates
+
+Sometimes formatting must be more elaborate, and it’s desirable to separate the format from the code more completely. This can be done with the `text/template` and `html/template` packages, which provide a mechanism for substituting the values of variables into a text or HTML template.
+
+A template is a string or file containing one or more portions enclosed in double braces, {{...}}, called *actions*. Most of the string is printed literally, but the actions trigger other behaviors. Each action contains an expression in the template language, a simple but powerful notation for printing values, selecting struct fields, calling functions and methods, expressing control flow such as if-else statements and range loops, and instantiating other templates. A simple template string is shown below:
+
+```go
+const templ = `{{.TotalCount}} issues:
+     {{range .Items}}----------------------------------------
+     Number: {{.Number}}
+     User:   {{.User.Login}}
+     Title:  {{.Title | printf "%.64s"}}
+     Age:    {{.CreatedAt | daysAgo}} days
+     {{end}}`
+
+```
+
+This template first prints the number of matching issues, then prints the number, user, title, and age in days of each one. Within an action, there is a notion of the current value, referred to as ‘‘dot’’ and written as `.` a period. The dot initially refers to the template’s parameter, which will be a *github.IssuesSearchResult* in this example. The `{{.TotalCount}}` action expands to the value of the TotalCount field, printed in the usual way. The `{{range .Items}}` and `{{end}}` actions create a loop, so the text between them is expanded multiple times, with dot bound to successive elements of Items.
+
+Within an action, the `|` notation makes the result of one operation the argument of another, analogous to a Unix shell pipeline. In the case of Title, the second operation is the printf function, which is a built-in synonym for `fmt.Sprintf` in all templates. For Age, the second operation is the following function, daysAgo, which converts the CreatedAt field into an elapsed time, using time.Since:
+
+```go
+func daysAgo(t time.Time) int {
+  return int(time.Since(t).Hours() / 24)
+}
+```
+
+##### Producing Template
+
+Producing output with a template is a two-step process. First we must parse the template into a suitable internal representation, and then execute it on specific inputs. Parsing need be done only once. 
+
+The code below creates and parses the template *templ* defined above. Note the chaining of method calls: *template.New* creates and returns a template; *Funcs* adds *daysAgo* to the set of functions accessible within this template, then returns that template; finally, Parse is called on the result.
+
+```go
+report, err := template.New("report").
+		Funcs(template.FuncMap{"daysAgo": daysAgo}).
+		Parse(templ)
+if err != nil {
+  log.Fatal(err)
+}
+```
+
+Once the template has been created, augmented with `daysAgo`, parsed, and checked, we can execute it using a *github.IssuesSearchResult* as the data source and os.Stdout as the destination:
+
+```go
+var report = template.Must(template.New("issuelist").
+         Funcs(template.FuncMap{"daysAgo": daysAgo}).
+         Parse(templ))
+func main() {
+  result, err := github.SearchIssues(os.Args[1:])
+  if err != nil {
+    log.Fatal(err)
+  }
+  if err := report.Execute(os.Stdout, result); err != nil {
+    log.Fatal(err)
+  } 
+}
+```
+
+The program prints a plain text report like this:
+
+```go
+$ go build gopl.io/ch4/issuesreport
+$ ./issuesreport repo:golang/go is:open json decoder
+13 issues:
+----------------------------------------
+Number: 5680
+User:   eaigner
+Title:  encoding/json: set key converter on en/decoder
+Age:    750 days
+----------------------------------------
+Number: 6050
+User:   gopherbot
+Title:  encoding/json: provide tokenizer
+Age:    695 days
+----------------------------------------
+...
+
+```
+
+#### HTML Templates
+
+The `html/template`package. It uses the same API and expression language as `text/template` but adds features for automatic and context-appropriate escaping of strings appearing within HTML, JavaScript, CSS, or URLs. These features can help avoid a perennial security problem of HTML generation, an *injection attack*, in which an adversary crafts a string value like the title of an issue to include malicious code that, when improperly escaped by a template, gives them control over the page.
+
+The template below prints the list of issues as an HTML table. Note the different import:
+
+```go
+import "html/template"
+var issueList = template.Must(template.New("issuelist").Parse(`
+     <h1>{{.TotalCount}} issues</h1>
+     <table>
+     <tr style='text-align: left'>
+       <th>#</th>
+       <th>State</th>
+       <th>User</th>
+       <th>Title</th>
+     </tr>
+     {{range .Items}}
+     <tr>
+       <td><a href='{{.HTMLURL}}'>{{.Number}}</a></td>
+       <td>{{.State}}</td>
+       <td><a href='{{.User.HTMLURL}}'>{{.User.Login}}</a></td>
+       <td><a href='{{.HTMLURL}}'>{{.Title}}</a></td>
+     </tr>
+     {{end}}
+     </table>
+     `))
+```
+
+The command below executes the new template on the results of a slightly different query:
+
+```go
+$ go build gopl.io/ch4/issueshtml
+$ ./issueshtml repo:golang/go commenter:gopherbot json encoder >issues.html
+```
+
+##### Auto Escaping
+
+If we used the `text/template` package by mistake, the four-character string "\&lt;" would have been rendered as a less-than character '<', and the string "<link>" would have become a link element, changing the structure of the HTML document and perhaps compromising its security.
+
+We can suppress this *auto-escaping* behavior for fields that contain trusted HTML data by using the named string type template.HTML instead of string. Similar named types exist for trusted JavaScript, CSS, and URLs. The program below demonstrates the principle by using two fields with the same value but different types: A is a `string` and B is a `template.HTML`.
+
+```go
+func main() {
+  const templ = `<p>A: {{.A}}</p><p>B: {{.B}}</p>`
+  t := template.Must(template.New("escape").Parse(templ))
+  var data struct {
+    A string        // untrusted plain text
+    B template.HTML // trusted HTML
+  }
+  data.A = "<b>Hello!</b>"
+  data.B = "<b>Hello!</b>"
+  if err := t.Execute(os.Stdout, data); err != nil {
+    log.Fatal(err)
+  } }
+```
+
+Figure 4.6 shows the template’s output as it appears in a browser. We can see that A was subject to escaping but B was not.
+
+![image-20210224212207942](Asserts/Go/image-20210224212207942.png)
+
 ## Function
+
+A function lets us wrap up a sequence of statements as a unit that can be called from elsewhere in a program, perhaps multiple times.
+
+### Function Declarations
+
+A function declaration has a name, a list of parameters, an optional list of results, and a body:
+
+```go
+// under scope rule, the parameters are only available inside the function (local)
+func name(parameter-list) (result-list) { 
+  body
+}
+```
+
+
 
 ```go
 // defined return type 
@@ -480,9 +2293,77 @@ func main() {
 }
 ```
 
+## Control Structures
+
+### For
+
+```go
+// for loop
+// every variable declared need to be used inside the loop
+// type 1
+for i, card := range cards {
+  fmt.Println(i, card)
+}
+
+// type 2
+for i := 0; i < 100; i++ {
+  fmt.Printf(i)
+}
+
+// inifite loop
+for {
+  
+}
+```
+
+### If
+
+```go
+if i % 2 == 0 {
+  // divisible by 2
+} else if i % 3 == 0 {
+  // divisible by 3
+} else if i % 4 == 0 {
+  // divisible by 4
+}
+
+// is ok is true then it will print out 
+if name, ok := elements["Un"]; ok {
+  fmt.Println(name, ok)
+}
+```
+
+### Switch
+
+```go
+switch i {
+case 0: fmt.Println("Zero")
+case 1: fmt.Println("One")
+case 2: fmt.Println("Two")
+case 3: fmt.Println("Three")
+case 4: fmt.Println("Four")
+case 5: fmt.Println("Five")
+default: fmt.Println("Unknown Number")
+}
+```
+
 ## Pointers
 
-Pointers reference a location in memory where a value is stored rather than the value itself.
+A *pointer* value is the *address* of a variable.A pointer is thus the location at which a value is stored. Not every value has an address, but every variable does. With a pointer, we can read or update the value of a variable *indirectly*, without using or even knowing the name of the variable, if indeed it has a name.
+
+If a variable is declared var x int, the expression &x (‘‘address of x’’) yields a pointer to an integer variable, that is, a value of type *int, which is pronounced ‘‘pointer to int.’’
+
+```go
+x := 1
+p := &x         // p, of type *int, points to x
+fmt.Println(*p) // "1"
+*p = 2          // equivalent to x = 2
+fmt.Println(x)  // "2"
+```
+
+> _**Note**_: It is perfectly safe for a function to return the address of a local variable in Go.
+
+In Go, all the parameters are pass by value, so it is important to learn the pointer and pass the slices and other 'heavy' parameters by reference to avoid making a new copy.
 
 ### The * and & operators
 
@@ -508,6 +2389,26 @@ func main() {
 `new` takes a type as an argument, allocates enough memory to fit a value of that type and returns a pointer to it.
 
 In some programming languages there is a significant difference between using `new` and `&`, with great care being needed to eventually delete anything created with `new`. Go is not like this, it's a garbage collected programming language which means memory is cleaned up automatically when nothing refers to it anymore.
+
+### Passing Pointer to Function
+
+Edit one item
+
+```go
+func zero(ptr *[32]byte) {
+	for i := range ptr {
+    ptr[i] = 0 // set idx i item to 0
+	} 
+}
+```
+
+Change whole array
+
+```go
+func zero(ptr *[32]byte) {
+  *ptr = [32]byte{}
+}
+```
 
 ## Structs and Interfaces
 
@@ -783,7 +2684,67 @@ buf.Write([]byte("test"))
 
 A `Buffer` doesn't have to be initialized and supports both the `Reader` and `Writer` interfaces. You can convert it into a `[]byte` by calling `buf.Bytes()`. If you only need to read from a string you can also use the `strings.NewReader` function which is more efficient than using a buffer.
 
+### Command Line Arguments
+
+The variable `os.Args` is a *slice* of strings and provides the arguments that pass to the program. The first element of os.Args, os.Args[0], is the name of the command itself.
+
+#### Command Line Flags
+
+```go
+package main
+ import (
+ "flag"
+ "fmt"
+ "strings"
+)
+var n = flag.Bool("n", false, "omit trailing newline")
+var sep = flag.String("s", " ", "separator")
+func main() {
+  flag.Parse()
+  fmt.Print(strings.Join(flag.Args(), *sep))
+  if !*n {
+    fmt.Println()
+  } 
+}
+// running ./echo4 -s / a bc def
+//  a/bc/def
+```
+
+### Scanner
+
+The bufio package, which helps make input and output efficient and convenient. The scanner reads from the program’s standard input. Each call to input.Scan() reads the next line and removes the newline character from the end; the result can be retrieved by calling input.Text(). The Scan function returns true if there is a line and false when there is no more input.
+
+```go
+package main
+import (
+	"bufio"
+	"fmt"
+  "os"
+)
+func main() {
+    counts := make(map[string]int)
+    input := bufio.NewScanner(os.Stdin)
+    for input.Scan() {
+    	counts[input.Text()]++
+		}
+  // NOTE: ignoring potential errors from input.Err()
+  	for line, n := range counts {
+    	if n > 1 {
+      	fmt.Printf("%d\t%s\n", n, line)
+    	} 
+    }
+}
+```
+
 ## Files & Folders
+
+### Read Files
+
+1. os.Open(file_name): return a os.File object, and use Scanner to process the  input
+2. ReadFile: Read the entire file as bytes.
+3. *os.File.Read: The lowest level of read file.
+
+#### OS Open
 
 To open a file in Go use the `Open` function from the `os` package. Here is an example of how to read the contents of a file and display them on the terminal:
 
@@ -808,19 +2769,29 @@ func main() {
   if err != nil {
     return
   }
-  // read the file
+  // read the file option1
   bs := make([]byte, stat.Size())
   _, err = file.Read(bs)
   if err != nil {
     return
   }
-
   str := string(bs)
   fmt.Println(str)
+  
+  //read the file option2
+input := bufio.NewScanner(file)
+for input.Scan() {
+	fmt.Println(input.Text())
+	// NOTE: ignoring potential errors from input.Err()
+}
 }
 ```
 
-We use `defer file.Close()` right after opening the file to make sure the file is closed as soon as the function completes. Reading files is very common, so there's a shorter way to do this:
+We use `defer file.Close()` right after opening the file to make sure the file is closed as soon as the function completes. 
+
+#### Read File
+
+Reading files is very common, so there's a shorter way to do this:
 
 ```go
 package main
@@ -840,7 +2811,7 @@ func main() {
 }
 ```
 
-Here is how we can create a file:
+### Create New File
 
 ```go
 package main
@@ -921,6 +2892,34 @@ import "errors"
 func main() {
   err := errors.New("error message")
 }
+```
+
+### Std Error
+
+Print the error msg to standard error pipe.
+
+```go
+f, err := os.Open(arg)
+ if err != nil {
+     fmt.Fprintf(os.Stderr, "dup2: %v\n", err)
+ } 
+
+f.Close()
+```
+
+### Log.Fatalf
+
+The function log.Fatalf prints a message and calls os.Exit(1).
+
+```go
+var cwd string
+func init() {
+  cwd, err := os.Getwd() // compile error: unused: cwd
+  if err != nil {
+    log.Fatalf("os.Getwd failed: %v", err)
+	} 
+}
+
 ```
 
 ## Containers & Sort

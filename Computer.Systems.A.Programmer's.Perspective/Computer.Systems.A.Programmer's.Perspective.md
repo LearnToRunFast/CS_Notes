@@ -81,10 +81,10 @@ There are only a few of these simple operations, and they revolve around main me
 
 - The register file is a small storage device that consists of a collection of word-size registers, each with its own unique name. 
 - The ALU computes new data and address values. Here are some examples of the simple operations that the CPU might carry out at the request of an instruction:
-  - **Load**: Copy a byte or a word from main memory into a register, overwriting the previous contents of the register.
-  - **Store**: Copy a byte or a word from a register to a location in main memory, overwriting the previous contents of that location.
-  - **Operate**: Copy the contents of two registers to the ALU, perform an arithmetic operation on the two words, and store the result in a register, overwriting the previous contents of that register.
-  - **Jump**: Extract a word from the instruction itself and copy that word into the program counter (PC), overwriting the previous value of the PC.
+	- **Load**: Copy a byte or a word from main memory into a register, overwriting the previous contents of the register.
+	- **Store**: Copy a byte or a word from a register to a location in main memory, overwriting the previous contents of that location.
+	- **Operate**: Copy the contents of two registers to the ALU, perform an arithmetic operation on the two words, and store the result in a register, overwriting the previous contents of that register.
+	- **Jump**: Extract a word from the instruction itself and copy that word into the program counter (PC), overwriting the previous value of the PC.
 
 We say that a processor appears to be a simple implementation of its instruction set architecture, but in fact modern processors use far more complex mechanisms to speed up program execution. Thus, we can distinguish the processor’s instruction set architecture, describing the effect of each machine-code instruction, from its *micro-architecture*, describing how the processor is actually implemented.
 
@@ -100,7 +100,7 @@ Once the code and data in the hello object file are loaded into memory, the proc
 
 ### Memory Hierarchy
 
-An important lesson from this simple example is that a system spends a lot of time moving information from one place to another. The machine instructions in the hello program are originally stored on disk. When the program is loaded, they are copied to main memory. As the processor runs the program, instruc- tions are copied from main memory into the processor. Similarly, the data string hello,world\n, originally on disk, is copied to main memory and then copied from main memory to the display device. From a programmer’s perspective, much of this copying is overhead that slows down the “real work” of the program. Thus, a major goal for system designers is to make these copy operations run as fast as possible.
+An important lesson from this simple example is that a system spends a lot of time moving information from one place to another. The machine instructions in the hello program are originally stored on disk. When the program is loaded, they are copied to main memory. As the processor runs the program, instructions are copied from main memory into the processor. Similarly, the data string hello,world\n, originally on disk, is copied to main memory and then copied from main memory to the display device. From a programmer’s perspective, much of this copying is overhead that slows down the “real work” of the program. Thus, a major goal for system designers is to make these copy operations run as fast as possible.
 
  The processor can read data from the register file almost 100 times faster than from memory. Even more troublesome, as semiconductor technology progresses over the years, this *processor–memory gap* continues to increase. It is easier and cheaper to make processors run faster than it is to make main memory run faster.
 
@@ -445,7 +445,7 @@ Signed integers can represent zero, positive integers, as well as negative integ
 
 In all the above three schemes, the *most-significant bit* (msb) is called the *sign bit*. The sign bit is used to represent the *sign* of the integer - with 0 for positive integers and 1 for negative integers. The *magnitude* of the integer, however, is interpreted differently in different schemes.
 
-##### *n*-bit Sign Integers in Sign-Magnitude Representation
+##### n-bit Sign Integers in Sign-Magnitude Representation
 
 In sign-magnitude representation:
 
@@ -469,7 +469,7 @@ The drawbacks of sign-magnitude representation are:
 1. There are two representations (`0000 0000B` and `1000 0000B`) for the number zero, which could lead to inefficiency and confusion.
 2. Positive and negative integers need to be processed separately.
 
-##### *n*-bit Sign Integers in 1's Complement Representation
+##### n-bit Sign Integers in 1's Complement Representation
 
 In 1's complement representation:
 
@@ -495,7 +495,7 @@ Again, the drawbacks are:
 1. There are two representations (`0000 0000B` and `1111 1111B`) for zero.
 2. The positive integers and negative integers need to be processed separately.
 
-##### *n*-bit Sign Integers in 2's Complement Representation
+##### n-bit Sign Integers in 2's Complement Representation
 
 In 2's complement representation:
 
