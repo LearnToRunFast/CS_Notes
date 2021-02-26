@@ -689,7 +689,7 @@ Strings may be compared with comparison operators like == and <; the comparison 
 Since strings are immutable, constructions that try to modify a string’s data in place are not allowed:
 
 ```go
-     s[0] = 'L' // compile error: cannot assign to s[0]
+s[0] = 'L' // compile error: cannot assign to s[0]
 ```
 
 #### String Literals
@@ -2108,78 +2108,373 @@ func name(parameter-list) (result-list) {
 }
 ```
 
-
+You may occasionally encounter a function declaration without a body, indicating that the function is implemented in a language other than Go. Such a declaration defines the function signature.
 
 ```go
-// defined return type 
-func newFunc() string {}
+package math
+func Sin(x float64) float64 // implemented in assembly language
+```
 
-// defined two return type
-func newFunc() (string, string) {}
 
-// name the return value
-func f2() (r int) { // it will return 1
-	r = 1
-	return
+
+### Function Signature
+
+The type of a function is sometimes called its *signature*. Two functions have the same type or signature if they have the same sequence of parameter types and the same sequence of result types. The names of parameters and results don’t affect the type, nor does whether or not they were declared using the factored form.
+
+### Parameters
+
+Parameters are local variables within the body of the function, with their initial values set to the arguments supplied by the caller. Function parameters and named results are variables in the same *lexical block* as the function’s outermost local variables.
+
+### Pass By Value
+
+Arguments are passed *by value*, so the function receives a copy of each argument; modifications to the copy do not affect the caller. However, if the argument contains some kind of reference, like a **pointer**, **slice**, **map**, **function**, or **channel**, then the caller may be affected by any modifications the function makes to variables *indirectly* referred to by the argument.
+
+### Recursion
+
+Functions may be *recursive*, that is, they may call themselves, either directly or indirectly.
+
+The example program below uses a non-standard package, golang.org/x/net/html, which provides an HTML parser. The `golang.org/x/...` repositories hold packages designed and maintained by the Go team for applications such as networking, internationalized text processing, mobile platforms, image manipulation, cryptography, and developer tools.
+
+The function html.Parse reads a sequence of bytes, parses them, and returns the root of the HTML document tree, which is an html.Node. HTML has several kinds of nodes—text, comments, and so on—but here we are concerned only with *element* nodes of the form \<name key='value'\>.
+
+```go
+package html
+type Node struct {
+  Type                    NodeType
+  Data                    string
+  Attr                    []Attribute
+  FirstChild, NextSibling *Node
 }
+type NodeType int32
+const (
+  ErrorNode NodeType = iota
+  TextNode
+  DocumentNode
+  ElementNode
+  CommentNode
+  DoctypeNode
+)
 
-// different files with same package can call the function without importing
-// file 1
-func printOne() string {
-  return "1"
+type Attribute struct {
+  Key, Val string
 }
+func Parse(r io.Reader) (*Node, error)
+```
 
-//file 2
+The main function parses the standard input as HTML, extracts the links using a recursive visit function, and prints each discovered link:
+
+```go
+package main
+import (
+  "fmt"
+  "os"
+  "golang.org/x/net/html"
+)
 func main() {
-  fmt.Println(printOne())
+  doc, err := html.Parse(os.Stdin)
+  if err != nil {
+    fmt.Fprintf(os.Stderr, "findlinks1: %v\n", err)
+    os.Exit(1)
+  }
+  for _, link := range visit(nil, doc) {
+    fmt.Println(link)
+  } 
 }
 ```
+
+The visit function traverses an HTML node tree, extracts the link from the href attribute of each *anchor* element \<a href='…'\>, appends the links to a slice of strings, and returns the resulting slice:
+
+```go
+// visit appends to links each link found in n and returns the result.
+func visit(links []string, n *html.Node) []string {
+  if n.Type == html.ElementNode && n.Data == "a" {
+    for _, a := range n.Attr {
+      if a.Key == "href" {
+        links = append(links, a.Val)
+      } 
+    }
+  }
+  for c := n.FirstChild; c != nil; c = c.NextSibling {
+    links = visit(links, c)
+  }
+  return links
+}
+```
+
+Example output of Go home page:
+
+```go
+$ go build gopl.io/ch1/fetch
+$ go build gopl.io/ch5/findlinks1
+$ ./fetch https://golang.org | ./findlinks1
+#
+/doc/
+/pkg/
+/help/
+/blog/
+http://play.golang.org/
+//tour.golang.org/
+https://golang.org/dl/
+//blog.golang.org/
+/LICENSE
+/doc/tos.html
+http://www.google.com/intl/en/policies/privacy/
+```
+
+#### Call Stack In GO
+
+Many programming language implementations use a fixed-size function call stack; sizes from 64KB to 2MB are typical. Fixed-size stacks impose a limit on the depth of recursion, so one must be careful to avoid a *stack overflow* when traversing large data structures recursively; fixed-size stacks may even pose a security risk. In contrast, typical Go implementations use variable-size stacks that start small and grow as needed up to a limit on the order of a gigabyte. This lets us use recursion safely and without worrying about overflow.
+
+### Return Values
+
+You can return single or list of return values, below is an example of returning two values
+
+```go
+func findLinks(url string) ([]string, error) {
+  resp, err := http.Get(url)
+  if err != nil {
+    return nil, err
+  }
+  if resp.StatusCode != http.StatusOK {
+    resp.Body.Close()
+    return nil, fmt.Errorf("getting %s: %s", url, resp.Status)
+  }
+  doc, err := html.Parse(resp.Body)
+  resp.Body.Close()
+  if err != nil {
+    return nil, fmt.Errorf("parsing %s as HTML: %v", url, err)
+  }
+  return visit(nil, doc), nil
+}
+```
+
+The result of calling a multi-valued function is a tuple of values. The caller of such a function must explicitly assign the values to variables if any of them are to be used:
+
+```go
+links, err := findLinks(url)
+
+// ignore err
+links, _ := findLinks(url) // errors ignored
+
+//A multi-valued call may appear as the sole argument when calling a function of multiple parameters. 
+log.Println(findLinks(url))
+```
+
+#### Named Results
+
+In a function with named results, the operands of a return statement may be omitted. This is called a *bare return*.
+
+```go
+
+// CountWordsAndImages does an HTTP GET request for the HTML
+// document url and returns the number of words and images in it.
+func CountWordsAndImages(url string) (words, images int, err error) {
+  resp, err := http.Get(url)
+  if err != nil {
+    // is equivalent to return words, images, err
+    return
+  }
+
+  doc, err := html.Parse(resp.Body)
+  resp.Body.Close()
+  if err != nil {
+    err = fmt.Errorf("parsing HTML: %s", err)
+    return
+  }
+  words, images = countWordsAndImages(doc)
+  return
+}
+func countWordsAndImages(n *html.Node) (words, images int) { /* ... */ }
+
+```
+
+### Function As Value
+
+Functions are *first-class values* in Go: like other values, function values have types, and they may be assigned to variables or passed to or returned from functions. A function value may be called like any other function. For example:
+
+```go
+func square(n int) int     { return n * n }
+func negative(n int) int   { return -n }
+func product(m, n int) int { return m * n }
+f := square
+fmt.Println(f(3)) // "9"
+f = negative
+fmt.Println(f(3))     // "-3"
+fmt.Printf("%T\n", f) // "func(int) int"
+f = product // compile error: can't assign func(int, int) int to func(int) int
+
+
+// The zero value of a function type is nil. Calling a nil function value causes a panic:
+var f func(int) int
+f(3) // panic: call of nil function
+```
+
+For instance, strings.Map applies a function to each character of a string, joining the results to make another string.
+
+```go
+func add1(r rune) rune { return r + 1 }
+fmt.Println(strings.Map(add1, "HAL-9000")) // "IBM.:111"
+fmt.Println(strings.Map(add1, "VMS"))      // "WNT"
+fmt.Println(strings.Map(add1, "Admix"))    // "Benjy"
+```
+
+#### Comparison
+
+Function values may be compared with nil:
+
+```go
+var f func(int) int
+if f != nil {
+  f(3)
+}
+```
+
+but they are not comparable, so they may not be compared against each other or used as keys in a map.
+
+### Anonymous Functions
+
+**Named functions can be declared only at the package level**, but we can use a *function literal* to denote a function value within any expression. A function literal is written like a function declaration, but without a name following the func keyword. It is an expression, and its value is called an *anonymous function*.
+
+The earlier call to strings.Map can be rewritten as
+
+```go
+strings.Map(func(r rune) rune { return r + 1 }, "HAL-9000")
+```
+
+More importantly, functions defined in this way have access to the entire lexical environment, so the inner function can refer to variables from the enclosing function, as this example shows:
+
+```go
+// squares returns a function that returns
+// the next square number each time it is called.
+func squares() func() int {
+  var x int
+  return func() int {
+    x++
+    return x * x
+  } 
+}
+func main() {
+  f := squares()
+  fmt.Println(f()) // "1"
+  fmt.Println(f()) // "4"
+  fmt.Println(f()) // "9"
+  fmt.Println(f()) // "16"
+}
+```
+
+Consider the problem of computing a sequence of computer science courses that satisfies the prerequisite requirements of each one. The prerequisites are given in the prereqs table below, which is a mapping from each course to the list of courses that must be completed before it.
+
+```go
+var prereqs = map[string][]string{
+  "algorithms": {"data structures"},
+  "calculus":   {"linear algebra"},
+  "compilers": {
+    "data structures",
+    "formal languages",
+    "computer organization",
+  },
+
+  "data structures":               {"discrete math"},
+  "databases":                       {"data structures"},
+  "discrete math":                 {"intro to programming"},
+  "formal languages":        {"discrete math"},
+  "networks":                       {"operating systems"},
+  "operating systems":      {"data structures", "computer organization"},
+  "programming languages": {"data structures", "computer organization"},
+}
+```
+
+This kind of problem is known as `topological sorting`. Conceptually, the prerequisite information forms a directed graph with a node for each course and edges from each course to the courses that it depends on. The graph is acyclic: there is no path from a course that leads back to itself. We can compute a valid sequence using depth-first search through the graph with the code below:
+
+```go
+
+func main() {
+  for i, course := range topoSort(prereqs) {
+    fmt.Printf("%d:\t%s\n", i+1, course)
+  } 
+}
+func topoSort(m map[string][]string) []string {
+  var order []string
+  seen := make(map[string]bool)
+  var visitAll func(items []string)
+
+  visitAll = func(items []string) {
+    for _, item := range items {
+    }
+    if !seen[item] {
+      seen[item] = true
+      visitAll(m[item])
+      order = append(order, item)
+    } }
+  var keys []string
+  for key := range m {
+    keys = append(keys, key)
+  }
+  sort.Strings(keys)
+  visitAll(keys)
+  return order
+}
+```
+
+When an anonymous function requires recursion, as in this example, we must first declare a variable, and then assign the anonymous function to that variable. Had these two steps been combined in the declaration, the function literal would not be within the scope of the variable visitAll so it would have no way to call itself recursively:
+
+```go
+visitAll := func(items []string) {
+  // ...
+  visitAll(m[item]) // compile error: undefined: visitAll
+  // ...
+}
+```
+
+### Caveat: Capturing Iteration Variables
+
+Consider a program that must create a set of directories and later remove them. We can use a slice of function values to hold the clean-up operations. (For brevity, we have omitted all error handling in this example.)
+
+```go
+var rmdirs []func()
+for _, d := range tempDirs() {
+  dir := d               // NOTE: necessary!
+  os.MkdirAll(dir, 0755) // creates parent directories too
+  rmdirs = append(rmdirs, func() {
+    os.RemoveAll(dir)
+  }) 
+}
+// ...do some work...
+for _, rmdir := range rmdirs {
+  rmdir() // clean up
+}
+```
+
+Why `dir := d` is necessary ? The reason is a consequence of the scope rules for loop variables. In the program immediately above, the for loop introduces a new lexical block in which the variable *d* is declared. **All function values created by this loop ‘‘capture’’ and share the same variable—an addressable storage location, not its value at that particular moment.** The value of `d` is updated in successive iterations, so by the time the cleanup functions are called, the `d` variable has been updated several times by the now-completed for loop. Thus `d` holds the value from the final iteration, and consequently all calls to os.RemoveAll will attempt to remove the same directory.
+
+The problem of iteration variable capture is most often encountered when using the `go` statement or with `defer`since both may delay the execution of a function value until after the loop has finished. But the problem is not inherent to go or defer.
 
 ### Variadic Functions
 
+A *variadic function* is one that can be called with varying numbers of arguments. The most familiar examples are `fmt.Printf` and its variants. `Printf` requires one fixed argument at the beginning, then accepts any number of subsequent arguments.
+
 ```go
-func add(args ...int) int {
-  total := 0
-  for _, v := range args {
-    total += v
-  }
-  return total
-}
-func main() {
-  fmt.Println(add(1,2,3))
+func Printf(format string, a ...interface{}) (n int, err error) {
+	return Fprintf(os.Stdout, format, a...)
 }
 ```
 
-By using `...` before the type name of the last parameter you can indicate that it takes zero or more of those parameters. In this case we take zero or more `int`s. We invoke the function like any other function except we can pass as many `int`s as we want.
+> _**Note**_: The *interface{}* type means that this function can accept any values at all for its final arguments.
 
-This is precisely how the `fmt.Println` function is implemented:
+Implicitly, the caller allocates an array, copies the arguments into it, and passes a slice of the entire array to the function. Invoking a variadic function when the arguments are already in a slice: place an ellipsis after the final argument.
 
 ```go
-func Println(a ...interface{}) (n int, err error)
+values := []int{1, 2, 3, 4}
+fmt.Println(sum(values...)) // "10"
 ```
 
-The `Println` function takes any number of values of any type.
-
-We can also pass a slice of `int`s by following the slice with `...`:
+Although the` …int` parameter behaves like a slice within the function body, the type of a variadic function is distinct from the type of a function with an ordinary slice parameter.
 
 ```go
-func main() {
-  xs := []int{1,2,3}
-  fmt.Println(add(xs...)) // xs... convert xs into individual value
-}
-func add(x ...int) int {
-	sum := 0
-	for _, value := range x {
-		sum += value
-	}
-	return sum
-}
-```
-
-### Function Literals(Lambda)
-
-```go
-func() {}
+func f(...int) {}
+func g([]int)  {}
+fmt.Printf("%T\n", f) // "func(...int)"
+fmt.Printf("%T\n", g) // "func([]int)"
 ```
 
 ### Closure
@@ -2216,20 +2511,9 @@ func main() {
 
 `makeEvenGenerator` returns a function which generates even numbers. Each time it's called it adds 2 to the local `i` variable which – unlike normal local variables – persists between calls.
 
-### Recursion
+### Defer
 
-```go
-func factorial(x uint) uint {
-  if x == 0 {
-    return 1
-  }
-  return x * factorial(x-1)
-}
-```
-
-### Defer, Panic & Recover
-
-Go has a special statement called `defer` which schedules a function call to be run after the function completes. Consider the following example:
+Go has a special statement called `defer` which schedules a function call to be run after the function that contains the `defer` statement has finished, whether normally, by executing a return statement or falling off the end, or abnormally, by panicking. Any number of calls may be deferred; they are executed in the *reverse of the order* in which they were deferred. Consider the following example:
 
 ```go
 package main
@@ -2237,61 +2521,606 @@ package main
 import "fmt"
 
 func first() {
-  fmt.Println("1st")
+	fmt.Printf("1st\t")
 }
 func second() {
-  fmt.Println("2nd")
+	fmt.Printf("2nd\t")
+}
+func third() {
+	fmt.Printf("3rd\t")
 }
 func main() {
-  defer second() // this function will only run after
-  first()
+	defer second() // this function will only run after
+	defer third()
+	first()
 }
+
+//1st	3rd	2nd	
 ```
 
-`defer` is often used when resources need to be freed in some way. For example when we open a file we need to make sure to close it later. With `defer`:
+The right place for a `defer` statement that releases a resource is immediately after the resource has been successfully acquired.
 
 ```go
 f, _ := os.Open(filename)
-defer f.Close()
+defer f.Close() // immediately after the resource has been successfully acquired
+// ... other logic
 ```
 
-This has 3 advantages:
+#### Constructing An Event Flow
 
-1. it keeps our `Close` call near our `Open` call so it's easier to understand
-2. (if our function had multiple return statements (perhaps one in an `if` and one in an `else`) `Close` will happen before both of them
-3. deferred functions are run even if a run-time panic occurs.
+The defer statement can also be used to pair ‘‘on entry’’ and ‘‘on exit’’ actions when debugging a complex function. Consider the bigSlowOperation function below:
+
+```go
+func bigSlowOperation() {
+  defer trace("bigSlowOperation")() // don't forget the extra parentheses
+  // ...lots of work...
+  time.Sleep(10 * time.Second) // simulate slow operation by sleeping
+}
+func trace(msg string) func() {
+  start := time.Now()
+  log.Printf("enter %s", msg)
+  return func() { log.Printf("exit %s (%s)", msg, time.Since(start)) }
+}
+```
+
+Each time bigSlowOperation is called, it logs its entry and exit and the elapsed time between them. 
+
+```go
+
+$ go build gopl.io/ch5/trace
+$ ./trace
+2015/11/18 09:53:26 enter bigSlowOperation
+2015/11/18 09:53:36 exit bigSlowOperation (10.000589217s)
+```
+
+#### Debug The Return Value of Function
+
+Deferred functions run *after* return statements have updated the function’s result variables. Because an anonymous function can access its enclosing function’s variables, including named results, a deferred anonymous function can observe the function’s results.
+
+```go
+func double(x int) (result int) {
+  defer func() { fmt.Printf("double(%d) = %d\n", x, result) }()
+  return x + x
+}
+_ = double(4)
+// Output:
+// "double(4) = 8"
+```
+
+#### Defer In Loop
+
+Because deferred functions aren’t executed until the very end of a function’s execution, a defer statement in a loop deserves extra scrutiny. The code below could run out of file descriptors since no file will be closed until all files have been processed:
+
+```go
+for _, filename := range filenames {
+  f, err := os.Open(filename)
+  if err != nil {
+    return err
+  }
+  defer f.Close() // NOTE: risky; could run out of file descriptors
+  // ...process f...
+}
+```
+
+One solution is to move the loop body, including the `defer` statement, into another function that is called on each iteration.
+
+```go
+for _, filename := range filenames {
+  if err := doFile(filename); err != nil {
+    return err
+  } 
+}
+func doFile(filename string) error {
+  f, err := os.Open(filename)
+  if err != nil {
+    return err
+  }
+  defer f.Close()
+  // ...process f...
+}
+```
+
+#### F.Close Without Defer
+
+The example below is an improved fetch program showing below:
+
+```go
+// Fetch downloads the URL and returns the
+// name and length of the local file.
+func fetch(url string) (filename string, n int64, err error) {
+  resp, err := http.Get(url)
+  if err != nil {
+    return "", 0, err
+  }
+  defer resp.Body.Close()
+  
+  local := path.Base(resp.Request.URL.Path)
+  if local == "/" {
+    local = "index.html"
+  }
+  f, err := os.Create(local)
+  if err != nil {
+    return "", 0, err
+  }
+  n, err = io.Copy(f, resp.Body)
+  // Close file, but prefer error from Copy, if any.
+  if closeErr := f.Close(); err == nil {
+    err = closeErr
+  }
+  return local, n, err
+}
+```
+
+The deferred call to `resp.Body.Close` should be familiar by now. It’s tempting to use a second deferred call, to `f.Close`, to close the local file, but this would be subtly wrong because os.Create opens a file for writing, creating it as needed. On many file systems, notably NFS, write errors are not reported immediately but may be postponed until the file is closed. Failure to check the result of the close operation could cause serious data loss to go unnoticed. However, if both `io.Copy` and `f.Close` fail, we should prefer to report the error from `io.Copy` since it occurred first and is more likely to tell us the root cause.
 
 ### Panic & Recover
 
-Earlier we created a function that called the `panic` function to cause a run time error. We can handle a run-time panic with the built-in `recover` function. `recover` stops the panic and returns the value that was passed to the call to `panic`. We might be tempted to use it like this:
+#### Panic
+
+When the Go runtime detects these mistakes, it *panics*. During a typical panic, normal execution stops, all deferred function calls in that goroutine are executed, and the program crashes with a log message. This log message includes the *panic value*, which is usually an error message of some sort, and, for each goroutine, a *stack trace* showing the stack of function calls that were active at the time of the panic. This log message often has enough information to diagnose the root cause of the problem without running the program again, so it should always be included in a bug report about a panicking program.
+
+Not all panics come from the runtime. The built-in panic function may be called directly; it accepts any value as an argument. A panic is often the best thing to do when some ‘‘impossible’’ situation happens, for instance, execution reaches a case that logically can’t happen:
 
 ```go
-package main
-
-import "fmt"
-
-func main() {
-  panic("PANIC")
-  str := recover()
-  fmt.Println(str)
+switch s := suit(drawCard()); s {
+  case "Spades":   // ...
+case "Hearts":   // ...
+case "Diamonds": // ...
+case "Clubs":    // ...
+default:
+  panic(fmt.Sprintf("invalid suit %q", s)) // Joker?
 }
 ```
 
-But the call to `recover` will never happen in this case because the call to `panic` immediately stops execution of the function. Instead we have to pair it with `defer`:
+Since a panic causes the program to crash, it is gener- ally used for grave errors, such as a logical inconsistency in the program; diligent program- mers consider any crash to be proof of a bug in their code. In a robust program, ‘‘expected’’ errors, the kind that arise from incorrect input, misconfiguration, or failing I/O, should be handled gracefully; they are best dealt with using error values.
+
+For diagnostic purposes, the runtime package lets the programmer dump the stack using the same machinery. By deferring a call to `printStack`in main,
 
 ```go
-package main
-
-import "fmt"
-
 func main() {
+  defer printStack()
+  f(3)
+}
+func printStack() {
+  var buf [4096]byte
+  n := runtime.Stack(buf[:], false)
+  os.Stdout.Write(buf[:n])
+}
+
+```
+
+#### Recover
+
+Earlier we created a function that called the `panic` function to cause a run time error. We can handle a run-time panic with the built-in `recover` function. `recover` stops the panic and returns the value that was passed to the caller.
+
+```go
+// a fancier version might include the entire call stack using runtime.Stack.
+func Parse(input string) (s *Syntax, err error) {
   defer func() {
-    str := recover()
-    fmt.Println(str)
+    if p := recover(); p != nil {
+      err = fmt.Errorf("internal error: %v", p)
+    }
   }()
-  panic("PANIC")
+}
+// ...parser...
+```
+
+Recovering from a panic within the same package can help simplify the handling of complex or unexpected errors, but as a general rule, you should not attempt to recover from another package’s panic. Public APIs should report failures as errors. Similarly, you should not recover from a panic that may pass through a function you do not maintain, such as a caller- provided callback, since you cannot reason about its safety.
+
+Recovering from a panic mat risk leaking resources or leaving the failed handler in an unspecified state that could lead to other problems. It’s safest to recover selectively if at all.
+
+```go
+// soleTitle returns the text of the first non-empty title element
+// in doc, and an error if there was not exactly one.
+func soleTitle(doc *html.Node) (title string, err error) {
+  type bailout struct{}
+
+  defer func() {
+    switch p := recover(); p {
+      case nil:
+      // no panic
+      case bailout{}:
+      // "expected" panic
+      err = fmt.Errorf("multiple title elements")
+      default:
+      panic(p) // unexpected panic; carry on panicking
+    } 
+  }()
+  // Bail out of recursion if we find more than one non-empty title.
+  forEachNode(doc, func(n *html.Node) {
+    if n.Type == html.ElementNode && n.Data == "title" && n.FirstChild != nil {
+      if title != "" {
+        panic(bailout{}) // multiple title elements
+      } 
+      title = n.FirstChild.Data
+    }
+  }, nil)
+
+  if title == "" {
+    return "", fmt.Errorf("no title element")
+  }
+  return title, nil
 }
 ```
+
+## Methods
+
+A method is declared with a variant of the ordinary function declaration in which an extra parameter appears before the function name. The parameter attaches the function to the type of that parameter.
+
+### Method Declarations
+
+```go
+package main
+
+import (
+	"fmt"
+	"math"
+)
+
+type Point struct{ X, Y float64 }
+
+// traditional function
+func Distance(p, q Point) float64 {
+  return math.Hypot(q.X-p.X, q.Y-p.Y)
+}
+
+// same thing, but as a method of the Point type
+func (p Point) Distance(q Point) float64 {
+	return math.Hypot(q.X-p.X, q.Y-p.Y)
+}
+func main() {
+	p := Point{1, 2}
+	q := Point{4, 6}
+	fmt.Println(Distance(p, q)) // "5", function call
+	fmt.Println(p.Distance(q))  // "5", method call
+}
+```
+
+The extra parameter p is called the method’s *receiver*, a legacy from early object-oriented languages that described calling a method as ‘‘sending a message to an object.’’
+
+A common choice for choosing *receiver* name is the first letter of the type name, like p for Point.
+
+> _**Note**_: There’s no conflict between the two declarations of functions called Distance above. The first declares a package-level function. The second declares a method of the type Point, so its name is Point.Distance.
+
+The expression p.Distance is called a *selector*, because it selects the appropriate Distance method for the receiver p of type Point. Selectors are also used to select fields of struct types, as in p.X. Since methods and fields inhabit the same name space, declaring a method X on the struct type Point would be ambiguous and the compiler will reject it.
+
+
+
+It is often convenient to define additional behaviors for simple types such as numbers, strings, slices, maps, and sometimes even functions. Methods may be declared on any named type defined in the same package, so long as its underlying type is neither a pointer nor an interface.
+
+### Methods with a Pointer Receiver
+
+Because calling a function makes a copy of each argument value, if a function needs to update a variable, or if an argument is so large that we wish to avoid copying it, we must pass the address of the variable using a pointer. The same goes for methods that need to update the receiver variable: we attach them to the pointer type, such as `*Point`.
+
+```go
+func (p *Point) ScaleBy(factor float64) {
+  p.X *= factor
+  p.Y *= factor
+}
+```
+
+The name of this method is `(*Point).ScaleBy`. The parentheses are necessary; without them, the expression would be parsed as `*(Point.ScaleBy)`.
+
+The `(*Point).ScaleBy` method can be called by providing a `*Point` receiver, like this:
+
+```go
+r := &Point{1, 2}
+r.ScaleBy(2)
+fmt.Println(*r) // "{2, 4}"
+```
+
+or this:
+
+```go
+p := Point{1, 2}
+pptr := &p
+pptr.ScaleBy(2)
+fmt.Println(p) // "{2, 4}"
+```
+
+or this:
+
+```go
+p := Point{1, 2}
+(&p).ScaleBy(2)
+fmt.Println(p) // "{2, 4}"
+```
+
+But the last two cases are ungainly. Fortunately, the language helps us here. If the receiver p is a *variable* of type Point but the method requires a `*Point` receiver, we can use this shorthand:
+
+```go
+p.ScaleBy(2)
+```
+
+and the compiler will perform an implicit *&p* on the variable. This works only for variables, including struct fields like *p.X* and array or slice elements like *perim[0]*. We cannot call a `*Point` method on a non-addressable Point receiver, because there’s no way to obtain the
+
+address of a temporary value.
+
+```go
+Point{1, 2}.ScaleBy(2) // compile error: can't take address of Point literal
+```
+
+But we *can* call a Point method like *Point.Distance* with a `*Point` receiver, because there is a way to obtain the value from the address: just load the value pointed to by the receiver. The compiler inserts an implicit `*` operation for us. These two function calls are equivalent:
+
+```go
+pptr.Distance(q)
+(*pptr).Distance(q)
+```
+
+Let’s summarize these three cases again, since they are a frequent point of confusion. In every valid method call expression, exactly one of these three statements is true.
+
+Either the receiver argument has the same type as the receiver parameter, for example both have type T or both have type *T:
+
+```go
+Point{1, 2}.Distance(q) //  Point
+pptr.ScaleBy(2)         // *Point
+```
+
+Or the receiver argument is a *variable* of type T and the receiver parameter has type *T. The compiler implicitly takes the address of the variable:
+
+```go
+p.ScaleBy(2) // implicit (&p)
+```
+
+Or the receiver argument has type *T and the receiver parameter has type T. The compiler implicitly dereferences the receiver, in other words, loads the value:
+
+```go
+pptr.Distance(q) // implicit (*pptr)
+```
+
+If all the methods of a named type T have a receiver type of T itself (not *T), it is safe to copy instances of that type; calling any of its methods necessarily makes a copy. For example, *time.Duration* values are liberally copied, including as arguments to functions. But if any method has a pointer receiver, you should avoid copying instances of T because doing so may violate internal invariants. For example, copying an instance of bytes.Buffer would cause the original and the copy to alias the same underlying array of bytes. Subsequent method calls would have unpredictable effects.
+
+### Composing Types by Struct Embedding
+
+Consider the type ColoredPoint:
+
+```go
+import "image/color"
+type Point struct{ X, Y float64 }
+type ColoredPoint struct {
+  Point
+  Color color.RGBA
+}
+```
+
+We could have defined `ColoredPoint` as a struct of three fields, but instead we *embedded* a `Point` to provide the `X` and `Y` fields. If we want, we can select the fields of `ColoredPoint` that were contributed by the embedded Point without mentioning Point:
+
+```go
+var cp ColoredPoint
+cp.X = 1
+fmt.Println(cp.Point.X) // "1"
+cp.Point.Y = 2
+fmt.Println(cp.Y) // "2"
+```
+
+A similar mechanism applies to the *methods* of Point. We can call methods of the embedded Point field using a receiver of type `ColoredPoint`, even though `ColoredPoint` has no declared methods:
+
+```go
+red := color.RGBA{255, 0, 0, 255}
+blue := color.RGBA{0, 0, 255, 255}
+var p = ColoredPoint{Point{1, 1}, red}
+var q = ColoredPoint{Point{5, 4}, blue}
+fmt.Println(p.Distance(q.Point)) // "5"
+p.ScaleBy(2)
+q.ScaleBy(2)
+fmt.Println(p.Distance(q.Point)) // "10"
+```
+
+The methods of `Point` have been *promoted* to `ColoredPoint`. In this way, embedding allows complex types with many methods to be built up by the *composition* of several fields, each providing a few methods.
+
+A `ColoredPoint` is not a `Point`, but it ‘‘has a’’ `Point`, and it has two additional methods `Distance` and `ScaleBy` promoted from `Point`. If you prefer to think in terms of implementation, the embedded field instructs the compiler to generate additional wrapper methods that delegate to the declared methods, equivalent to these:
+
+```go
+func (p ColoredPoint) Distance(q Point) float64 {
+  return p.Point.Distance(q)
+}
+func (p *ColoredPoint) ScaleBy(factor float64) {
+  p.Point.ScaleBy(factor)
+}
+```
+
+The type of an anonymous field may be a *pointer* to a named type, in which case fields and methods are promoted indirectly from the pointed-to object. Adding another level of indirection lets us share common structures and vary the relationships between objects dynamically. The declaration of `ColoredPoint` below embeds a `*Point`:
+
+```go
+type ColoredPoint struct {
+  *Point
+  Color color.RGBA
+}
+p := ColoredPoint{&Point{1, 1}, red}
+q := ColoredPoint{&Point{5, 4}, blue}
+fmt.Println(p.Distance(*q.Point)) // "5"
+q.Point = p.Point                 // p and q now share the same Point
+p.ScaleBy(2)
+fmt.Println(*p.Point, *q.Point) // "{2 2} {2 2}"
+```
+
+A struct type may have more than one anonymous field. Had we declared `ColoredPoint` as
+
+```go
+type ColoredPoint struct {
+  Point
+  color.RGBA
+}
+```
+
+then a value of this type would have all the methods of Point, all the methods of `RGBA`, and any additional methods declared on `ColoredPoint` directly. When the compiler resolves a selector such as `p.ScaleBy` to a method, it first looks for a directly declared method named `ScaleBy`, then for methods promoted once from `ColoredPoint’s` embedded fields, then for methods promoted twice from embedded fields within `Point` and `RGBA`, and so on. The compiler reports an error if the selector was ambiguous because two methods were promoted from the same rank.
+
+Methods can be declared only on named types (like `Point`) and pointers to them (`Point`), but thanks to embedding, it’s possible and sometimes useful for *unnamed* struct types to have methods too.
+
+```go
+var cache = struct {
+  sync.Mutex
+  mapping map[string]string 
+}{
+  mapping: make(map[string]string),
+}
+func Lookup(key string) string {
+  cache.Lock()
+  v := cache.mapping[key]
+  cache.Unlock()
+  return v
+}
+```
+
+### Method Values and Expressions
+
+#### Method Values
+
+Usually we select and call a method in the same expression, as in `p.Distance()`, but it’s possible to separate these two operations. The selector `p.Distance` yields a *method value*, a function that binds a method (`Point.Distance`) to a specific receiver value p. This function can then be invoked without a receiver value; it needs only the non-receiver arguments.
+
+```go
+p := Point{1, 2}
+q := Point{4, 6}
+
+distanceFromP := p.Distance // method value
+fmt.Println(distanceFromP(q)) // "5"
+var origin Point // {0, 0}
+fmt.Println(distanceFromP(origin)) // "2.23606797749979", ;5
+
+scaleP := p.ScaleBy // method value
+scaleP(2) // p becomes (2, 4)
+scaleP(3) //      then (6, 12)
+scaleP(10) //      then (60, 120)
+
+```
+
+Method values are useful when a package’s API calls for a function value, and the client’s desired behavior for that function is to call a method on a specific receiver. For example, the function time.AfterFunc calls a function value after a specified delay. This program uses it to launch the rocket r after 10 seconds:
+
+```go
+type Rocket struct { /* ... */ }
+func (r *Rocket) Launch() { /* ... */ }
+r := new(Rocket)
+time.AfterFunc(10 * time.Second, func() { r.Launch() })
+```
+
+The method value syntax is shorter:
+
+```go
+time.AfterFunc(10 * time.Second, r.Launch)
+```
+
+#### Method Expression
+
+Related to the method value is the *method expression*. When calling a method, as opposed to an ordinary function, we must supply the receiver in a special way using the selector syntax. A method expression, written T.f or (*T).f where T is a type, yields a function value with a regular first parameter taking the place of the receiver, so it can be called in the usual way.
+
+```go
+p := Point{1, 2}
+q := Point{4, 6}
+distance := Point.Distance   // method expression
+fmt.Println(distance(p, q))  // "5"
+fmt.Printf("%T\n", distance) // "func(Point, Point) float64"
+scale := (*Point).ScaleBy
+scale(&p, 2)
+fmt.Println(p)            // "{2 4}"
+fmt.Printf("%T\n", scale) // "func(*Point, float64)"
+```
+
+### Example: Bit Vector Type
+
+In domains such as dataflow analysis where set elements are small non-negative integers, sets have many elements, and set operations like union and intersection are common, a *bit vector* is ideal.
+
+
+
+A bit vector uses a slice of unsigned integer values or ‘‘words,’’ each bit of which represents a possible element of the set. The set contains *i* if the *i*-th bit is set. The following program demonstrates a simple bit vector type with three methods:
+
+```go
+// An IntSet is a set of small non-negative integers.
+// Its zero value represents the empty set.
+type IntSet struct {
+  words []uint64
+}
+
+// Has reports whether the set contains the non-negative value x.
+func (s *IntSet) Has(x int) bool {
+  word, bit := x/64, uint(x%64)
+  return word < len(s.words) && s.words[word]&(1<<bit) != 0
+}
+
+// Add adds the non-negative value x to the set.
+func (s *IntSet) Add(x int) {
+  word, bit := x/64, uint(x%64)
+  for word >= len(s.words) {
+    s.words = append(s.words, 0)
+  }
+  s.words[word] |= 1 << bit
+}
+
+// UnionWith sets s to the union of s and t.
+func (s *IntSet) UnionWith(t *IntSet) {
+  for i, tword := range t.words {
+    if i < len(s.words) {
+      s.words[i] |= tword
+    } else {
+      s.words = append(s.words, tword)
+    } 
+  }
+}
+```
+
+Since each word has 64 bits, to locate the bit for x, we use the quotient x/64 as the word index and the remainder x%64 as the bit index within that word. The UnionWith operation uses the bitwise OR operator | to compute the union 64 elements at a time. 
+
+This implementation lacks many desirable features, but one is hard to live without a way to print an IntSet as a string. Let’s give it a String method:
+
+```go
+// String returns the set as a string of the form "{1 2 3}".
+func (s *IntSet) String() string {
+  var buf bytes.Buffer
+  buf.WriteByte('{')
+  for i, word := range s.words {
+    if word == 0 {
+      continue
+    }
+    for j := 0; j < 64; j++ {
+      if word&(1<<uint(j)) != 0 {
+        if buf.Len() > len("{") {
+          buf.WriteByte(' ')
+        }
+        fmt.Fprintf(&buf, "%d", 64*i+j)
+      }
+    } 
+  }
+  buf.WriteByte('}')
+  return buf.String()
+}
+```
+
+We can now demonstrate IntSet in action:
+
+```go
+var x, y IntSet
+x.Add(1)
+x.Add(144)
+x.Add(9)
+fmt.Println(x.String()) // "{1 9 144}"
+y.Add(9)
+y.Add(42)
+fmt.Println(y.String()) // "{9 42}"
+x.UnionWith(&y)
+fmt.Println(x.String()) // "{1 9 42 144}"
+fmt.Println(x.Has(9), x.Has(123)) // "true false"
+```
+
+A word of caution: we declared String and Has as methods of the pointer type `*IntSet` not out of necessity, but for consistency with the other two methods, which need a pointer receiver because they assign to s.words. Consequently, an IntSet *value* does not have a String method, occasionally leading to surprises like this:
+
+```go
+fmt.Println(&x)         // "{1 9 42 144}"
+fmt.Println(x.String()) // "{1 9 42 144}"
+fmt.Println(x)          // "{[4398046511618 0 65536]}"
+```
+
+In the first case, we print an `*IntSet` pointer, which does have a String method. In the second case, we call String() on an IntSet variable; the compiler inserts the implicit & oper- ation, giving us a pointer, which has the String method. But in the third case, because the IntSet value does not have a String method, `fmt.Println` prints the representation of the struct instead. It’s important not to forget the & operator. Making String a method of IntSet, not `*IntSet`, might be a good idea, but this is a case-by-case judgment.
+
+### Encapsulation
+
+A variable or method of an object is said to be *encapsulated* if it is inaccessible to clients of the object. Encapsulation, sometimes called *information hiding*, is a key aspect of object-oriented programming.
+
+Go has only one mechanism to control the visibility of names: capitalized identifiers are exported from the package in which they are defined, and uncapitalized names are not. The same mechanism that limits access to members of a package also limits access to the fields of a struct or the methods of a type. As a consequence, to encapsulate an object, we must make it a struct.
+
+Encapsulation provides three benefits. 
+
+- First, because clients cannot directly modify the object’s variables, one need inspect fewer statements to understand the possible values of those variables.
+- Second, hiding implementation details prevents clients from depending on things that might change, which gives the designer greater freedom to evolve the implementation without breaking API compatibility.
+- It prevents clients from setting an object’s variables arbitrarily. Because the object’s variables can be set only by functions in the same package, the author of that package can ensure that all those functions maintain the object’s internal invariants. 
 
 ## Control Structures
 
@@ -2337,13 +3166,28 @@ if name, ok := elements["Un"]; ok {
 
 ```go
 switch i {
-case 0: fmt.Println("Zero")
-case 1: fmt.Println("One")
-case 2: fmt.Println("Two")
-case 3: fmt.Println("Three")
-case 4: fmt.Println("Four")
-case 5: fmt.Println("Five")
-default: fmt.Println("Unknown Number")
+  case 0: fmt.Println("Zero")
+  case 1: fmt.Println("One")
+  case 2: fmt.Println("Two")
+  case 3: fmt.Println("Three")
+  case 4: fmt.Println("Four")
+  case 5: fmt.Println("Five")
+  default: fmt.Println("Unknown Number")
+  }
+```
+
+A switch does not need an operand; it can just list the cases, each of which is a boolean expression: This form is called a *tagless switch*; it’s equivalent to switch true.
+
+```go
+func Signum(x int) int {
+  switch {
+    case x > 0:
+    	return +1
+    default:
+    	return 0
+    case x < 0:
+    	return -1
+  } 
 }
 ```
 
@@ -2410,135 +3254,13 @@ func zero(ptr *[32]byte) {
 }
 ```
 
-## Structs and Interfaces
+## Interfaces
 
-### Structs
+`Interface` is a contract, any object implmented the contract methods will be accpted as it is one of the kind.
 
-An easy way to make this program better is to use a struct. A struct is a type which contains named fields. For example we could represent a Circle like this:
+### Interface as Contracts
 
-```go
-// type 1
-type Circle struct {
-  x float64
-  y float64
-  r float64
-}
 
-// type 2
-type Circle struct {
-  x, y, r float64
-}
-
-// initialization
-var c Circle // type 1
-c := new(Circle) // type 2
-
-// assignment
-c := Circle{x: 0, y: 0, r: 5} // type 1
-c := Circle{0, 0, 5} // type 2
-
-// access fiedls by .
-c.x = 10
-c.y = 5
-```
-
-The `type` keyword introduces a new type. It's followed by the name of the type (`Circle`), the keyword `struct` to indicate that we are defining a `struct` type and a list of fields inside of curly braces. Each field has a name and a type. 
-
-#### Receiver
-
-By creating a new type with a function that has a receiver, we are adding a 'method' to any value of that type.
-
-```go
-type deck []string // now deck will act like array of string
-
-// any variable that is deck type can access "print" function
-func (d *deck) print() { // d deck is the receiver here
-  for i, card := range d {
-    fmt.Println(i, card)
-  }
-}
-```
-
-#### Embedded Types
-
-A struct's fields usually represent the has-a relationship. For example a `Circle` has a `radius`. Suppose we had a person struct:
-
-```go
-type Person struct {
-  Name string
-}
-func (p *Person) Talk() {
-  fmt.Println("Hi, my name is", p.Name)
-}
-```
-
-And we wanted to create a new `Android` struct. We could do this:
-
-```go
-type Android struct {
-  Person Person
-  Model string
-}
-```
-
-This would work, but we would rather say an Android is a Person, rather than an Android has a Person. Go supports relationships like this by using an embedded type. Also known as anonymous fields, embedded types look like this:
-
-```go
-type Android struct {
-  Person
-  Model string
-}
-```
-
-We use the type (`Person`) and don't give it a name. When defined this way the `Person` struct can be accessed using the type name:
-
-```go
-a := new(Android)
-a.Person.Talk()
-```
-
-But we can also call any `Person` methods directly on the `Android`:
-
-```go
-a := new(Android)
-a.Talk()
-```
-
-The is-a relationship works this way intuitively: People can talk, an android is a person, therefore an android can talk.
-
-### Interface
-
-**Interface** is a contract, any object implmented the contract methods will be accpted as it is one of the kind.
-
-`bot` is a interface which has a method call `getGreeting`. The `printGreeting` accepts `bot` type as argument, as both `englishBot` and `spanishBot` implements the `getGeeting` method, they considered as some kind of `bot` object.
-
-```go
-type bot interface {
-	getGreeting() string
-}
-
-type englishBot struct {} //as long as englishBot has the interface method
-type spanishBot struct {}
-
-func main() {
-  eb := engBot{}
-  sb := spanBot{}
-  
-  printGreeting(eb)
-  printGreeting(sb)
-}
-
-func printGreeting(b bot) {
-  fmt.Println(b.getGreeting())
-}
-
-func (englishBot) getGreeting() string {
-  return "eng"
-}
-func (spanishBot) getGreeting() string {
-  return "span"
-}
-```
 
 ## Concurrency
 
@@ -2882,7 +3604,20 @@ The function you pass to `Walk` is called for every file and folder in the root 
 
 ## Errors
 
-Go has a built-in type for errors that we have already seen (the `error` type). We can create our own errors by using the `New` function in the `errors` package:
+A function for which failure is an expected behavior returns an additional result, conventionally the last one. If the failure has only one possible cause, the result is a boolean, usually called ok, as in this example of a cache lookup that always succeeds unless there was no entry for that key:
+
+```go
+value, ok := cache.Lookup(key)
+if !ok {
+  // ...cache[key] does not exist...
+}
+```
+
+More often, and especially for I/O, the failure may have a variety of causes for which the caller will need an explanation. In such cases, the type of the additional result is error. The built-in type error is an interface type.
+
+### Error Object
+
+We can create our own errors by using the `New` function in the `errors` package:
 
 ```go
 package main
@@ -2894,33 +3629,150 @@ func main() {
 }
 ```
 
-### Std Error
+#### End of File (EOF)
 
-Print the error msg to standard error pipe.
+The io package guarantees that any read failure caused by an end-of-file condition is always reported by a distinguished error, `io.EOF`, which is defined as follows:
 
 ```go
-f, err := os.Open(arg)
- if err != nil {
-     fmt.Fprintf(os.Stderr, "dup2: %v\n", err)
- } 
+package io
+import "errors"
+// EOF is the error returned by Read when no more input is available.
+var EOF = errors.New("EOF")
 
-f.Close()
 ```
 
-### Log.Fatalf
-
-The function log.Fatalf prints a message and calls os.Exit(1).
+The caller can detect this condition using a simple comparison, as in the loop below, which reads runes from the standard input.
 
 ```go
-var cwd string
-func init() {
-  cwd, err := os.Getwd() // compile error: unused: cwd
-  if err != nil {
-    log.Fatalf("os.Getwd failed: %v", err)
-	} 
+in := bufio.NewReader(os.Stdin)
+for {
 }
-
+r, _, err := in.ReadRune()
+if err == io.EOF {
+  break // finished reading
+}
+if err != nil {
+  return fmt.Errorf("read failed: %v", err)
+}
+// ...use r...
 ```
+
+### Error-Handling Strategies
+
+When a function call returns an error, it’s the caller’s responsibility to check it and take appropriate action. Depending on the situation, there may be a number of possibilities. Let’s take a look at five of them.
+
+#### Propagate The Error
+
+A failure in a subroutine becomes a failure of the calling routine.
+
+```go
+resp, err := http.Get(url)
+if err != nil {
+	return nil, err
+}
+```
+
+Structs a new error message using `fmt.Errorf`:
+
+```go
+doc, err := html.Parse(resp.Body)
+resp.Body.Close()
+if err != nil {
+  return nil, fmt.Errorf("parsing %s as HTML: %v", url, err)
+}
+```
+
+The `fmt.Errorf` function formats an error message using `fmt.Sprintf` and returns a new error value. We use it to build descriptive errors by successively prefixing additional context information to the original error message. When the error is ultimately handled by the program’s main function, it should provide a clear causal chain from the root problem to the overall failure, reminiscent of a NASA accident investigation:
+
+```go
+genesis: crashed: no parachute: G-switch failed: bad relay orientation
+```
+
+In general, **the call f(x) is responsible for reporting the attempted operation f and the argument value x as they relate to the context of the error.** The caller is responsible for adding further information that it has but the call f(x) does not, such as the URL in the call to html.Parse above.
+
+#### Retry Operation
+
+For errors that represent transient or unpredictable problems, it may make sense to *retry* the failed operation, possibly with a delay between tries, and perhaps with a limit on the number of attempts or the time spent trying before giving up entirely.
+
+```go
+// WaitForServer attempts to contact the server of a URL.
+// It tries for one minute using exponential back-off.
+// It reports an error if all attempts fail.
+func WaitForServer(url string) error {
+  const timeout = 1 * time.Minute
+  deadline := time.Now().Add(timeout)
+  for tries := 0; time.Now().Before(deadline); tries++ {
+    _, err := http.Head(url)
+    if err == nil {
+      return nil // success
+    }
+    log.Printf("server not responding (%s); retrying...", err)
+    time.Sleep(time.Second << uint(tries)) // exponential back-off
+  }
+  return fmt.Errorf("server %s failed to respond after %s", url, timeout)
+}
+```
+
+#### Stop The Program
+
+If progress is impossible, the caller can print the error and stop the program gracefully, but this course of action should generally be reserved for the main package of a program.
+
+```go
+// (In function main.)
+if err := WaitForServer(url); err != nil {
+  fmt.Fprintf(os.Stderr, "Site is down: %v\n", err)
+  os.Exit(1)
+}
+```
+
+The function `log.Fatalf` prints a message and calls *os.Exit(1)*, by default it prefixes the time and date to the error message.
+
+```go
+if err := WaitForServer(url); err != nil {
+  log.Fatalf("Site is down: %v\n", err)
+}
+// 2006/01/02 15:04:05 Site is down: no such domain: bad.gopl.io
+```
+
+The default format is helpful in a long-running server, but less so for an interactive tool. For a more attractive output, we can set the prefix used by the log package to the name of the command, and suppress the display of the date and time:
+
+```go
+log.SetPrefix("wait: ")
+log.SetFlags(0)
+```
+
+#### Log Errors And Continue
+
+In some cases, it’s sufficient just to log the error and then continue, perhaps with reduced functionality. Again there’s a choice between using the log package, which adds the usual prefix:(All log functions append a newline if one is not already present.)
+
+```go
+if err := Ping(); err != nil {
+  log.Printf("ping failed: %v; networking disabled", err)
+}
+```
+
+Printing directly to the `standard error stream`:
+
+```go
+if err := Ping(); err != nil {
+  fmt.Fprintf(os.Stderr, "ping failed: %v; networking disabled\n", err)
+}
+```
+
+#### Ignore An Error
+
+```go
+dir, err := ioutil.TempDir("", "scratch")
+if err != nil {
+  return fmt.Errorf("failed to create temp dir: %v", err)
+}
+// ...use temp dir...
+os.RemoveAll(dir) // ignore errors; $TMPDIR is cleaned periodically
+```
+
+The call to os.RemoveAll may fail, but the program ignores it because the operating system periodically cleans out the temporary directory. In this case, discarding the error was inten- tional, but the program logic would be the same had we forgotten to deal with it. **Get into the habit of considering errors after every function call, and when you deliberately ignore one, document your intention clearly.**
+
+If failure causes the function to return, the logic for success is not indented within an else block but follows at the outer level. Functions tend to exhibit a common structure, with a series of initial checks to reject errors, followed by the substance of the function at the end, minimally indented.
 
 ## Containers & Sort
 

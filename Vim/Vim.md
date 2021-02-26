@@ -44,6 +44,10 @@
 
 `h` `j` `k` `l` corresponding to left, down, up and right
 
+`*` Move to function declaration or go back
+
+`opt + up arrow` Move current line up to one line/
+
 ### Move by word
 
 `w` next beginning of the word 
