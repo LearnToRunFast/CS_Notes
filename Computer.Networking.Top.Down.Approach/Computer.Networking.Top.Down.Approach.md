@@ -317,3 +317,334 @@ To solve this problem, we will need *end-point authentication,* that is, a mecha
 
 ## Application Layer
 
+### Principles of Network Applications
+
+Confining application software to the end systems—as shown in Figure 2.1, has facilitated the rapid development and deployment of a vast array of network applications.
+
+![image-20210227215247170](Asserts/Computer.Networking.Top.Down.Approach/image-20210227215247170.png)
+
+#### Network Application Architectures
+
+The **application architecture** is designed by the application developer and dictates how the application is structured over the various end systems. In choosing the application architecture, an application developer will likely draw on one of the two predominant architectural paradigms used in modern network applications: the `client-server architecture` or the `peer-to-peer (P2P) architecture`.
+
+In a **client-server architecture**, there is an always-on host, called the *server*, which services requests from many other hosts, called *clients*. Note that with the client-server architecture, clients do not directly communicate with each other. Another characteristic of the client-server architecture is that the server has a fixed, well-known address, called an IP address. Some of the better-known applications with a client-server architecture include the Web, FTP, Telnet, and e-mail. The client-server architecture is shown in Figure 2.2(a).
+
+Often in a client-server application, a single-server host is incapable of keep- ing up with all the requests from clients. A **data center**, housing a large number of hosts, is often used to create a powerful virtual server. A data center can have hundreds of thousands of servers, which must be powered and maintained. Additionally, the service providers must pay recurring interconnection and bandwidth costs for sending data from their data centers.
+
+![image-20210227215917289](Asserts/Computer.Networking.Top.Down.Approach/image-20210227215917289.png)
+
+In a **P2P architecture**, there is minimal (or no) reliance on dedicated servers in data centers. Instead the application exploits direct communication between pairs of intermittently connected hosts, called *peers*. The peers are not owned by the service provider, but are instead desktops and laptops controlled by users. Because the peers communicate without passing through a dedicated server, the architecture is called peer-to-peer. The P2P architecture is illustrated in Figure 2.2(b).
+
+Some applications have hybrid architectures, combining both client-server and P2P elements. For example, for many instant messaging applications, servers are used to track the IP addresses of users, but user-to-user messages are sent directly between user hosts (without passing through intermediate servers).
+
+One of the most compelling features of P2P architectures is their **self-scalability**. For example, in a P2P file-sharing application, although each peer gener- ates workload by requesting files, each peer also adds service capacity to the system by distributing files to other peers. P2P architectures are also cost effective, since they normally don’t require significant server infrastructure and server bandwidth. However, P2P applications face challenges of *security*, *performance*, and *reliability* due to their highly `decentralized structure`.
+
+#### Processes Communicating
+
+Processes on two different end systems communicate with each other by exchanging **messages** across the computer network. A sending process creates and sends messages into the network; a receiving process receives these messages and possibly responds by sending messages back. Figure 2.1 illustrates that processes communicating with each other reside in the application layer of the five layer protocol stack.
+
+In the context of a communication session between a pair of processes, the process that initiates the communication (that is, initially contacts the other process at the beginning of the session) is labeled as the *client*. The process that waits to be contacted to begin the session is the *server*.
+
+##### Socket
+
+A process sends messages into, and receives messages from, the network through a software interface called a **socket**. Figure 2.3 illustrates socket communication between two processes that communicate over the Internet. As shown in this figure, a socket is the interface between the application layer and the transport layer within a host. It is also referred to as the **Application Programming Interface (API)** between the application and the network, since the socket is the programming interface with which network applications are built.
+
+![image-20210227221526569](Asserts/Computer.Networking.Top.Down.Approach/image-20210227221526569.png)
+
+The application developer has control of everything on the application-layer side of the socket but has little control of the transport-layer side of the socket. The only control that the application developer has on the transport-layer side is:
+
+1. the choice of transport protocol
+2. perhaps the ability to fix a few transport-layer parameters such as maximum buffer and maximum segment sizes. 
+
+Once the application developer chooses a transport protocol (if a choice is available), the application is built using the transport-layer services provided by that protocol.
+
+##### Address
+
+In order for a process running on one host to send packets to a process running on another host, the receiving process needs to have an address. To identify the receiving process, two pieces of information need to be specified:
+
+1. the address of the host
+2. an identifier that specifies the receiving process in the destination host.
+
+In the Internet, the host is identified by its **IP address**. A host could be running many network applications, so a destination **port number** helps to specify the receiving process. Popular applications have been assigned specific port numbers. For example, a Web server is identified by port number 80. A mail server process (using the SMTP protocol) is identified by port number 25.
+
+#### Transport Services Available to Applications
+
+Many networks, including the Internet, provide more than one transport-layer protocol. When you develop an application, you must choose one of the available transport-layer protocols. Choosing the protocol by classify the possible services along four dimensions: reliable data transfer, throughput, timing, and security.
+
+**Reliable Data Transfer**
+
+We know that packets can get lost within a computer network. If a protocol provides guarantee that the data sent by one end of the application is delivered correctly and completely to the other end of the application, it is said to provide **reliable data transfer**. 
+
+When a transport-layer protocol doesn’t provide reliable data transfer, some of the data sent by the sending process may never arrive at the receiving process. This may be acceptable for **loss-tolerant applications**, most notably multimedia applications such as conversational audio/video that can tolerate some amount of data loss.
+
+**Throughput**
+
+Throughput is the rate at which the sending process can deliver bits to the receiving process. Because other sessions will be sharing the bandwidth along the network path, and because these other sessions will be coming and going, the available throughput can fluctuate with time. These observations lead to another natural service that a transport-layer protocol could provide, namely, guaranteed available throughput at some specified rate. With such a service, the application could request a guaranteed throughput of *r* bits/sec, and the transport protocol would then ensure that the available throughput is always at least *r* bits/sec.
+
+Applications that have throughput requirements are said to be **bandwidth-sensitive applications**. Many current multimedia applications are bandwidth sensitive, although some multimedia applications may use adaptive coding techniques to encode digitized voice or video at a rate that matches the currently available throughput. While bandwidth-sensitive applications have specific throughput requirements, **elastic applications** can make use of as much, or as little, throughput as happens to be available.
+
+**Timing**
+
+A transport-layer protocol can also provide timing guarantees. As with throughput guarantees, timing guarantees can come in many shapes and forms. An example guarantee might be that every bit that the sender pumps into the socket arrives at the receiver’s socket no more than 100 msec later. Such a service would be appealing to interactive real-time applications, such as Internet telephony.
+
+**Security**
+
+Finally, a transport protocol can provide an application with one or more security services. For example, in the sending host, a transport protocol can encrypt all data transmitted by the sending process, and in the receiving host, the transport-layer pro- tocol can decrypt the data before delivering the data to the receiving process. Such a service would provide confidentiality between the two processes, even if the data is somehow observed between sending and receiving processes. 
+
+A transport protocol can also provide other security services in addition to *confidentiality*, including *data integrity* and *end-point authentication*.
+
+#### Transport Services Provided by the Internet
+
+The Internet (and, more generally, TCP/ IP networks) makes two transport protocols available to applications, UDP and TCP. As an application developer, one of the first decisions you have to make is whether to use UDP or TCP when you create a new network application for the Internet. Each of these protocols offers a different set of services to the invoking applications. Figure 2.4 shows the service requirements for some selected applications.
+
+![image-20210228122724858](Asserts/Computer.Networking.Top.Down.Approach/image-20210228122724858.png)
+
+**TCP Services**
+
+The TCP service model includes a connection-oriented service and a reliable data transfer service. When an application invokes TCP as its transport protocol, the application receives both of these services from TCP.
+
+- *Connection-oriented service.* TCP has the client and server exchange transport-layer control information with each other *before* the application-level messages begin to flow. This so-called *handshaking procedure* alerts the client and server, allowing them to prepare for an onslaught of packets. After the handshaking phase, a **TCP connection** is said to exist between the sockets of the two processes. The connection is a *full-duplex* connection in that the two processes can send messages to each other over the connection at the same time. When the application finishes sending messages, it must tear down the connection.
+- *Reliable data transfer service.* The communicating processes can rely on TCP to deliver all data sent without error and in the proper order. When one side of the application passes a stream of bytes into a socket, it can count on TCP to deliver the same stream of bytes to the receiving socket, with no missing or duplicate bytes.
+
+TCP also includes a *congestion-control* mechanism, a service for the general welfare of the Internet rather than for the direct benefit of the communicating processes. The TCP congestion-control mechanism throttles a sending process (client or server) when the network is congested between sender and receiver. TCP congestion control also attempts to limit each TCP connection to its fair share of network bandwidth.
+
+Neither TCP nor UDP provides any encryption—the data that the sending process passes into its socket is the same data that travels over the network to the destination process. As privacy and other security issues have become critical for many applications, the Internet community has developed an enhancement for TCP, called **Secure Sockets Layer (SSL)**. TCP-enhanced-with-SSL not only does everything that traditional TCP does but also provides critical process-to-process security services, including encryption, data integrity, and end-point authentication. 
+
+SSL is not a third Internet transport protocol, but instead is an enhancement of TCP, with the enhancements being implemented in the application layer.  In particular, if an application wants to use the services of SSL, it needs to include SSL code (existing, highly optimized libraries and classes) in both the client and server sides of the application. SSL has its own socket API that is similar to the traditional TCP socket API. When an application uses SSL, the sending process passes cleartext data to the SSL socket; SSL in the sending host then encrypts the data and passes the encrypted data to the TCP socket. The encrypted data travels over the Internet to the TCP socket in the receiving process. The receiving socket passes the encrypted data to SSL, which decrypts the data. Finally, SSL passes the cleartext data through its SSL socket to the receiving process. 
+
+**UDP Services**
+
+UDP is a *no-frills*, *lightweight* transport protocol, providing minimal services. UDP is connectionless, so there is no handshaking before the two processes start to communicate. UDP provides an unreliable data transfer service; UDP provides *no* guarantee that the message will ever reach the receiving process and messages that do arrive at the receiving process may arrive out of order. UDP does not include a congestion-control mechanism, so the sending side of UDP can pump data into the layer below (the network layer) at any rate it pleases.
+
+**Services Not Provided by Internet Transport Protocols**
+
+Today’s Internet can often provide satisfactory service to time-sensitive applications, but it cannot provide any *timing* or *throughput* guarantees. Figure 2.5 indicates the transport protocols used by some popular Internet applications. We see that e-mail, remote terminal access, the Web, and file transfer all use TCP. These applications have chosen TCP primarily because TCP provides reliable data transfer, guaranteeing that all data will eventually get to its destination.
+
+Because Internet telephony applications (such as Skype) can often tolerate some loss but require a minimal rate to be effective, developers of Internet telephony applications usually prefer to run their applications over UDP, thereby circumventing TCP’s congestion control mechanism and packet overheads. But because *many firewalls are configured to block (most types of) UDP traffic*, Internet telephony applications often are *designed to use TCP as a backup if UDP communication fails*.
+
+![image-20210228125521041](Asserts/Computer.Networking.Top.Down.Approach/image-20210228125521041.png)
+
+#### Application-Layer Protocols
+
+An **application-layer protocol** defines how an application’s processes, running on different end systems, pass messages to each other. In particular, an application-layer protocol defines:
+
+- The *types of messages exchanged*, for example, request messages and response messages
+
+- The *syntax of the various message* types, such as the fields in the message and how the fields are delineated
+
+- The *semantics of the fields*, that is, the meaning of the information in the fields
+
+- *Rules* for determining when and how a process sends messages and responds to
+
+  messages
+
+It is important to distinguish between network applications and application-layer protocols. An application-layer protocol is only one piece of a network application. 
+
+An Web application consists of many components, including a standard for document formats (that is, HTML), Web browsers, Web servers (for example, Apache and Microsoft servers), and an application-layer protocol. The Web’s application-layer protocol, *HTTP*, defines the format and sequence of messages exchanged between browser and Web server. 
+
+An Internet e-mail application also has many components, including mail servers that house user mailboxes; mail clients (such as Microsoft Outlook) that allow users to read and create messages; a standard for defining the structure of an e-mail message; and application-layer protocols that define how messages are passed between servers, how messages are passed between servers and mail clients, and how the contents of message headers are to be interpreted. The principal application-layer protocol for electronic mail is *SMTP* (Simple Mail Transfer Protocol). Thus, e-mail’s principal application-layer protocol, SMTP, is only one piece of the e-mail application.
+
+### The Web and HTTP
+
+#### Overview of HTTP
+
+The **HyperText Transfer Protocol (HTTP)**, the Web’s application-layer protocol.HTTP is implemented in two programs: a client program and a server program. The client program and server program, executing on different end systems, talk to each other by exchanging HTTP messages. HTTP defines the structure of these messages and how the client and server exchange the messages. The general idea is illustrated in Figure 2.6. When a user requests a Web page (for example, clicks on a hyperlink), the browser sends HTTP request messages for the objects in the page to the server. The server receives the requests and responds with HTTP response messages that contain the objects.
+
+![image-20210228134407314](Asserts/Computer.Networking.Top.Down.Approach/image-20210228134407314.png)
+
+A **Web page** (also called a document) consists of objects. An **object** is simply a file—such as an HTML file, a JPEG image, a Java applet, or a video clip—that is addressable by a single URL. Most Web pages consist of a **base HTML file** and several referenced objects.  **Web browsers** (such as Internet Explorer and Firefox) implement the client side of HTTP. **Web servers**, which implement the server side of HTTP, house Web objects, each addressable by a URL. 
+
+HTTP uses TCP as its underlying transport protocol. The HTTP client first initiates a TCP connection with the server. Once the connection is established, the browser and the server processes access TCP through their socket interfaces. HTTP need not worry about lost data or the details of how TCP recovers from loss or reordering of data within the network. That is the job of TCP and the protocols in the lower layers of the protocol stack.
+
+It is important to note that the server sends requested files to clients without storing any state information about the client.(we call it *stateless*) Because an HTTP server maintains no information about the clients, HTTP is said to be a **stateless protocol**. 
+
+#### Non-Persistent and Persistent Connections
+
+When this client-server interaction is taking place over TCP, the application developer needs to make an important decision—should each request/response pair be sent over a *separate* TCP connection, or should all of the requests and their corresponding responses be sent over the *same* TCP connection?
+
+In the former approach, the application is said to use **non-persistent connections**; and in the latter approach, **persistent connections**. HTTP, which can use both *non-persistent* connections and *persistent connections*. HTTP uses persistent connections in its default mode.
+
+##### HTTP with Non-Persistent Connections
+
+The steps of transferring a Web page from server to client for the case of non-persistent connections with URL http://www.someSchool.edu/someDepartment/home.index:
+
+1. The HTTP client process initiates a TCP connection to the server www.someSchool.edu on port number 80, which is the *default port number for HTTP*. Associated with the TCP connection, there will be a socket at the client and a socket at the server.
+2. The HTTP client sends an HTTP request message to the server via its socket. The request message includes the path name */someDepartment/home.index*.
+3. The HTTP server process receives the request message via its socket, retrieves the object */someDepartment/home.index* from its storage (RAM or disk), encapsulates the object in an HTTP response message, and sends the response message to the client via its socket.
+4. The HTTP server process tells TCP to close the TCP connection. (But TCP doesn’t actually terminate the connection until it knows for sure that the client has received the response message intact.)
+5. The HTTP client receives the response message. The TCP connection terminates. The message indicates that the encapsulated object is an HTML file. The client extracts the file from the response message, examines the HTML file, and finds references to the 10 JPEG objects.
+6. The first four steps are then repeated for each of the referenced JPEG objects.
+
+The HTTP specifications define only the communication protocol between the client HTTP program and the server HTTP program. It is depended on browsers how they interpret (that is, display to the user) a Web page.
+
+> _**Note**_: Each TCP connection transports exactly one request message and one response message. Thus, if user requests the Web page containers N objects, N TCP connections are generated with *non-persistent connections*.
+
+The **round-trip time (RTT)**, which is the time it takes for a small packet to travel from client to server and then back to the client. The RTT includes packet-propagation delays, packet queuing delays in intermediate routers and switches, and packet-processing delays. Now consider what happens when a user clicks on a hyperlink. As shown in Figure 2.7, this causes the browser to initiate a TCP connection between the browser and the Web server; this involves a “*three-way handshake*”—the client sends a small TCP segment to the server, the server acknowledges and responds with a small TCP segment, and, finally, the client acknowledges back to the server. The first two parts of the three-way handshake take one RTT. After completing the first two parts of the handshake, the client sends the HTTP request message combined with the third part of the three-way handshake (the acknowledgment) into the TCP connection. Once the request message arrives at the server, the server sends the HTML file into the TCP connection. This HTTP request/response eats up another RTT. Thus, roughly, the total response time is two RTTs plus the transmission time at the server of the HTML file.
+
+![image-20210228140313616](Asserts/Computer.Networking.Top.Down.Approach/image-20210228140313616.png)
+
+##### HTTP with Persistent Connections
+
+Non-persistent connections have some shortcomings. 
+
+1. A brand-new connection must be established and maintained for *each requested object*. For each of these connections, TCP buffers must be allocated and TCP variables must be kept in both the client and server. This can place a significant burden on the Web server, which may be serving requests from hundreds of different clients simultaneously.
+2. Each object suffers a delivery delay of two RTTs—one RTT to establish the TCP connection and one RTT to request and receive an object.
+
+With HTTP 1.1 persistent connections, the server leaves the TCP connection open after sending a response. Subsequent requests and responses between the same client and server can be sent over the same connection. Typically, the HTTP server closes a connection when it isn’t used for a certain time (a configurable timeout interval).
+
+#### HTTP Message Format
+
+The HTTP specifications include the definitions of the HTTP message formats. There are two types of HTTP messages, request messages and response messages, both of which are discussed below.
+
+##### HTTP Request Message
+
+Below we provide a typical HTTP request message:
+
+```http
+GET /somedir/page.html HTTP/1.1
+Host: www.someschool.edu
+Connection: close 
+User-agent: Mozilla/5.0 
+Accept-language: fr
+```
+
+`GET /somedir/page.html HTTP/1.1` is called the **request line**; the subsequent lines are called the **header lines**. The request line has three fields: 
+
+1. the method field
+   - The method field can take on several different values, including GET, POST, HEAD, PUT, and DELETE. The great majority of HTTP request messages use the GET method.
+     - *GET* get from server
+     - *POST* submit form to server
+     - *HEAD* is similar to the GET method. When a server receives a request with the HEAD method, it responds with an HTTP message but it leaves out the requested object. Application developers often use the HEAD method for debugging.
+     - *PUT*  is often used in conjunction with Web publishing tools. It allows a user to upload an object to a specific path (directory) on a specific Web server. It is also used by applications that need to upload objects to Web servers.
+     - *DELETE*  allows a user, or an application, to delete an object on a Web server.
+2. the URL field
+   - The GET method is used when the browser requests an object, with the requested object identified in the URL field.
+3. the HTTP version field 
+   - The version is self-explanatory; in this example, the browser implements version HTTP/1.1.
+
+`Host: www.someschool.edu` the information provided by the host header line is required by Web proxy caches. 
+
+` Connection: close` it wants the server to close the connection after sending the requested object.
+
+`User-agent` specifies the user agent, that is, the browser type that is making the request to the server. This header line is useful because the server can actu- ally send different versions of the same object to different types of user agents. 
+
+`Accept-language:` indicates that the user prefers to receive a French version of the object, if such an object exists on the server; otherwise, the server should send its default version. The Accept-language: header is just one of many content negotiation headers available in HTTP.
+
+Let’s now look at the general format of a request message, as shown in Figure 2.8. The entity body is empty with the GET method, but is used with the POST method. An HTTP client often uses the POST method when the user fills out a form.
+
+![image-20210228142326217](Asserts/Computer.Networking.Top.Down.Approach/image-20210228142326217.png)
+
+HTML forms often use the *GET* method and include the inputted data (in the form fields) in the requested URL. For example, if a form uses the GET method, has two fields, and the inputs to the two fields are *monkeys* and *bananas*, then the URL will have the structure www.somesite.com/animalsearch?monkeys&bananas.
+
+##### HTTP Response Message
+
+Below we provide a typical HTTP response message. This response message could be the response to the example request message just discussed. 
+
+```http
+HTTP/1.1 200 OK
+Connection: close
+Date: Tue, 18 Aug 2015 15:44:04 GMT
+Server: Apache/2.2.3 (CentOS)
+Last-Modified: Tue, 18 Aug 2015 15:11:03 GMT 
+Content-Length: 6821
+Content-Type: text/html
+
+(data data data data data ...)
+```
+
+It has three sections: an initial **status line**, six **header lines**, and then the **entity body**.
+
+- **status line** has three fields: the *protocol version field*, a *status code*, and a corresponding *status message*. 
+-  **header lines** 
+  - `Connection: close` tell the client that it is going to close the TCP connection after sending the message.
+  - `Date: Tue, 18 Aug 2015 15:44:04 GMT` indicates the time and date when the HTTP response was created and sent by the server
+  - `Server: Apache/2.2.3 (CentOS)` indicates that the message was generated by an Apache Web server
+  - `Last-Modified: Tue, 18 Aug 2015 15:11:03 GMT ` indicates the time and date when the object was created or last modified. It is critical for object caching, both in the local client and in network cache servers
+  - `Content-Length: 6821` indicates the number of bytes in the object being sent.
+  - `Content-Type: text/html ` indicates that the object in the entity body is HTML text.(The object type is officially indicated by the Content-Type: header and not by the file extension.)
+
+- **Entity body** contains the requested object itself
+
+Let’s now look at the general format of a response message, which is shown in Figure 2.9. 
+
+![image-20210228144033397](Asserts/Computer.Networking.Top.Down.Approach/image-20210228144033397.png)
+
+The status code and associated phrase indicate the result of the request. Some common status codes and associated phrases include:
+
+- **200 OK**: Request succeeded and the information is returned in the response.
+- **301 Moved Permanently**: Requested object has been permanently moved; the new URL is specified in *Location: header* of the response message. The client software will automatically retrieve the new URL.
+- **400 Bad Request**: This is a generic error code indicating that the request could not be understood by the server.
+- **404 Not Found**: The requested document does not exist on this server.
+- **505 HTTP Version Not Supported**: The requested HTTP protocol version is not supported by the server.
+
+#### User-Server Interaction: Cookies
+
+HTTP server is stateless, simplifies server design and has permitted engineers to develop high-performance Web servers that can handle thousands of simultaneous TCP connections. But often it is desirable to identify client at server side. For these purposes, HTTP uses *cookies*. Cookies allow sites to keep track of users. Most major commercial Web sites use cookies today.
+
+As shown in Figure 2.10, cookie technology has four components: 
+
+1. a cookie header line in the HTTP response message
+2. a cookie header line in the HTTP request message
+3. a cookie file kept on the user’s end system and managed by the user’s browser  
+4. a back-end database at the Web site. 
+
+![image-20210228144816525](Asserts/Computer.Networking.Top.Down.Approach/image-20210228144816525.png)
+
+Using Figure 2.10, let’s walk through an example of how cookies work. Suppose Susan, who always accesses the Web using Internet Explorer from her home PC, contacts Amazon.com for the first time. Let us suppose that in the past she has already visited the eBay site. When the request comes into the Amazon Web server, the server creates a unique identification number and creates an entry in its back-end database that is indexed by the identification number. The Amazon Web server then responds to Susan’s browser, including in the HTTP response a Set-cookie: header, which contains the identification number. For example, the header line might be:`Set-cookie: 1678`.
+
+When Susan’s browser receives the HTTP response message, it sees the Set-cookie: header. The browser then appends a line to the special cookie file that it manages. This line includes the hostname of the server and the identification number in the Set-cookie: header. Note that the cookie file already has an entry for eBay, since Susan has visited that site in the past. As Susan continues to browse the Amazon site, each time she requests a Web page, her browser consults her cookie file, extracts her identification number for this site, and puts a cookie header line that includes the identification number in the HTTP request. Specifically, each of her HTTP requests to the Amazon server includes the header line: `Cookie: 1678`
+
+In this manner, the Amazon server is able to track Susan’s activity at the Amazon site. Although the Amazon Web site does not necessarily know Susan’s name, it knows exactly which pages user 1678 visited, in which order, and at what times! Amazon uses cookies to provide its shopping cart service—Amazon can maintain a list of all of Susan’s intended purchases, so that she can pay for them collectively at the end of the session.
+
+If Susan returns to Amazon’s site, say, one week later, her browser will continue to put the header line Cookie: 1678 in the request messages. Amazon also recommends products to Susan based on Web pages she has visited at Amazon in the past. If Susan also registers herself with Amazon—providing full name, e-mail address, postal address, and credit card information—Amazon can then include this information in its database, thereby associating Susan’s name with her identifica- tion number (and all of the pages she has visited at the site in the past!). This is how Amazon and other e-commerce sites provide “one-click shopping”—when Susan chooses to purchase an item during a subsequent visit, she doesn’t need to re-enter her name, credit card number, or address.
+
+Although cookies often simplify the Internet shopping experience for the user, they are controversial because they can also be considered as an invasion of privacy. As we just saw, using a combination of cookies and user-supplied account information, a Web site can learn a lot about a user and potentially sell this information to a third party. 
+
+#### Web Caching
+
+A **Web cache**—also called a **proxy server**—is a network entity that satisfies HTTP requests on the behalf of an origin Web server. The Web cache has its own disk storage and keeps copies of recently requested objects in this storage. As shown in Figure 2.11, a user’s browser can be configured so that all of the user’s HTTP requests are first directed to the Web cache.
+
+![image-20210228145639056](Asserts/Computer.Networking.Top.Down.Approach/image-20210228145639056.png)
+
+Suppose a browser is requesting the object http://www.someschool.edu/campus.gif:
+
+1. The browser establishes a TCP connection to the Web cache and sends an HTTP request for the object to the Web cache.
+2. The Web cache checks to see if it has a copy of the object stored locally. If it does, the Web cache returns the object within an HTTP response message to the client browser.
+3. If the Web cache does not have the object, the Web cache opens a TCP connection to the origin server, that is, to www.someschool.edu. The Web cache then sends an HTTP request for the object into the cache-to-server TCP connection. After receiving this request, the origin server sends the object within an HTTP response to the Web cache.
+4. When the Web cache receives the object, it stores a copy in its local storage and sends a copy, within an HTTP response message, to the client browser (over the existing TCP connection between the client browser and the Web cache).
+
+**Advantage of Cache Server**
+
+Web cache can substantially reduce the response time for a client request, particularly if the bottleneck bandwidth between the client and the origin server is much less than the bottleneck bandwidth between the client and the cache.
+
+Web caches can substantially reduce traffic on an institution’s access link to the Internet.
+
+Web caches can substantially reduce Web traffic in the Internet as a whole, thereby improving performance for all applications.
+
+**The Conditional GET**
+
+Although caching can reduce user-perceived response times, it introduces a new problem—the copy of an object residing in the cache may be stale. HTTP has a mechanism that allows a cache to verify that its objects are up to date. This mechanism is called the **conditional GET**. 
+
+An HTTP request message is a so-called conditional GET message if 
+
+1. the request message uses the `GET` method
+2. the request message includes an `If-Modified-Since:` header line.
+
+The cache performs an up-to-date check by issuing a conditional GET. Specifically, the cache sends:
+
+```http
+GET /fruit/kiwi.gif HTTP/1.1
+Host: www.exotiquecuisine.com 
+If-modified-since: Wed, 9 Sep 2015 09:23:24
+```
+
+This **conditional GET** is telling the server to send the object only if the object has been modified since the specified date. Suppose the object has not been modified since *9 Sep 2015 09:23:24*. Then, fourth, the Web server sends a response message to the cache:
+
+```http
+HTTP/1.1 304 Not Modified
+Date: Sat, 10 Oct 2015 15:39:29 Server: Apache/1.3.0 (Unix)
+(empty entity body)
+```
+
+### Electronic Mail in the Internet
+
