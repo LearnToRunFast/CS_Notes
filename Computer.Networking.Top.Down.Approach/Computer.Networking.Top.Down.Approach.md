@@ -648,3 +648,169 @@ Date: Sat, 10 Oct 2015 15:39:29 Server: Apache/1.3.0 (Unix)
 
 ### Electronic Mail in the Internet
 
+Figure 2.14 presents a high-level view of the Internet mail system. We see from this diagram that it has three major components: **user agents**, **mail servers**, and the **Simple Mail Transfer Protocol (SMTP)**. Mail servers form the core of the e-mail infrastructure. Each recipient, such as Bob, has a **mailbox** located in one of the mail servers. The mailbox manages and maintains the messages that have been sent to the specified recipient. A typical message starts its journey in the sender’s user agent, travels to the sender’s mail server, and travels to the recipient’s mail server, where it is deposited in the recipient’s mailbox. When User wants to access the messages in his mailbox, the mail server containing his mailbox authenticates Bob (with usernames and passwords). If sender server cannot deliver mail to recipient server, Sender server holds the message in a **message queue** and attempts to transfer the message later. Reattempts are often done every 30 minutes or so.
+
+![image-20210228155817764](Asserts/Computer.Networking.Top.Down.Approach/image-20210228155817764.png)
+
+#### SMTP
+
+**SMTP** is the principal application-layer protocol for Internet electronic mail. It uses the reliable data transfer service of TCP to transfer mail from the sender’s mail server to the recipient’s mail server. 
+
+To illustrate the basic operation of SMTP, let’s walk through a common scenario. Suppose Alice wants to send Bob a simple ASCII message.
+
+1. Alice invokes her user agent for e-mail, provides Bob’s e-mail address (for example, bob@someschool.edu), composes a message, and instructs the user agent to send the message.
+2. Alice’s user agent sends the message to her mail server, where it is placed in a message queue.
+3. The client side of SMTP, running on Alice’s mail server, sees the message in the message queue. It opens a TCP connection to an SMTP server, running on Bob’s mail server.
+4. After some initial SMTP handshaking, the SMTP client sends Alice’s message into the TCP connection.
+5. At Bob’s mail server, the server side of SMTP receives the message. Bob’s mail server then places the message in Bob’s mailbox.
+6. Bob invokes his user agent to read the message at his convenience.
+
+The scenario is summarized in Figure 2.15. It is important to observe that SMTP does not normally use intermediate mail servers for sending mail, even when the two mail servers are located at opposite ends of the world.
+
+![image-20210228160624016](Asserts/Computer.Networking.Top.Down.Approach/image-20210228160624016.png)
+
+Let’s next take a look at an example transcript of messages exchanged between an SMTP client (C) and an SMTP server (S). The hostname of the client is crepes.fr and the hostname of the server is hamburger.edu. The ASCII text lines prefaced with C: are exactly the lines the client sends into its TCP socket, and the ASCII text lines prefaced with S: are exactly the lines the server sends into its TCP socket. The following transcript begins as soon as the TCP connection is established.
+
+```
+S: 220 hamburger.edu 
+C: HELO crepes.fr
+S: 250 Hello crepes.fr, pleased to meet you C: MAIL FROM: <alice@crepes.fr>
+S: 250 alice@crepes.fr ... Sender ok
+C: RCPT TO: <bob@hamburger.edu>
+S: 250 bob@hamburger.edu ... Recipient ok
+C: DATA
+S: 354 Enter mail, end with ”.” on a line by itself C: Do you like ketchup?
+C: How about pickles?
+C: .
+S: 250 Message accepted for delivery
+C: QUIT
+S: 221 hamburger.edu closing connection
+```
+
+As part of the dialogue, the client issued five commands: *HELO* (an abbreviation for HELLO), *MAIL FROM*, *RCPT TO*, *DATA*, and *QUIT*.
+
+#### Comparison with HTTP
+
+HTTP is mainly a **pull protocol**—someone loads information on a Web server and users use HTTP to pull the information from the server at their convenience. SMTP is primarily a **push protocol**—the sending mail server pushes the file to the receiving mail server. 
+
+SMTP requires each message, including the body of each message, to be in 7-bit ASCII format. If the message contains characters that are not 7-bit ASCII (for example, French characters with accents) or contains binary data (such as an image file), then the message has to be encoded into 7-bit ASCII. HTTP data does not impose this restriction.
+
+HTTP encapsulates each object in its own HTTP response message. SMTP places all of the message’s objects into one message.
+
+#### Mail Message Formats
+
+A typical message header looks like this(which is different from SMTP commands mentioned above):
+
+```smalltalk
+From: alice@crepes.fr
+To: bob@hamburger.edu
+Subject: Searching for the meaning of life.
+```
+
+After the message header, a blank line follows; then the message body (in ASCII) follows. 
+
+#### Mail Access Protocols
+
+Typically the sender’s user agent does not dialogue directly with the recipient’s mail server. Instead, as shown in Figure 2.16, Alice’s user agent uses SMTP to push the e-mail message into her mail server, then Alice’s mail server uses SMTP (as an SMTP client) to relay the e-mail message to Bob’s mail server.
+
+![image-20210228223444986](Asserts/Computer.Networking.Top.Down.Approach/image-20210228223444986.png)
+
+Bob’s user agent can’t use SMTP to obtain the messages because obtaining the messages is a pull operation, whereas SMTP is a push protocol. A special mail access protocol that transfers messages from Bob’s mail server to his local PC. There are currently a number of popular mail access protocols, including **Post Office Protocol—Version 3 (POP3), Internet Mail Access Protocol (IMAP)**, and **HTTP**.
+
+Figure 2.16 provides a summary of the protocols that are used for Internet mail: SMTP is used to transfer mail from the sender’s mail server to the recipient’s mail server; SMTP is also used to transfer mail from the sender’s user agent to the sender’s mail server. A *mail access protocol*, such as POP3, is used to transfer mail from the recipient’s mail server to the recipient’s user agent.
+
+##### POP3
+
+POP3 is an extremely simple mail access protocol. It is short and quite readable. Because the protocol is so simple, its functionality is rather limited. POP3 begins when the user agent (the client) opens a TCP connection to the mail server (the server) on *port 110*. With the TCP connection established, POP3 progresses through three phases: *authorization*, *transaction*, and *update*. 
+
+1. During the first phase, *authorization*, the user agent sends a username and a password (in the clear) to authenticate the user. 
+2. During the second phase, *transaction*, the user agent retrieves messages; also during this phase, the user agent can mark messages for deletion, remove deletion marks, and obtain mail statistics. 
+3. The third phase, *update*, occurs after the client has issued the quit command, ending the POP3 session; at this time, the mail server deletes the messages that were marked for deletion
+
+In a POP3 transaction, the user agent issues commands, and the server responds to each command with a reply. There are two possible responses: *+OK* (sometimes followed by server-to-client data), used by the server to indicate that the previous command was fine; and *-ERR*, used by the server to indicate that something was wrong with the previous command.
+
+A user agent using POP3 can often be configured (by the user) to “download and delete” or to “download and keep.”In the *download-and-delete* mode, the user agent will issue the `list`, `retr`, `quit` and `dele` commands. After processing the quit command, the POP3 server enters the update phase. A problem with this download-and-delete mode is that the recipient can't reread the message on different machines. In the *download-and-keep* mode, the user agent leaves the messages on the mail server after downloading them.
+
+During a POP3 session between a user agent and the mail server, the POP3 server maintains some state information; in particular, it keeps track of which user messages have been marked deleted. However, the POP3 server does not carry state information across POP3 sessions. This lack of state information across sessions greatly simplifies the implementation of a POP3 server.
+
+##### IMAP
+
+The POP3 protocol does not provide any means for a user to create remote folders and assign messages to folders. To solve this and other problems, the IMAP protocol was invented. Like POP3, IMAP is a mail access protocol. It has many more features than POP3, but it is also significantly more complex.
+
+An IMAP server will associate each message with a folder; when a message first arrives at the server, it is associated with the recipient’s INBOX folder. The IMAP protocol provides commands to allow users to create folders and move messages from one folder to another. IMAP also provides commands that allow users to search remote folders for messages matching specific criteria. Unlike POP3, an IMAP server maintains user state information across IMAP sessions—for example, the names of the folders and which messages are associated with which folders.
+
+Another important feature of IMAP is that it has commands that permit a user agent to obtain components of messages. For example, a user agent can obtain just the message header of a message or just one part of a multipart MIME message. This feature is useful when there is a low-bandwidth connection.
+
+##### Web-Based E-Mail
+
+More and more users today are sending and accessing their e-mail through their Web browsers. With this service, the user agent is an ordinary Web browser, and the user communicates with its remote mailbox via HTTP. When a recipient wants to access a message in his mailbox, the e-mail message is sent from his mail server to his browser using the HTTP protocol rather than the POP3 or IMAP protocol. When a sender wants to send an e-mail message, the e-mail message is sent from her browser to her mail server over HTTP rather than over SMTP. Her mail server, however, still sends messages to, and receives messages from, other mail servers using SMTP.
+
+### DNS—The Internet’s Directory Service
+
+ Hostnames provide little, if any, information about the location within the Internet of the host and it consist of variable-length alphanumeric characters, they would be difficult to process by routers. For these reasons, hosts are identified by so-called **IP addresses**.
+
+An IP address looks like 121.7.106.83, where each period separates one of the bytes expressed in decimal notation from 0 to 255. An *IP address is hierarchical* because as we scan the address from left to right, we obtain more and more specific information about where the host is located in the Internet.
+
+#### Services Provided by DNS
+
+There are two ways to identify a host—by a hostname and by an IP address. People prefer the more mnemonic hostname identifier, while routers prefer fixed-length, hierarchically structured IP addresses. 
+
+In order to reconcile these preferences, we need a directory service that translates hostnames to IP addresses. This is the main task of the Internet’s **domain name system (DNS)**.
+
+The DNS is a distributed database implemented in a hierarchy of **DNS servers**, and (2) an application-layer protocol that allows hosts to query the distributed database. The DNS servers are often UNIX machines running the Berkeley Internet Name Domain (BIND) software. The DNS protocol runs over *UDP* and uses *port 53*.
+
+DNS is commonly employed by other application-layer protocols—including HTTP and SMTP to translate user-supplied hostnames to IP addresses.
+
+Consider client browsing www.someschool.edu. This is done as follows.
+
+1. The same user machine runs the client side of the DNS application.
+
+2. The browser extracts the hostname, www.someschool.edu, from the URL
+
+   and passes the hostname to the client side of the DNS application.
+
+3. The DNS client sends a query containing the hostname to a DNS server.
+
+4. The DNS client eventually receives a reply, which includes the IP address for
+
+   the hostname.
+
+5. Once the browser receives the IP address from DNS, it can initiate a TCP connection to the HTTP server process located at port 80 at that IP address.
+
+The desired IP address is often cached in a “nearby” DNS server, which helps to reduce DNS network traffic as well as the average DNS delay.
+
+DNS provides a few other important services in addition to translating host- names to IP addresses:
+
+- **Host aliasing.** A host with a complicated hostname can have one or more alias names. For example, a hostname such as relay1.west-coast.enterprise.com could have, say, two aliases such as enterprise.com and www.enterprise.com. In this case, the hostname relay1.west-coast.enterprise.com is said to be a **canonical hostname**. Alias hostnames are typically more mnemonic than canonical hostnames. DNS can be invoked by an application to obtain the canonical hostname for a supplied alias hostname as well as the IP address of the host.
+- **Mail server aliasing.** For obvious reasons, it is highly desirable that e-mail addresses be mnemonic. DNS can be invoked by a mail application to obtain the canonical hostname for a supplied alias hostname as well as the IP address of the host.
+- **Load distribution.** DNS is also used to perform load distribution among replicated servers, such as replicated Web servers. For replicated Web servers, a *set* of IP addresses is thus associated with one canonical hostname. The DNS database contains this set of IP addresses. When clients make a DNS query for a name mapped to a set of addresses, the server responds with the entire set of IP addresses, but rotates the ordering of the addresses within each reply. A client typically sends its HTTP request message to the IP address that is listed first in the set.
+
+#### Overview of How DNS Works
+
+##### A Distributed, Hierarchical Database
+
+In order to deal with the issue of scale, the DNS uses a large number of servers, organized in a hierarchical fashion and distributed around the world. No single DNS server has all of the mappings for all of the hosts in the Internet. Instead, the mappings are distributed across the DNS servers. To a first approximation, there are three classes of DNS servers—*root DNS servers*, *top-level domain (TLD)* DNS servers, and *authoritative DNS* servers—organized in a hierarchy as shown in Figure 2.17.
+
+![image-20210228232606405](Asserts/Computer.Networking.Top.Down.Approach/image-20210228232606405.png)
+
+Three classes of DNS servers:
+
+- **Root DNS servers.** There are over 400 root name servers scattered all over the world. Root name servers provide the IP addresses of the TLD servers.
+- **Top-level domain (TLD) servers.** For each of the top-level domains — top-level domains such as com, org, net, edu, and gov, and all of the country top-level domains such as uk, fr, ca, and jp — there is TLD server (or server cluster). TLD servers provide the IP addresses for authoritative DNS servers.
+- **Authoritative DNS servers.** Every organization with publicly accessible hosts (such as Web servers and mail servers) on the Internet must provide publicly accessible DNS records that map the names of those hosts to IP addresses. Most universities and large companies implement and maintain their own primary and secondary (backup) authoritative DNS server.
+
+Suppose a DNS client wants to determine the IP address for the hostname www.amazon.com. The client first contacts one of the root servers, which returns IP addresses for TLD servers for the top-level domain *com*. The client then contacts one of these TLD servers, which returns the IP address of an authoritative server for amazon.com.
+
+There is another important type of DNS server called the **local DNS server**. A local DNS server does not strictly belong to the hierarchy of servers but is nevertheless central to the DNS architecture. When a host makes a DNS query, the query is sent to the local DNS server, which acts a proxy, forwarding the query into the DNS server hierarchy.
+
+The TLD server may not directly knows the authoritative DNS server for the hostname. The TLD server may know only of an intermediate DNS server, which in turn knows the authoritative DNS server for the hostname. 
+
+The example shown in Figure 2.19 makes use of both **recursive queries** and **iterative queries**. The query sent from cse.nyu.edu to dns.nyu.edu is a recursive query, since the query asks dns.nyu.edu to obtain the mapping on its behalf. But the subsequent three queries are iterative since all of the replies are directly returned to dns.nyu.edu. In theory, any DNS query can be iterative or recursive. In practice, the queries typically follow the pattern in Figure 2.19: The query from the requesting host to the local DNS server is recursive, and the remaining queries are iterative.
+
+![image-20210228233857973](Asserts/Computer.Networking.Top.Down.Approach/image-20210228233857973.png)
+
+##### DNS Caching
+
+**DNS caching**, a critically important feature of the DNS system. DNS extensively exploits DNS caching in order to improve the delay performance and to reduce the number of DNS messages ricocheting around the Internet. The DNS will cache the mapping if there is any same query before. Because hosts and mappings between hostnames and IP addresses are by no means permanent, DNS servers discard cached information after a period of time (often set to two days).
+
+#### DNS Records and Messages

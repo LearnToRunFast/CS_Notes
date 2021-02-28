@@ -1,6 +1,6 @@
 # Computer Systems: A Programmer’s Perspective
 
-## Chapter 1 Overview
+## Overview
 
 ### Form of a program
 
@@ -244,7 +244,7 @@ The operating system kernel serves as an intermediary between the application an
 
 Finally, networks provide ways for computer systems to communicate with one another. From the viewpoint of a particular system, the network is just another I/O device.
 
-## Chapter 2 Representing and Manipulating Information
+## Representing and Manipulating Information
 
 ### Information Storage
 
@@ -891,3 +891,66 @@ UTF-8 file is always stored as big endian. BOM plays no part. However, in some s
 
 **End-of-File (EOF)**: when you read from a file, EOF is an indicator that you reached the end of file. Note that, EOF is not a sign but a system signal(return -1 when reach the end of file). (TODO, how to distinguish between error is EOF)
 
+## Machine-Level Representation of Programs
+
+Computers execute *machine code*, sequences of bytes encoding the low-level operations that manipulate data, manage memory, read and write data on storage devices, and communicate over networks. A compiler generates machine code through a series of stages; based on the rules of the programming language, the instruction set of the target machine, and the conventions followed by the operating system. 
+
+The gcc C compiler generates its output in the form of *assembly code* which is a textual representation of the machine code giving the individual instructions in the program. Gcc then invokes both an *assembler* and a *linker* to generate the executable machine code from the assembly code.
+
+Most of the time, it is much more productive and reliable to work at the higher level of abstraction provided by a high-level language. The type checking provided by a compiler helps detect many program errors and makes sure we reference and manipulate data in consistent ways. With modern optimizing compilers, the generated code is usually at least as efficient as what a skilled assembly-language programmer would write by hand. Best of all, a program written in a high-level language can be compiled and executed on a number of different machines, whereas assembly code is highly machine specific.
+
+But being able to read and understand the machine code is an important skill for serious programmers. By invoking the compiler with appropriate command-line parameters, the compiler will generate a file showing its output in assembly-code form. By reading this code, we can understand the optimization capabilities of the compiler and analyze the underlying inefficiencies in the code. 
+
+Programmers seeking to maximize the performance of a critical section of code often try different variations of the source code, each time compiling and examining the generated assembly code to get a sense of how efficiently the program will run. 
+
+There are times when the layer of abstraction provided by a high-level language hides information about the run-time behavior of a program that we need to understand. Such information is visible at the machine-code level. 
+
+Many attacks involve exploiting weaknesses in system programs to overwrite information and thereby take control of the system. Understanding how these vulnerabilities arise and how to guard against them requires a knowledge of the machine-level representation of programs.
+
+#### Program Encodings
+
+##### Code Examples
+
+Consider program:
+
+```c
+long mult2(long, long);
+void multstore(long x, long y, long *dest) {
+  long t = mult2(x, y);
+  *dest = t;
+}
+```
+
+It will only generate `mstore.s` when `-S` flag, the output looks like:
+
+```assembly
+multstore:
+pushq   %rbx
+movq    %rdx, %rbx
+call    mult2
+movq    %rax, (%rbx)
+popq    %rbx
+ret
+```
+
+If we use the `-c` command-line option, gcc will both compile and assemble the code.
+
+```c
+gcc -Og -c mstore.c
+```
+
+This will generate an object-code file *mstore.o* that is in binary format and hence cannot be viewed directly. Embedded within the 1,368 bytes of the file *mstore.o* is a 14-byte sequence with the hexadecimal representation
+
+```assembly
+53 48 89 d3 e8 00 00 00 00 48 89 03 5b c3
+```
+
+A key lesson to learn from this is that the program executed by the machine is simply a sequence of bytes encoding a series of instructions. The machine has very little information about the source code from which these instructions were generated.
+
+To inspect the contents of machine-code files, a class of programs known as *disassemblers* can be invaluable. These programs generate a format similar to assembly code from the machine code. With Linux systems, the program objdump (for “object dump”) can serve this role given the *-d* command-line flag:
+
+```c
+objdump -d mstore.o
+```
+
+![image-20210228214618770](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210228214618770.png)
