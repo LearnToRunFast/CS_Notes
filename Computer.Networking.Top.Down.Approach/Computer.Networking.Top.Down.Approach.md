@@ -403,7 +403,7 @@ The Internet (and, more generally, TCP/ IP networks) makes two transport protoco
 
 The TCP service model includes a connection-oriented service and a reliable data transfer service. When an application invokes TCP as its transport protocol, the application receives both of these services from TCP.
 
-- *Connection-oriented service.* TCP has the client and server exchange transport-layer control information with each other *before* the application-level messages begin to flow. This so-called *handshaking procedure* alerts the client and server, allowing them to prepare for an onslaught of packets. After the handshaking phase, a **TCP connection** is said to exist between the sockets of the two processes. The connection is a *full-duplex* connection in that the two processes can send messages to each other over the connection at the same time. When the application finishes sending messages, it must tear down the connection.
+- *Connection-oriented service.* TCP has the client and server exchange transport-layer control information with each other *before* the application-level messages begin to flow. This so-called *handshaking procedure* alerts the client and server, allowing them to prepare for an onslaught of packets. During the handshaking process, a *new* socket that is dedicated to that particular client will be created. So there are two types of socket on server side, one is welcoming socket and each newly created server-side connection socket for individual client. After the handshaking phase, a **TCP connection** is said to exist between the sockets of the two processes. The connection is a *full-duplex* connection in that the two processes can send messages to each other over the connection at the same time. When the application finishes sending messages, it must tear down the connection.
 - *Reliable data transfer service.* The communicating processes can rely on TCP to deliver all data sent without error and in the proper order. When one side of the application passes a stream of bytes into a socket, it can count on TCP to deliver the same stream of bytes to the receiving socket, with no missing or duplicate bytes.
 
 TCP also includes a *congestion-control* mechanism, a service for the general welfare of the Internet rather than for the direct benefit of the communicating processes. The TCP congestion-control mechanism throttles a sending process (client or server) when the network is congested between sender and receiver. TCP congestion control also attempts to limit each TCP connection to its fair share of network bandwidth.
@@ -814,3 +814,270 @@ The example shown in Figure 2.19 makes use of both **recursive queries** and **i
 **DNS caching**, a critically important feature of the DNS system. DNS extensively exploits DNS caching in order to improve the delay performance and to reduce the number of DNS messages ricocheting around the Internet. The DNS will cache the mapping if there is any same query before. Because hosts and mappings between hostnames and IP addresses are by no means permanent, DNS servers discard cached information after a period of time (often set to two days).
 
 #### DNS Records and Messages
+
+The DNS servers that together implement the DNS distributed database store **resource records (RRs)**, including RRs that provide hostname-to-IP address mappings. A resource record is a four-tuple that contains the following fields:
+
+```
+(Name, Value, Type, TTL)
+```
+
+**TTL** is the time to live of the resource record; it determines when a resource should be removed from a cache.
+
+The meaning of Name and Value depend on **Type**:
+
+1. If *Type=A*, then Name is a hostname and Value is the *IP address for the hostname*. Thus, a Type A record provides the standard hostname-to-IP address mapping. As an example 
+
+   ```
+   (relay1.bar.foo.com, 145.37.93.126, A)
+   ```
+
+2. If *Type=NS*, then Name is a domain (such as foo.com) and Value is the *hostname of an authoritative DNS server* that knows how to obtain the IP addresses for hosts in the domain. This record is used to route DNS queries further along in the query chain. As an example 
+
+   ```
+   (foo.com, dns.foo.com, NS) 
+   ```
+
+3. If *Type=CNAME*, then Value is a *canonical hostname for the alias hostname Name*. This record can provide querying hosts the canonical name for a hostname. As an example
+
+   ```
+   (foo.com, relay1.bar.foo.com, CNAME)
+   ```
+
+4. If *Type=MX*, then Value is the *canonical name of a mail server* that has an alias hostname Name. MX records allow the hostnames of mail servers to have simple aliases. As an example
+
+   ```
+   (foo.com, mail.bar.foo.com, MX)
+   ```
+
+##### DNS Messages
+
+These are the only two kinds of DNS messages, DNS query and reply messages.Both query and reply messages have the same format, as shown in Figure 2.21.The semantics of the various fields in a DNS message are as follows:
+
+![image-20210301105131661](Asserts/Computer.Networking.Top.Down.Approach/image-20210301105131661.png)
+
+- The first 12 bytes is the *header section*, which has a number of fields. 
+  - The first field is a 16-bit number that identifies the query. This identifier is copied into the reply message to a query, allowing the client to match received replies with sent queries.
+  - There are a number of flags in the flag field. 
+    - A 1-bit query/reply flag indicates whether the message is a query (0) or a reply (1). 
+    - A 1-bit authoritative flag is set in a reply message when a DNS server is an authoritative server for a queried name. 
+    - A 1-bit recursion-desired flag is set when a client (host or DNS server) desires that the DNS server perform recursion when it doesn’t have the record. 
+    - A 1-bit recursion-available field is set in a reply if the DNS server supports recursion. 
+  - There are also four number-of fields. These fields indicate the number of occurrences of the four types of data sections that follow the header.
+
+- The *question section* contains information about the query that is being made. This section includes
+  - a name field that contains the name that is being queried, 
+  - a type field that indicates the type of question being asked about the name—for example, a host address associated with a name (Type A) or the mail server for a name (Type MX).
+- In a reply from a DNS server, the *answer section* contains the resource records for the name that was originally queried. Recall that in each resource record there is the Type (for example, A, NS, CNAME, and MX), the Value, and the TTL. A reply can return multiple RRs in the answer, since a hostname can have multiple IP addresses.
+- The *authority section* contains records of other authoritative servers.
+- The *additional section* contains other helpful records. For example, the answer field in a reply to an MX query contains a resource record providing the canonical hostname of a mail server. The additional section contains a Type A record providing the IP address for the canonical hostname of the mail server.
+
+We use **nslookup program** to send a DNS query message directly from the host to some DNS server.
+
+##### Inserting Records into the DNS Database
+
+Suppose you have just created an exciting new startup company called Network Utopia. The first thing you’ll surely want to do is register the domain name networkutopia.com at a registrar. A **registrar** is a commercial entity that verifies the uniqueness of the domain name, enters the domain name into the DNS database, and collects a small fee from you for its services.
+
+When you register the domain name networkutopia.com with some registrar, you also need to provide the registrar with the names and IP addresses of your primary and secondary authoritative DNS servers. Suppose the names and IP addresses are dns1.networkutopia.com, dns2.networkutopia.com, 212.2.212.1, and 212.212.212.2. For each of these two authoritative DNS servers, the registrar would then make sure that a Type NS and a Type A record are entered into the TLD com servers. Specifically, for the primary authoritative server for networkutopia.com, the registrar would insert the following two resource records into the DNS system:
+
+```
+(networkutopia.com, dns1.networkutopia.com, NS) 
+(dns1.networkutopia.com, 212.212.212.1, A)
+```
+
+You’ll also have to make sure that the Type A resource record for your Web server www.networkutopia.com and the Type MX resource record for your mail server mail.networkutopia.com are entered into your authoritative DNS servers.
+
+### Peer-to-Peer File Distribution
+
+We will just drive in a popular application of P2P called BitTorrent.
+
+#### BitTorrent
+
+BitTorrent is a popular P2P protocol for file distribution. In BitTorrent lingo, the collection of all peers participating in the distribution of a particular file is called a *torrent*. Peers in a torrent download equal-size *chunks* of the file from one another, with a typical chunk size of 256 kbytes. When a peer first joins a torrent, it has no chunks. Over time it accumulates more and more chunks. While it downloads chunks it also uploads chunks to other peers. Once a peer has acquired the entire file, it may leave the torrent, or remain in the torrent and continue to upload chunks to other peers. Also, any peer may leave the torrent at any time with only a subset of chunks, and later rejoin the torrent.
+
+Each torrent has an infrastructure node called a *tracker*. When a peer joins a torrent, it registers itself with the tracker and periodically informs the tracker that it is still in the torrent.  In this manner, the tracker keeps track of the peers that are participating in the torrent.
+
+As shown in Figure 2.24, when a new peer, Alice, joins the torrent, the tracker randomly selects a subset of peers (for concreteness, say 50) from the set of participating peers, and sends the IP addresses of these 50 peers to Alice. Possessing this list of peers, Alice attempts to establish concurrent TCP connections with all the peers on this list. 
+
+![image-20210301112511674](Asserts/Computer.Networking.Top.Down.Approach/image-20210301112511674.png)
+
+In deciding which chunks to request, Alice uses a technique called **rarest first**. The idea is to determine, from among the chunks she does not have, the chunks that are the rarest among her neighbors and then request those rarest chunks first. In this manner, the rarest chunks get more quickly redistributed, aiming to (roughly) equalize the numbers of copies of each chunk in the torrent.
+
+To determine which requests she responds to, BitTorrent uses a clever trading algorithm. The basic idea is that Alice gives priority to the neighbors that are currently supplying her data *at the highest rate*. Specifically, for each of her neighbors, Alice continually measures the rate at which she receives bits and determines the four peers that are feeding her bits at the highest rate. She then reciprocates by sending chunks to these same four peers. Every 10 seconds, she recalculates the rates and possibly modifies the set of four peers. In BitTorrent lingo, these four peers are said to be **unchoked**.  Importantly, every 30 seconds, she also picks one additional neighbor at random and sends it chunks. Let’s call the randomly chosen peer Bob. In BitTorrent lingo, Bob is said to be **optimistically unchoked**. The effect is that peers capable of uploading at compatible rates tend to find each other. BitTorrent has a number of interesting mechanisms that are not discussed here, including pieces (mini-chunks), pipelining, random first selection, endgame mode, and anti-snubbing.
+
+#### Distributed Hast Table (DHT)
+
+A distributed hash table is a simple database, with the database records being distributed over the peers in a P2P system. DHTs have been widely implemented (e.g., in BitTorrent) and have been the subject of extensive research.
+
+### Video Streaming and Content Distribution Networks
+
+#### Internet Video
+
+A video is a sequence of images, typically being displayed at a constant rate, for example, at 24 or 30 images per second. An uncompressed, digitally encoded image consists of an array of pixels, with each pixel encoded into a number of bits to represent luminance and color. An important characteristic of video is that it can be compressed, thereby trading off video quality with bit rate. The higher the bit rate, the better the image quality and the better the overall user viewing experience.
+
+For example, a single 2 Mbps video with a duration of 67 minutes will consume 1 gigabyte of storage and traffic. The most important performance measure for streaming video is average end- to-end throughput. In order to provide continuous playout, the network must provide an average throughput to the streaming application that is at least as large as the bit rate of the compressed video.
+
+#### HTTP Streaming and DASH
+
+In HTTP streaming, the video is simply stored at an HTTP server as an ordinary file with a specific URL. When a user wants to see the video, the client establishes a TCP connection with the server and issues an HTTP *GET* request for that URL. The server then sends the video file, within an HTTP response message, as quickly as the underlying network protocols and traffic conditions will allow.
+
+On the client side, the bytes are collected in a client application buffer. Once the number of bytes in this buffer exceeds a predetermined threshold, the client application begins playback—specifically, the streaming video application periodically grabs video frames from the client application buffer, decompresses the frames, and displays them on the user’s screen. Thus, the video streaming application is displaying video as it is receiving and buffering frames corresponding to latter parts of the video. 
+
+It has a major shortcoming: All clients receive the same encoding of the video, despite the large variations in the amount of bandwidth available to a client.
+
+This has led to the development of a new type of HTTP-based streaming, often referred to as **Dynamic Adaptive Streaming over HTTP (DASH)**. In DASH, the video is encoded into several different versions, with each version having a different bit rate and, correspondingly, a different quality level. The client dynamically requests chunks of video segments of a few seconds in length.
+
+With DASH, each video version is stored in the HTTP server, each with a different URL. The HTTP server also has a **manifest file**, which provides a URL for each version along with its bit rate. The client first requests the manifest file and learns about the various versions. The client then selects one chunk at a time by specifying a URL and a byte range in an HTTP GET request message for each chunk. While downloading chunks, the client also measures the received bandwidth and runs a rate determination algorithm to select the chunk to request next. DASH therefore allows the client to freely switch among different quality levels.
+
+#### Content Distribution Networks
+
+If a company store all of its videos in the data center, and stream the videos directly from the data center to clients worldwide. But there are three major problems with this approach:
+
+1. If the client is far from the data center, it will pass through many ISPs and the lowest link throughput will become a bottleneck
+2. A popular video will likely be sent many times over the same communication links. Not only does this waste network bandwidth, but the Internet video company itself will be paying its provider ISP for sending the *same* bytes into the Internet over and over again. 
+3. A single data center represents a single point of failure—if the data center or its links to the Internet goes down, it would not be able to distribute *any* video streams.
+
+In order to meet the challenge of distributing massive amounts of video data to users distributed around the world, almost all major video-streaming companies make use of **Content Distribution Networks (CDNs)**. A CDN manages servers in multiple geographically distributed locations, stores copies of the videos (and other types of Web content, including documents, images, and audio) in its servers, and attempts to direct each user request to a CDN location that will provide the best user experience. The CDN may be a **private CDN**; owned by the content provider itself. The CDN may alternatively be a **third-party CDN** that distributes content on behalf of multiple content providers.
+
+CDNs typically adopt one of two different server placement philosophies:
+
+- **Enter Deep.** is to *enter deep* into the access networks of Internet Service Providers, by deploying server clusters in access ISPs all over the world. The goal is to get close to end users, thereby improving user-perceived delay and throughput by decreasing the number of links and routers between the end user and the CDN server from which it receives content. Because of this highly distributed design, the task of maintaining and managing the clusters becomes challenging.
+- **Bring Home.** is to *bring the ISPs home* by building large clusters at a smaller number (for example, tens) of sites. **Instead of getting inside the access ISPs, these CDNs typically place their clusters in Internet Exchange Points (IXPs)**. Compared with the enter-deep design philosophy, the bring-home design typically results in lower maintenance and management overhead, possibly at the expense of higher delay and lower throughput to end users.
+
+Once its clusters are in place, the CDN replicates content across its clusters. In fact, many CDNs do not push videos to their clusters but instead use a simple pull strategy: If a client requests a video from a cluster that is not storing the video, then the cluster retrieves the video (from a central repository or from another cluster) and stores a copy locally while streaming the video to the client at the same time. When a cluster’s storage becomes full, it removes videos that are not frequently requested.
+
+##### CDN Operation
+
+When a browser in a user’s host is instructed to retrieve a specific video (identified by a URL), the CDN must intercept the request so that it can (1) determine a suitable CDN server cluster for that client at that time, and (2) redirect the client’s request to a server in that cluster. 
+
+Most CDNs take advantage of DNS to intercept and redirect requests. Let’s consider a simple example to illustrate how the DNS is typically involved. Suppose a content provider, NetCinema, employs the third-party CDN company, KingCDN, to distribute its videos to its customers.On the NetCinema Web pages, each of its videos is assigned a URL that includes the string “video” and a unique identifier for the video itself; for example, a video might be assigned http://video.netcinema.com/6Y7B23V. Details as shown in Figure 2.25:
+
+1. When the user clicks on the video link, the user’s host sends a DNS query for video.netcinema.com.
+
+2. The user’s Local DNS Server (LDNS) relays the DNS query to an authoritative
+
+   DNS server for NetCinema, which observes the string “video” in the hostname video.netcinema.com. To “hand over” the DNS query to KingCDN, instead of returning an IP address, the NetCinema authoritative DNS server returns to the LDNS a hostname in the KingCDN’s domain, for example, a1105.kingcdn.com.
+
+3. From this point on, the DNS query enters into KingCDN’s private DNS infrastructure. The user’s LDNS then sends a second query, now for a1105.kingcdn.com, and KingCDN’s DNS system eventually returns the IP addresses of a KingCDN content server to the LDNS. Within the KingCDN’s DNS system, that the CDN server from which the client will receive its content is specified.
+
+4. The LDNS forwards the IP address of the content-serving CDN node to the user’s host.
+
+5. Once the client receives the IP address for a KingCDN content server, it establishes a direct TCP connection with the server at that IP address and issues an HTTP GET request for the video. If DASH is used, the server will first send to the client a manifest file with a list of URLs, one for each version of the video, and the client will dynamically select chunks from the different versions.
+
+![image-20210301130530415](Asserts/Computer.Networking.Top.Down.Approach/image-20210301130530415.png)
+
+##### Cluster Selection Strategies
+
+At the core of any CDN deployment is a **cluster selection strategy**, being able to dynamically directing clients to a server cluster or a data center within the CDN.
+
+One simple strategy is to assign the client to the cluster that is **geographically closest**. Using commercial geo-location databases and Max-Mind, each LDNS IP address is mapped to a geographic location. Such a solution can work reasonably well for a large fraction of the clients. 
+
+However, there are some drawbacks for some clients:
+
+1. geographically closest cluster may not be the closest cluster in terms of the length or number of hops of the network path. 
+2. a problem inherent with all DNS-based approaches is that some end-users are configured to use remotely located LDNSs, in which case the LDNS location may be far from the client’s location. 
+3. this simple strategy ignores the variation in delay and available bandwidth over time of Internet paths, always assigning the same cluster to a particular client.
+
+In order to determine the best cluster for a client based on the *current* traffic conditions, CDNs can instead perform periodic **real-time measurements** of delay and loss performance between their clusters and clients. For instance, a CDN can have each of its clusters periodically send probes (for example, ping messages or DNS queries) to all of the LDNSs around the world. One drawback of this approach is that many LDNSs are configured to not respond to such probes.
+
+### Socket Programming: Creating Network Applications
+
+There are two types of network applications. 
+
+One type is an implementation whose operation is specified in a protocol standard, such as an RFC or some other standards document; such an application is sometimes referred to as “*open*,” since the rules specifying its operation are known to all. For such an implementation, the client and server programs must conform to the rules dictated by the RFC.
+
+The other type of network application is a proprietary network application. In this case the client and server programs employ an application-layer protocol that has *not* been openly published in an RFC or elsewhere. A single developer (or development team) creates both the client and server programs, and the developer has complete control over what goes in the code. But because the code does not implement an open protocol, other independent developers will not be able to develop code that interoperates with the application.
+
+#### Socket Programming with UDP
+
+Figure 2.27 highlights the main socket-related activity of the client and server that communicate over the UDP transport service.
+
+![image-20210301143837180](Asserts/Computer.Networking.Top.Down.Approach/image-20210301143837180.png)
+
+**UDPClient.py**
+
+```python
+from socket import *
+serverName = ’hostname’
+serverPort = 12000
+# AF_INET indicates that the underlying network is using IPv4. 
+# type of SOCK_DGRAM, which means it is a UDP socket
+clientSocket = socket(AF_INET, SOCK_DGRAM)
+#get input from user
+message = raw_input(’Input lowercase sentence:’) 
+# encode the string into bytes and send over to server
+clientSocket.sendto(message.encode(),(serverName, serverPort)) 
+# get message from server
+modifiedMessage, serverAddress = clientSocket.recvfrom(2048) 
+#print out the message from server
+print(modifiedMessage.decode())
+# close the connection
+clientSocket.close()
+```
+
+**UDPServer.py**
+
+```python
+from socket import *
+serverPort = 12000
+
+serverSocket = socket(AF_INET, SOCK_DGRAM) 
+# binds the port number 12000 to the server’s socket.
+serverSocket.bind((’’, serverPort)) 
+print(”The server is ready to receive”) 
+while True:
+  message, clientAddress = serverSocket.recvfrom(2048) 
+  # modify the client's message
+  modifiedMessage = message.decode().upper() 
+  # send to client
+  serverSocket.sendto(modifiedMessage.encode(), clientAddress)
+```
+
+#### Socket Programming with TCP
+
+In order for the server to be able to react to the client’s initial contact, the server has to be ready. This implies two things. First, as in the case of UDP, the TCP server must be running as a process before the client attempts to initiate contact. Second, the server program must have a special door—more precisely, a special socket—that welcomes some initial contact from a client process running on an arbitrary host.
+
+With the server process running, the client process can initiate a TCP connection to the server. This is done in the client program by creating a TCP socket. After creating its socket, the client initiates a three-way handshake and establishes a TCP connection with the server. The three-way handshake, which takes place within the transport layer, is completely invisible to the client and server programs.
+
+During the three-way handshake, when the server “hears” the knocking, a *new* socket that is dedicated to that particular client. In our example below, the welcoming door is a TCP socket object that we call *serverSocket*; the newly created socket dedicated to the client making the con- nection is called *connectionSocket*.
+
+From the application’s perspective, the client’s socket and the server’s connection socket are directly connected by a pipe. As shown in Figure 2.28, the client process can send arbitrary bytes into its socket, and TCP guarantees that the server process will receive (through the connection socket) each byte in the order sent. 
+
+![image-20210301150459837](Asserts/Computer.Networking.Top.Down.Approach/image-20210301150459837.png)
+
+Figure 2.29 highlights the main socket-related activity of the client and server that communicate over the TCP transport service.
+
+![image-20210301150613724](Asserts/Computer.Networking.Top.Down.Approach/image-20210301150613724.png)
+
+**TCPClient.py**
+
+```python
+from socket import *
+serverName = ’servername’
+serverPort = 12000
+clientSocket = socket(AF_INET, SOCK_STREAM) 
+#  initiates the TCP connection between the client and server.
+clientSocket.connect((serverName,serverPort)) sentence = raw_input(’Input lowercase sentence:’) 
+clientSocket.send(sentence.encode()) 
+modifiedSentence = clientSocket.recv(1024) 
+print(’From Server: ’, modifiedSentence.decode()) 
+clientSocket.close()
+```
+
+**TCPServer.py**
+
+```python
+from socket import *
+serverPort = 12000
+serverSocket = socket(AF_INET,SOCK_STREAM) 
+# serverSocket will be our welcoming socket.
+serverSocket.bind((’’,serverPort)) serverSocket.listen(1)
+print(’The server is ready to receive’)
+while True:
+  connectionSocket, addr = serverSocket.accept() 
+  sentence = connectionSocket.recv(1024).decode() 
+  capitalizedSentence = sentence.upper() 
+  connectionSocket.send(capitalizedSentence.encode()) connectionSocket.close()
+```
+
+## Transport Layer
+
