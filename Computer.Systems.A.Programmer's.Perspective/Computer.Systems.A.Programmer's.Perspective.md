@@ -511,8 +511,11 @@ In 2's complement representation:
 
 **Example 2**: Suppose that `n=8` and the binary representation` 1 000 0001B`.
   Sign bit is `1` ⇒ negative
-  Absolute value is the complement of `000 0001B` plus `1`, i.e., `111 1110B + 1B = 127D`
-  Hence, the integer is `-127D`
+  Absolute value is the complement of `000 0001B` plus `1`, i.e., `111 1110B + 1B = 127`
+
+  The negative value is $-2^7 + 2^0 = -127$
+
+
 
 ![image-20210223103448993](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210223103448993.png)
 
@@ -520,21 +523,70 @@ The following diagram explains how the 2's complement works. By re-arranging the
 
 ![image-20210223103954387](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210223103954387.png)
 
+**Max Positive Number**: $2^{w}-1$
+
+**Max Negative Number**: $-2^w$
+
 #### Conversions between Signed and Unsigned
 
 The effect of casting is to keep the bit values identical but change how these bits are interpreted.When an operation is performed where one operand is signed and the other is unsigned, C implicitly casts the signed argument to unsigned and performs the operations assuming the numbers are nonnegative. When converting from short to unsigned, the program first changes the size and then the type.
 
-> _**Note**_: Be aware of casting between signed and unsigned, it may cause unintentional behaviour.
+> _**Note**_: Be aware of casting between signed and unsigned, it may cause unintentional behaviour. In c, if you compare unsigned value with signed, c will explicit convert signed value into unsigned value which will leads to surprise result!
+
+Conversions between Signed and Unsigned can be split into two parts, if we convert signed to unsigned, we call signed as *from* and unsigned as *to*:
+
+1. If *from* is positive, then *to* is same value
+2. if *from* is negative, then
+   1. if *from* is *signed*, then add $2^w$ to *from* where* $2^w$ is the highest bit of current representation. eg. if it's 4 bit representation,  $2^4$ = 16 as showing below
+   2. if *from* is *unsigned*, then subtract $2^w$ to *from*
+
+![image-20210302114758181](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302114758181.png)
+
+
+
+#### Sign Extension
+
+Given w-bit signed integer x, convert it to (w+k)-bit integer with same value:
+
+Make k copies of sign bit for the left padding.
+
+![image-20210302120730732](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302120730732.png)
+
+Examples are showing below:
+
+Often see value like `ffff 0123`, it represents negative number. 
+
+![image-20210302120925778](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302120925778.png)
+
+#### Truncation
+
+Given k+w-bit signed or unsigned integer X, convert it to w-bit integer X’ with same value for “small enough” X:
+
+Drop top k bits, it results to $x_{w–1} , x_{w–2},\dots, x_0$
+
+![image-20210302121839055](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302121839055.png)
 
 ### Integer Arithmetic
 
-An arithmetic operation is said to *overflow* when the full integer result cannot fit within the word size limits of the data type.
+An arithmetic operation is said to *overflow* when the full integer result cannot fit within the word size limits of the data type. 
 
-#### Unsigned Negation
+#### Addition
 
-When x = 0, the additive inverse is clearly 0. For x > 0, consider the value $2^w − x$.
+##### Unsigned Addition
 
-#### Detecting Overflow For unsigned
+If there is an *overflow*, simply ignore the carry bit, it is some form of **modular arithmetic** where $s = (u + v) \ mod \ 2^{w}$
+
+![image-20210302123701730](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302123701730.png)
+
+##### Two’s Complement Addition
+
+If there is an *overflow*, same as unsigned addition, simply ignore the carry bit.
+
+![image-20210302124204494](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302124204494.png)
+
+#### Detecting Overflow
+
+##### Detecting Overflow For unsigned
 
 For x and y in the range $0≤x,y≤Max_w$,let $s= x+y$.Then the computation of s overflowed if and only if s < x (or equivalently, s < y).
 
@@ -542,35 +594,53 @@ For x and y in the range $0≤x,y≤Max_w$,let $s= x+y$.Then the computation of 
 
 For x and y in the range $Min_w ≤ x,y≤ Max_w$,let $s= x+y$. Then the computation of s has had positive overflow if and only if x > 0 and y > 0 but s ≤ 0. The computation has had negative overflow if and only if x < 0 and y < 0 but s ≥ 0.
 
-#### Two’s-Complement Negation
+#### Negation
+
+##### Unsigned Negation
+
+When x = 0, the additive inverse is clearly 0. For x > 0, consider the value $2^w − x$.
+
+##### Two’s-Complement Negation
 
 For w-bit two’s-complement addition, $TMin_w$ is its own additive inverse, while any other value x has −x as its additive inverse.
 
 Getting  two’s-complement negation:
 
-- In C, we can state that for any integer value x, computing the expressions x and ~x + 1 will give identical results.
-- A second way to perform two’s-complement negation of a number x is based on splitting the bit vector into two parts. Let k be the position of the rightmost 1, and complement each bit to the left of bit position k.
+- x and -x = ~x + 1
 
-#### Unsigned Multiplication
+- splitting the bit vector of x into two parts. Let k be the position of the rightmost 1, so the bit-level representation of x has the form $[x_{w−1}, x_{w−2}, . . . , x_{k+1}, 1, 0, . . . 0]$. The negation is then written in binary form as $[\sim x_{w−1}, \sim x_{w−2}, . . . \sim  x_{k+1}, 1, 0, . . . , 0]$. That is, we complement each bit to the left of bit position k. We illustrate this idea with some 4-bit numbers, where we highlight the rightmost pattern 1, 0, . . . , 0 in italics:
+
+  | x    |      |      | -x   |      |
+  | ---- | ---- | ---- | ---- | ---- |
+  | 1100 | -4   |      | 0100 | 4    |
+  | 1000 | -8   |      | 1000 | -8   |
+  | 0101 | 5    |      | 1011 | -5   |
+  | 0111 | 7    |      | 1001 | -7   |
+
+#### Multiplication
+
+##### Unsigned Multiplication
 
 For x and y such that $0 ≤ x, y ≤ UMax_w$, let s be the multiplication result of two unsigned number, then
 $$
 s=(x\ y)\ mod\ 2^w
 $$
 
-#### Two’s-Complement Multiplication
+##### Two’s-Complement Multiplication
 
 Instead, signed multi-plication in C generally is performed by truncating the 2w bit product to w bits. Truncating a two’s-complement number to w bits is equivalent to first computing its value modulo $2^w$ and then converting from unsigned to two’s complement, giving the following
 
 ![image-20210222221944054](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210222221944054.png)
 
-#### Multiplying by Constants
+##### Multiplying by Constants
 
 The integer multiply instruction on many machines was fairly slow, it requires clock cycles than addition, subtraction, bit-level operations, and shifting—required only 1 clock cycle. As a consequence, one important optimization used by compilers is to attempt to replace multiplications by constant factors with combinations of shift and addition operations. 
 
 Given that integer multiplication is more costly than shifting and adding, many C compilers try to remove many cases where an integer is being multiplied by a constant with combinations of shifting, adding, and subtracting. For example, suppose a program contains the expression $x*14$. Recognizing that $14 = 2^3 + 2^2 + 2^1$, the compiler can rewrite the multiplication as (x<<3) + (x<<2) + (x<<1), replacing one multiplication with three shifts and two additions. The two computations will yield the same result, regardless of whether x is unsigned or two’s complement, and even if the multiplication would cause an overflow. Even better, the compiler can also use the property $14 = 2^4 − 2^1$ to rewrite the multiplication as (x<<4) - (x<<1), requiring only two shifts and a subtraction.
 
-#### Dividing by Powers of 2
+#### Division
+
+##### Dividing by Powers of 2
 
 Integer division on most machines is even slower than integer multiplication— requiring 30 or more clock cycles.
 
@@ -586,154 +656,148 @@ Let C variables x and k have two’s-complement value x and unsigned value k, re
 
 ### Floating Point
 
-A floating-point number (or real number) can represent a very large (`1.23×10^88`) or a very small (`1.23×10^-88`) value. It could also represent very large negative number (`-1.23×10^88`) and very small negative number (`-1.23×10^88`), as well as zero, as illustrated:
+![image-20210302142950164](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302142950164.png)
 
-![image-20210223104701495](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210223104701495.png)
+Numbers of form 0.111111...2 are just below 1.0
 
-A floating-point number is typically expressed in the scientific notation, with a *fraction* (`F`), and an *exponent* (`E`) of a certain *radix* (`r`), in the form of `F×r^E`. Decimal numbers use radix of 10 (`F×10^E`); while binary numbers use radix of 2 (`F×2^E`).
+- 1/2 + 1/4 + 1/8 + ... + 1/2i + ... ➙ 1.0 = 1.0 – ε
 
-Representation of floating point number is not unique. For example, the number `55.66` can be represented as `5.566×10^1`, `0.5566×10^2`, `0.05566×10^3`, and so on. The fractional part can be *normalized*. In the normalized form, there is only a single non-zero digit before the radix point. For example, decimal number `123.4567` can be normalized as `1.234567×10^2`; binary number `1010.1011B` can be normalized as `1.0101011B×2^3`.
+#### Floating Point Representation
 
-It is important to note that floating-point numbers suffer from *loss of precision* when represented with a fixed number of bits (e.g., 32-bit or 64-bit). This is because there are *infinite* number of real numbers (even within a small range of says 0.0 to 0.1). On the other hand, a *n*-bit binary pattern can represent a *finite* `2^n` distinct numbers. Hence, not all the real numbers can be represented. The nearest approximation will be used instead, resulted in loss of accuracy.
+![image-20210302143235749](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302143235749.png)
 
-It is also important to note that floating number arithmetic is very much less efficient than integer arithmetic. It could be speed up with a so-called dedicated *floating-point co-processor*. Hence, use integers if your application does not require floating-point numbers.
+**Numerical Form:** $(-1)^s \cdot M \cdot 2^E$
 
-In computers, floating-point numbers are represented in scientific notation of *fraction* (`F`) and *exponent* (`E`) with a *radix* of 2, in the form of `F×2^E`. Both `E` and `F` can be positive as well as negative. Modern computers adopt IEEE 754 standard for representing floating-point numbers. There are two representation schemes: 32-bit single-precision and 64-bit double-precision.
+- Sign bit **s** determines whether number is negative or positive 
+- Significand **M** normally a fractional value in range [1.0,2.0)
+- Exponent **E** weights value by power of two
 
-#### IEEE-754 32-bit Single-Precision Floating-Point Numbers
+**Encoding** 
 
-In 32-bit single-precision floating-point representation:
+- MSB s is sign bit **s**
+- **exp** field encodes **E** (but is not equal to E)
+- **frac** field encodes **M** (but is not equal to M)
 
-- The most significant bit is the *sign bit* (`S`), with 0 for positive numbers and 1 for negative numbers.
-- The following 8 bits represent *exponent* (`E`).
-- The remaining 23 bits represents *fraction* (`F`).
+![image-20210302144004850](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302144004850.png)
 
-![image-20210223105435909](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210223105435909.png)
+**Precision options**
+
+![image-20210302143942252](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302143942252.png)
+
+#### Three “kinds” of floating point numbers
+
+Floating number can be categorised into three different kinds with different exp values:
+
+![image-20210302144506290](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302144506290.png)
 
 ##### Normalized Form
 
-Let's illustrate with an example, suppose that the 32-bit pattern is `1 1000 0001 011 0000 0000 0000 0000 0000`, with:
+A floating number is in normalized form when the *exp* is in between 0 and 11..11(no included).
 
-- `S = 1`
-- `E = 1000 0001`
-- `F = 011 0000 0000 0000 0000 0000`
+**Exponent E coded as a biased value:**  E = exp – Bias
 
-In the *normalized form*, the actual fraction is normalized with an implicit leading 1 in the form of `1.F`. In this example, the actual fraction is `1.011 0000 0000 0000 0000 0000 = 1 + 1×2^-2 + 1×2^-3 = 1.375D`.
+- *exp*: unsigned value of exp field
+- *Bias* = $2^{k-1} - 1$, where *k* is number of exponent bits
+  - Single precision: $2^{8-1} - 1= 127$ (**exp**: 1...254, E: -126...127)
+  - Double precision: $2^{11-1} - 1= 1023$ (**exp**: 1...2046, E: -1022…1023)
 
-The sign bit represents the sign of the number, with `S=0` for positive and `S=1` for negative number. In this example with `S=1`, this is a negative number, i.e., `-1.375D`.
+**Significand M coded with implied leading 1:** M = 1.xxx...x2
 
-In normalized form, the actual exponent is `E-127` (so-called excess-127 or bias-127). This is because we need to represent both positive and negative exponent. With an 8-bit E, ranging from 0 to 255, the excess-127 scheme could provide actual exponent of -127 to 128. In this example, `E-127=129-127=2D`.
+- xxx...x: bits of frac field
+- Minimum when **frac**=000...0 (M = 1.0)
+- Maximum when **frac**=111...1 (M = 2.0 – ε)
 
-Hence, the number represented is `-1.375×2^2=-5.5D`.
+**Example**
 
-**Example 1:** Suppose that IEEE-754 32-bit floating-point representation pattern is `0 10000000 110 0000 0000 0000 0000 0000`.
+![image-20210302145746625](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302145746625.png)
 
-```
-Sign bit S = 0 ⇒ positive number
-E = 1000 0000B = 128D (in normalized form)
-Fraction is 1.11B (with an implicit leading 1) = 1 + 1×2^-1 + 1×2^-2 = 1.75D
-The number is +1.75 × 2^(128-127) = +3.5D
-```
+##### Denormalized Form
 
-**Example 2:** Suppose that IEEE-754 32-bit floating-point representation pattern is `1 01111110 100 0000 0000 0000 0000 0000`.
+Normalized form has a serious problem, with an implicit leading 1 for the fraction, it cannot represent the number zero.  A floating number is in denormalized form when the *exp* = 000…0
 
-```
-Sign bit S = 1 ⇒ negative number
-E = 0111 1110B = 126D (in normalized form)
-Fraction is 1.1B  (with an implicit leading 1) = 1 + 2^-1 = 1.5D
-The number is -1.5 × 2^(126-127) = -0.75D
-```
+**Exponent E coded as a biased value:**  E = 1 – Bias
 
-##### De-Normalized Form
+**Significand M coded with implied leading 0:** M = 0.xxx...x2
 
-Normalized form has a serious problem, with an implicit leading 1 for the fraction, it cannot represent the number zero! Convince yourself on this!
+- xxx...x: bits of frac field
 
-De-normalized form was devised to represent zero and other numbers.
+##### Special Values
 
-For `E=0`, the numbers are in the de-normalized form. An implicit leading 0 (instead of 1) is used for the fraction; and the actual exponent is always `-126`. Hence, the number zero can be represented with `E=0` and `F=0` (because `0.0×2^-126=0`).
+When exp = 111…1
 
-We can also represent very small positive and negative numbers in de-normalized form with `E=0`. For example, if `S=1`, `E=0`, and `F=011 0000 0000 0000 0000 0000`. The actual fraction is `0.011=1×2^-2+1×2^-3=0.375D`. Since `S=1`, it is a negative number. With `E=0`, the actual exponent is `-126`. Hence the number is `-0.375×2^-126 = -4.4×10^-39`, which is an extremely small negative number (close to zero).
+1. frac = 000…0, Represents value $\infty$ (infinity)
+2. frac != 000…0, Represents Not-a-Number (NaN)
 
-**Example of De-Normalized Form:** Suppose that IEEE-754 32-bit floating-point representation pattern is `1 00000000 000 0000 0000 0000 0000 0001`.
+See Figure 2.33 for the summary of single-precision format: ![image-20210222232305568](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210222232305568.png)
 
-```
-Sign bit S = 1 ⇒ negative number
-E = 0 (in de-normalized form)
-Fraction is 0.000 0000 0000 0000 0000 0001B  (with an implicit leading 0) = 1×2^-23
-The number is -2^-23 × 2^(-126) = -2×(-149) ≈ -1.4×10^-45
-```
+A overall range for floating number is showing below:
 
-##### Summary
+![image-20210302151729900](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302151729900.png)
 
-In summary, the value (`N`) is calculated as follows:
+#### Rounding
 
-- For `1 ≤ E ≤ 254, N = (-1)^S × 1.F × 2^(E-127)`. These numbers are in the so-called *normalized* form. The sign-bit represents the sign of the number. Fractional part (`1.F`) are normalized with an implicit leading 1. The exponent is bias (or in excess) of `127`, so as to represent both positive and negative exponent. The range of exponent is `-126` to `+127`.
-- For `E = 0, N = (-1)^S × 0.F × 2^(-126)`. These numbers are in the so-called *denormalized* form. The exponent of `2^-126` evaluates to a very small number. Denormalized form is needed to represent zero (with `F=0` and `E=0`). It can also represents very small positive and negative number close to zero.
-- For `E = 255`, it represents special values, such as `±INF` (positive and negative infinity) and `NaN` (not a number).
+There are four ways to do a rounding:
 
-#### IEEE-754 64-bit Double-Precision Floating-Point Numbers
+![image-20210302152637523](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302152637523.png)
 
-The representation scheme for 64-bit double-precision is similar to the 32-bit single-precision:
+**Nearest Even Around Rules**:
 
-- The most significant bit is the *sign bit* (`S`), with 0 for positive numbers and 1 for negative numbers.
-- The following 11 bits represent *exponent* (`E`).
-- The remaining 52 bits represents *fraction* (`F`).
+1. if it's more than half, around up
+2. if it's less than half, around down
+3. if it's half, around to nearest even
+   1. value at specify precision is odd, around up(since it's odd, we can't truncate)
+   2. value at specify precision is even, around up (since it's even, we can truncate)
 
-![image-20210223111335881](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210223111335881.png)
+**Example of decimal number**
 
-The value (`N`) is calculated as follows:
+![image-20210302154012432](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302154012432.png)
 
-- Normalized form: For `1 ≤ E ≤ 2046, N = (-1)^S × 1.F × 2^(E-1023)`.
-- Denormalized form: For `E = 0, N = (-1)^S × 0.F × 2^(-1022)`. These are in the denormalized form.
-- For `E = 2047`, `N` represents special values, such as `±INF` (infinity), `NaN` (not a number).
+**Example of binary number**
 
-#### More on Floating-Point Representation
+![image-20210302154142807](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302154142807.png)
 
-There are three parts in the floating-point representation:
+#### Floating Number Multiplication
 
-- The *sign bit* (`S`) is self-explanatory (0 for positive numbers and 1 for negative numbers).
-- For the *exponent* (`E`), a so-called *bias* (or *excess*) is applied so as to represent both positive and negative exponent. The bias is set at half of the range. For single precision with an 8-bit exponent, the bias is 127 (or excess-127). For double precision with a 11-bit exponent, the bias is 1023 (or excess-1023).
-- The *fraction* (`F`) (also called the *mantissa* or *significand*) is composed of an implicit leading bit (before the radix point) and the fractional bits (after the radix point). The leading bit for normalized numbers is 1; while the leading bit for denormalized numbers is 0.
+Consider $(–1)^{s_1}\cdot M_1\cdot 2^{E_1}\times (–1)^{s_2}\cdot M_2\cdot 2^{E_2}= (–1)^s\cdot M\cdot 2^E$
 
-##### Normalized Floating-Point Numbers
+A result $(–1)^s\cdot M\cdot 2^E$ consists:
 
-In normalized form, the radix point is placed after the first non-zero digit, e,g., `9.8765D×10^-23D`, `1.001011B×2^11B`. For binary number, the leading bit is always 1, and need not be represented explicitly - this saves 1 bit of storage.
+- Sign s = s1 ^ s2
+- Significand M = M1 x M2
+- Exponent E = E1 + E2
 
-In IEEE 754's normalized form:
+There are some problems we need to fix:
 
-- For single-precision, `1 ≤ E ≤ 254` with excess of 127. Hence, the actual exponent is from `-126` to `+127`. Negative exponents are used to represent small numbers (< 1.0); while positive exponents are used to represent large numbers (> 1.0).
-    `N = (-1)^S × 1.F × 2^(E-127)`
-- For double-precision, `1 ≤ E ≤ 2046` with excess of 1023. The actual exponent is from `-1022` to `+1023`, and
-    `N = (-1)^S × 1.F × 2^(E-1023)`
+1. If *M* ≥ 2, shift *M* right, increment *E*
+2. If *E* out of range, overflow
+3. Round *M* to fit **frac** precision
 
-The *minimum* and *maximum* normalized floating-point numbers are:
+**Example with 4 bit significand**
 
-| Precision |                      Normalized N(min)                       |                      Normalized N(max)                       |
-| :-------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
-|  Single   | 0080 0000H 0 00000001 00000000000000000000000B E = 1, F = 0 N(min) = 1.0B × 2^-126 (≈1.17549435 × 10^-38) | 7F7F FFFFH 0 11111110 00000000000000000000000B E = 254, F = 0 N(max) = 1.1...1B × 2^127 = (2 - 2^-23) × 2^127 (≈3.4028235 × 10^38) |
-|  Double   | 0010 0000 0000 0000H N(min) = 1.0B × 2^-1022 (≈2.2250738585072014 × 10^-308) | 7FEF FFFF FFFF FFFFH N(max) = 1.1...1B × 2^1023 = (2 - 2^-52) × 2^1023 (≈1.7976931348623157 × 10^308) |
+![image-20210302155535826](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302155535826.png)
 
-![image-20210223111926250](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210223111926250.png)
+#### Floating Point Addition
 
-##### Denormalized Floating-Point Numbers
+Consider $(–1)^{s_1}\cdot M_1\cdot 2^{E_1}+ (–1)^{s_2}\cdot M_2\cdot 2^{E_2}= (–1)^s\cdot M\cdot 2^E$ where $E_1 > E_2$.
 
-If `E = 0`, but the fraction is non-zero, then the value is in denormalized form, and a leading bit of 0 is assumed, as follows:
+A result $(–1)^s\cdot M\cdot 2^E$ consists:
 
-- For single-precision, `E = 0`,
-    `N = (-1)^S × 0.F × 2^(-126)`
-- For double-precision, `E = 0`,
-    `N = (-1)^S × 0.F × 2^(-1022)`
+- Sign *s*, significand *M*:
+  - Result of signed align & add
+- Exponent $E = E_1$
 
-Denormalized form can represent very small numbers closed to zero, and zero, which cannot be represented in normalized form, as shown in the above figure.
+![image-20210302160333954](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302160333954.png)
 
-The minimum and maximum of *denormalized floating-point numbers* are:
+There are some problems we need to fix:
 
-| Precision |                     Denormalized D(min)                      |                     Denormalized D(max)                      |
-| :-------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
-|  Single   | 0000 0001H 0 00000000 00000000000000000000001B E = 0, F = 00000000000000000000001B D(min) = 0.0...1 × 2^-126 = 1 × 2^-23 × 2^-126 = 2^-149 (≈1.4 × 10^-45) | 007F FFFFH 0 00000000 11111111111111111111111B E = 0, F = 11111111111111111111111B D(max) = 0.1...1 × 2^-126 = (1-2^-23)×2^-126 (≈1.1754942 × 10^-38) |
-|  Double   | 0000 0000 0000 0001H D(min) = 0.0...1 × 2^-1022 = 1 × 2^-52 × 2^-1022 = 2^-1074 (≈4.9 × 10^-324) | 001F FFFF FFFF FFFFH D(max) = 0.1...1 × 2^-1022 = (1-2^-52)×2^-1022 (≈4.4501477170144023 × 10^-308) |
+1. If *M* ≥ 2, shift *M* right, increment *E*
+2. if *M* < 1, shift *M* left *k* positions, decrement *E* by *k*
+3. Overflow if *E* out of range
+4. Round *M* to fit **frac** precision
 
-The value encoded by a given bit representation can be divided into three different cases (the latter having two variants), depending on the value of exp. These are illustrated in Figure 2.33 for the single-precision format: ![image-20210222232305568](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210222232305568.png)
+**Example**
+
+![image-20210302155957944](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210302155957944.png)
 
 ### Character Encoding
 
@@ -954,3 +1018,44 @@ objdump -d mstore.o
 ```
 
 ![image-20210228214618770](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210228214618770.png)
+
+The disassembler determines the assembly code based purely on the byte sequences in the machine-code file. 
+
+#### Data Formats
+
+Due to its origins as a 16-bit architecture that expanded into a 32-bit one, Intel uses the term “word” to refer to a 16-bit data type. Based on this, they refer to 32- bit quantities as “double words,” and 64-bit quantities as “quad words.”
+
+Figure 3.1 shows the x86-64 representations used for the primitive data types of C. 
+
+![image-20210301160156391](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210301160156391.png)
+
+#### Accessing Information
+
+An x86-64 central processing unit (CPU) contains a set of 16 *general-purpose registers* storing 64-bit values. These registers are used to store integer data as well as pointers. Figure 3.2 diagrams the 16 registers.![image-20210301160742737](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210301160742737.png)
+
+As the nested boxes in Figure 3.2 indicate, instructions can operate on data of different sizes stored in the low-order bytes of the 16 registers. Byte-level operations can access the least significant byte, 16-bit operations can access the least significant 2 bytes, 32-bit operations can access the least significant 4 bytes, and 64-bit operations can access entire registers.
+
+As the annotations along the right-hand side of Figure 3.2 indicate, different registers serve different roles in typical programs. Most unique among them is the stack pointer, %rsp, used to indicate the end position in the run-time stack. Some instructions specifically read and write this register. 
+
+##### Operand Specifiers
+
+![image-20210301161806607](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210301161806607.png)
+
+The different operand possibilities can be classified into three types. 
+
+1. The first type, *immediate*, is for constant values. In ATT-format assembly code, these are written with a ‘\$’ followed by an integer using standard C notation—for example, \$-577 or \$0x1F. Different instructions allow different ranges of immediate values; the assembler will automatically select the most compact way of encoding a value. 
+2. The second type, *register*, denotes the contents of a register, one of the sixteen 8-, 4-, 2-, or 1-byte low-order portions of the registers for operands having 64, 32, 16, or 8 bits, respectively. In Figure 3.3, we use the notation $r_a$ to denote an arbitrary register $a$ and indicate its value with the reference $R[r_a]$, viewing the set of registers as an array R indexed by register identifiers.
+3. The third type of operand is a *memory* reference, in which we access some memory location according to a computed address, often called the *effective address*. Since we view the memory as a large array of bytes, we use the notation Mb[*Addr*] to denote a reference to the b-byte value stored in memory starting at address *Addr*. To simplify things, we will generally drop the subscript b.
+
+As Figure 3.3 shows, there are many different *addressing modes* allowing different forms of memory references. The most general form is shown at the bottom of the table with syntax *Imm*($r_b$,$r_i$,s). Such a reference has four components: 
+
+1. an immediate offset *Imm*
+2. a base register $r_b$
+3. an index register $r_i$ 
+4. a scale factor s, where s must be 1, 2, 4, or 8.
+
+Both the base and index must be 64-bit registers. The effective address is computed as $Imm + R[r_b] + R[r_i] \times s$. This general form is often seen when referencing elements of arrays. The other forms are simply special cases of this general form where some of the components are omitted. 
+
+[TODO]
+
+## 
