@@ -52,11 +52,11 @@ To understand what happens to our hello program when we run it, we need to under
 
 ![image-20210209090910865](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210209090910865.png)
 
-Buses
+**Buses**
 
 Running throughout the system is a collection of electrical conduits called *buses* that carry bytes of information back and forth between the components. Buses are typically designed to transfer fixed-size chunks of bytes known as *words*. The number of bytes in a word (the *word size*) is a fundamental system parameter that varies across systems. Most machines today have word sizes of either 4 bytes (32 bits) or 8 bytes (64 bits).
 
-I/O Devices
+**I/O Devices**
 
 Input/output (I/O) devices are the system’s connection to the external world. Our example system has four I/O devices: a keyboard and mouse for user input, a display for user output, and a disk drive (or simply disk) for long-term storage of data and programs. Initially, the executable hello program resides on the disk.
 
@@ -67,11 +67,11 @@ Each I/O device is connected to the I/O bus by either a *controller* or an *adap
 
 Regardless, the purpose of each is to transfer information back and forth between the I/O bus and an I/O device.
 
-Main Memory
+**Main Memory**
 
 The *main memory* is a temporary storage device that holds both a program and the data it manipulates while the processor is executing the program. Physically, main memory consists of a collection of *dynamic random access memory* (DRAM) chips. Logically, memory is organized as a linear array of bytes, each with its own unique address (array index) starting at zero. In general, each of the machine instructions that constitute a program can consist of a variable number of bytes. The sizes of data items that correspond to C program variables vary according to type. For example, on an x86-64 machine running Linux, data of type short require 2 bytes, types int and float 4 bytes, and types long and double 8 bytes.
 
-Processor
+**Processor**
 
 The *central processing unit* (CPU), or simply *processor*, is the engine that interprets (or *executes*) instructions stored in main memory. At its core is a word-size storage device (or *register*) called the *program counter* (PC). At any point in time, the PC points at (contains the address of) some machine-language instruction in main memory.
 
@@ -204,7 +204,9 @@ We use the term **concurrency** to refer to the general concept of a system with
 
 Building on the process abstraction, we are able to devise systems where multiple programs execute at the same time, leading to *concurrency*. With threads, we can even have multiple control flows executing within a single process. Traditionally, this concurrent execution was only *simulated*, by having a single computer rapidly switch among its executing processes, much as a juggler keeps multiple balls flying through the air. Until recently, most actual computing was done by a single processor, even if that processor had to switch among multiple tasks. This configuration is known as a *uniprocessor system.*
 
-When we construct a system consisting of multiple processors all under the control of a single operating system kernel, we have a *multiprocessor system*. Such systems have been available for large-scale computing since the 1980s, but they have more recently become commonplace with the advent of *multi-core* processors and *hyperthreading*. Figure 1.16 shows a taxonomy of these different processor types.![image-20210209120421948](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210209120421948.png)
+When we construct a system consisting of multiple processors all under the control of a single operating system kernel, we have a *multiprocessor system*. Such systems have been available for large-scale computing since the 1980s, but they have more recently become commonplace with the advent of *multi-core* processors and *hyperthreading*. Figure 1.16 shows a taxonomy of these different processor types.
+
+![image-20210209120421948](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210209120421948.png)
 
 Multi-core processors have several CPUs (referred to as “cores”) integrated onto a single integrated-circuit chip. Figure 1.17 illustrates the organization of a typical multi-core processor, where the chip has four CPU cores, each with its own L1 and L2 caches, and with each L1 cache split into two parts—one to hold recently fetched instructions and one to hold data. The cores share higher levels of cache as well as the interface to main memory. Industry experts predict that they will be able to have dozens, and ultimately hundreds, of cores on a single chip.
 
@@ -216,7 +218,7 @@ The use of multiprocessing can improve system performance in two ways. First, it
 
 ##### Instruction-Level Parallelism
 
-At a much lower level of abstraction, modern processors can execute multiple instructions at one time, a property known as *instruction-level parallelism*. For example, early microprocessors, such as the 1978-vintage Intel 8086, required multiple (typically 3–10) clock cycles to execute a single instruction. More recent processors can sustain execution rates of 2–4 instructions per clock cycle. Any given instruction requires much longer from start to finish, perhaps 20 cycles or more, but the processor uses a number of clever tricks to process as many as 100 instructions at a time. In Chapter 4, we will explore the use of *pipelining*, where the actions required to execute an instruction are partitioned into different steps and the processor hardware is organized as a series of stages, each performing one of these steps. The stages can operate in parallel, working on different parts of different instructions. We will see that a fairly simple hardware design can sustain an execution rate close to 1 instruction per clock cycle.
+At a much lower level of abstraction, modern processors can execute multiple instructions at one time, a property known as *instruction-level parallelism*. More recent processors can sustain execution rates of 2–4 instructions per clock cycle. Any given instruction requires much longer from start to finish, perhaps 20 cycles or more, but the processor uses a number of clever tricks to process as many as 100 instructions at a time. *Pipelining*, where the actions required to execute an instruction are partitioned into different steps and the processor hardware is organized as a series of stages, each performing one of these steps. The stages can operate in parallel, working on different parts of different instructions. We will see that a fairly simple hardware design can sustain an execution rate close to 1 instruction per clock cycle.
 
 Processors that can sustain execution rates faster than 1 instruction per cycle are known as *superscalar* processors. Most modern processors support superscalar operation. In Chapter 5, we will describe a high-level model of such processors. We will see that application programmers can use this model to understand the performance of their programs. They can then write programs such that the generated code achieves higher degrees of instruction-level parallelism and therefore runs faster.
 
@@ -957,69 +959,64 @@ UTF-8 file is always stored as big endian. BOM plays no part. However, in some s
 
 ## Machine-Level Representation of Programs
 
-Computers execute *machine code*, sequences of bytes encoding the low-level operations that manipulate data, manage memory, read and write data on storage devices, and communicate over networks. A compiler generates machine code through a series of stages; based on the rules of the programming language, the instruction set of the target machine, and the conventions followed by the operating system. 
+There are mainly two types of instruction set computer:
 
-The gcc C compiler generates its output in the form of *assembly code* which is a textual representation of the machine code giving the individual instructions in the program. Gcc then invokes both an *assembler* and a *linker* to generate the executable machine code from the assembly code.
+1. Complex instruction set computer
+2. Reduced Instruction set computer
 
-Most of the time, it is much more productive and reliable to work at the higher level of abstraction provided by a high-level language. The type checking provided by a compiler helps detect many program errors and makes sure we reference and manipulate data in consistent ways. With modern optimizing compilers, the generated code is usually at least as efficient as what a skilled assembly-language programmer would write by hand. Best of all, a program written in a high-level language can be compiled and executed on a number of different machines, whereas assembly code is highly machine specific.
+**Architecture**
 
-But being able to read and understand the machine code is an important skill for serious programmers. By invoking the compiler with appropriate command-line parameters, the compiler will generate a file showing its output in assembly-code form. By reading this code, we can understand the optimization capabilities of the compiler and analyze the underlying inefficiencies in the code. 
+Architecture also refers to *Instruction set architecture* is the parts of a processor design that one needs to understand or write assembly/machine code
 
-Programmers seeking to maximize the performance of a critical section of code often try different variations of the source code, each time compiling and examining the generated assembly code to get a sense of how efficiently the program will run. 
+- Examples: Instruction set specification, registers
 
-There are times when the layer of abstraction provided by a high-level language hides information about the run-time behavior of a program that we need to understand. Such information is visible at the machine-code level. 
+**Microarchitecture**
 
-Many attacks involve exploiting weaknesses in system programs to overwrite information and thereby take control of the system. Understanding how these vulnerabilities arise and how to guard against them requires a knowledge of the machine-level representation of programs.
+Microarchitecture is the implementation(more low level) of the architecture.
 
-#### Program Encodings
+- Examples: cache size and core frequency
 
-##### Code Examples
+**Code Forms**
 
-Consider program:
+- **Machine Code**: The byte-level programs that a processor executes
+- **Assembly Code**: A text representation of machine code
 
-```c
-long mult2(long, long);
-void multstore(long x, long y, long *dest) {
-  long t = mult2(x, y);
-  *dest = t;
-}
-```
+### Assembly/Machine Code View
 
-It will only generate `mstore.s` when `-S` flag, the output looks like:
+![image-20210303100859723](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303100859723.png)
 
-```assembly
-multstore:
-pushq   %rbx
-movq    %rdx, %rbx
-call    mult2
-movq    %rax, (%rbx)
-popq    %rbx
-ret
-```
+#### Visible State for Programmer
 
-If we use the `-c` command-line option, gcc will both compile and assemble the code.
+**Program counter(PC)**: Address of next instruction
 
-```c
-gcc -Og -c mstore.c
-```
+**Registers**: Special "named" memory for store program data
 
-This will generate an object-code file *mstore.o* that is in binary format and hence cannot be viewed directly. Embedded within the 1,368 bytes of the file *mstore.o* is a 14-byte sequence with the hexadecimal representation
+**Condition codes**: 
 
-```assembly
-53 48 89 d3 e8 00 00 00 00 48 89 03 5b c3
-```
+- Store status information about most recent arithmetic or logical operation
+- Used for conditional branching
 
-A key lesson to learn from this is that the program executed by the machine is simply a sequence of bytes encoding a series of instructions. The machine has very little information about the source code from which these instructions were generated.
+**Memory**:
 
-To inspect the contents of machine-code files, a class of programs known as *disassemblers* can be invaluable. These programs generate a format similar to assembly code from the machine code. With Linux systems, the program objdump (for “object dump”) can serve this role given the *-d* command-line flag:
+- Byte addressable array
+- Store code and user data
+
+#### Assemble Code
+
+`-Og` : specify the optimisation level. in this case, this is debug level, `O` stand for optimazation
+
+`-S`: the complier will stop at assembly  code
 
 ```c
-objdump -d mstore.o
+gcc -Og -S hello.c 
 ```
 
-![image-20210228214618770](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210228214618770.png)
+#### Disassemble Code
 
-The disassembler determines the assembly code based purely on the byte sequences in the machine-code file. 
+There are two ways recommend:
+
+1. Use `objdump -d <binary_file_name>`
+2. Use *gdb*, `gdb <binary_file_name>`
 
 #### Data Formats
 
@@ -1029,23 +1026,33 @@ Figure 3.1 shows the x86-64 representations used for the primitive data types of
 
 ![image-20210301160156391](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210301160156391.png)
 
+As the table of Figure 3.1 indicates, most assembly-code instructions generated by gcc have a single-character suffix denoting the size of the operand. For example, the data movement instruction has four variants: `movb` (move byte), `movw` (move word), `movl` (move double word), and `movq` (move quad word).
+
 #### Accessing Information
 
 An x86-64 central processing unit (CPU) contains a set of 16 *general-purpose registers* storing 64-bit values. These registers are used to store integer data as well as pointers. Figure 3.2 diagrams the 16 registers.![image-20210301160742737](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210301160742737.png)
 
-As the nested boxes in Figure 3.2 indicate, instructions can operate on data of different sizes stored in the low-order bytes of the 16 registers. Byte-level operations can access the least significant byte, 16-bit operations can access the least significant 2 bytes, 32-bit operations can access the least significant 4 bytes, and 64-bit operations can access entire registers.
+As the nested boxes in Figure 3.2 indicate, instructions can operate on data of different sizes stored in the low-order bytes of the 16 registers. Byte-level operations can access the least significant byte, 16-bit operations can access the least significant 2 bytes, 32-bit operations can access the least significant 4 bytes, and 64-bit operations can access entire registers. For example, if you are using `%al` register, it means you will only overwrite first 8-bit for register `%rax`.
 
-As the annotations along the right-hand side of Figure 3.2 indicate, different registers serve different roles in typical programs. Most unique among them is the stack pointer, %rsp, used to indicate the end position in the run-time stack. Some instructions specifically read and write this register. 
+As the annotations along the right-hand side of Figure 3.2 indicate, different registers serve different roles in typical programs. Most unique among them is the stack pointer, `%rsp`, used to indicate the end position in the run-time stack. Some instructions specifically read and write this register. 
 
-##### Operand Specifiers
-
-![image-20210301161806607](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210301161806607.png)
+##### Operand Types For Instructions
 
 The different operand possibilities can be classified into three types. 
 
-1. The first type, *immediate*, is for constant values. In ATT-format assembly code, these are written with a ‘\$’ followed by an integer using standard C notation—for example, \$-577 or \$0x1F. Different instructions allow different ranges of immediate values; the assembler will automatically select the most compact way of encoding a value. 
-2. The second type, *register*, denotes the contents of a register, one of the sixteen 8-, 4-, 2-, or 1-byte low-order portions of the registers for operands having 64, 32, 16, or 8 bits, respectively. In Figure 3.3, we use the notation $r_a$ to denote an arbitrary register $a$ and indicate its value with the reference $R[r_a]$, viewing the set of registers as an array R indexed by register identifiers.
-3. The third type of operand is a *memory* reference, in which we access some memory location according to a computed address, often called the *effective address*. Since we view the memory as a large array of bytes, we use the notation Mb[*Addr*] to denote a reference to the b-byte value stored in memory starting at address *Addr*. To simplify things, we will generally drop the subscript b.
+1. *immediate*, is for constant values.
+   - example, \$-577 or \$0x1F 
+   - Prefix with `$`
+   - Encode with 1, 2 or 4 bytes
+2.  *register*, One of 16 integer registers
+   - Example: **%rax**, **%r13**
+   - **%rsp** reserved for special use(stack pointer)
+   - Others have special uses for particular instructions
+3. *memory* reference, 8 consecutive bytes of memory at address given by register 
+   - Simplest example: `(%rax)`, use `%rax` value as address of the memory location
+   - `8(%rax)` offset 8 to current value of `%rax`
+
+![image-20210301161806607](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210301161806607.png)
 
 As Figure 3.3 shows, there are many different *addressing modes* allowing different forms of memory references. The most general form is shown at the bottom of the table with syntax *Imm*($r_b$,$r_i$,s). Such a reference has four components: 
 
@@ -1056,6 +1063,248 @@ As Figure 3.3 shows, there are many different *addressing modes* allowing differ
 
 Both the base and index must be 64-bit registers. The effective address is computed as $Imm + R[r_b] + R[r_i] \times s$. This general form is often seen when referencing elements of arrays. The other forms are simply special cases of this general form where some of the components are omitted. 
 
-[TODO]
+**Example**
 
-## 
+![image-20210303131235666](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303131235666.png)
+
+##### Data Movement Instructions
+
+Figure 3.4 lists the simplest form of data movement instructions—mov class. The class consists of four instructions: `movb`, `movw`, `movl`, and `movq`. 
+
+![image-20210303145925225](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303145925225.png)
+
+**Example**
+
+`movq Source, Dest` move source to destination, `q` here specify the word size, which is quad word in this case.
+
+- `Source`:is *immediate*, stored in a *register*, or stored in *memory*. 
+- `Dest`: designates a location that is either a register or a memory address.
+
+> _Note:_ Cannot do memory to memory transfer with a single instruction, you need to load the source value into a register, and the second to write this register value to the destination. 
+
+> _Note_: For most cases, the mov instructions will only update the specific register bytes or memory locations indicated by the destination operand. The only exception is that when `movl` has a register as the destination, it will also set the high-order 4 bytes of the register to 0.
+
+**Movq Operand Combinations**
+
+![image-20210303123528152](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303123528152.png)
+
+##### Data Movement Example
+
+Consider the data exchange routine shown in Figure 3.7, both as C code and as assembly code generated by gcc.
+
+![image-20210303152018396](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303152018396.png)
+
+##### Pushing and Popping Stack Data
+
+ The program stack plays a vital role in the handling of procedure calls. Recall that stack is *Last-in-First-Out*(LIFO) data structure.
+
+The `pushq` instruction provides the ability to push data onto the stack, while the `popq` instruction pops it. Each of these instructions takes a single operand—the data source for pushing and the data destination for popping.
+
+![image-20210303152547059](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303152547059.png)
+
+### Arithmetic and Logical Operations
+
+Figure 3.10 lists some of the x86-64 integer and logic operations. Most of the operations are given as instruction classes, as they can have different variants with different operand sizes. (Only leaq has no other size variants.) For example, add class has `addb`, `addw`, `addl`, and `addq`.
+
+![image-20210303153225079](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303153225079.png)
+
+The operations are divided into four groups: 
+
+1. load effective address
+   1. The *load effective address* instruction `leaq` is actually a variant of the `movq` instruction. It has the form of an instruction that reads from memory to a register, but it does not reference memory at all. (move address instead of content)
+2. unary
+   1. This operand can be either a *register* or a *memory location*. 
+   2. `incq (%rsp)` increase the value of `%rsp` by 8-byte
+   3. This syntax is reminiscent of the C increment (++) and decrement (--) operators.
+3. binary
+   1. This syntax is reminiscent of the C assignment operators, such as x -= y.
+   2. For example, the instruction subq %rax,%rdx decrements register` %rdx` by the value in `%rax`. 
+   3. The first operand can be either an *immediate* value, a *register*, or a *memory location*. The second can be either a *register* or a *memory location*. 
+4. shifts
+   1. the shift amount is given first and the value to shift is given second. 
+   2. the shift amount either as an *immediate* value or with the `single-byte register %cl`.
+
+*Binary* operations have two operands, while *unary* operations have one operand. 
+
+### Control
+
+#### Condition Codes
+
+In addition to the integer registers, the CPU maintains a set of single-bit *condition code* registers describing attributes of the most recent arithmetic or logical operation. They are:
+
+- **CF**: Carry flag. The most recent operation generated a carry out of the most significant bit. Used to detect overflow for unsigned operations.
+- **ZF**: Zero flag. The most recent operation yielded zero.
+- **SF**: Sign flag. The most recent operation yielded a negative value.
+- **OF**: Overflow flag. The most recent operation caused a two’s-complement overflow—either negative or positive.
+
+**Example**
+
+For example, suppose we used one of the add instructions to perform the equivalent of the C assignment t = a+b, where variables a, b, and t are integers. Then the condition codes would be set according to the following C expressions:
+
+CF	(unsigned) t < (unsigned) a				  	 Unsigned overflow 
+
+ZF	(t == 0) 															 Zero
+
+SF	(t < 0)															 	Negative
+
+OF	 (a < 0 == b < 0) && (t < 0 != a < 0)	  Signed overflow
+
+> _**Note**_: The `leaq` instruction does not alter any condition codes, since it is intended to be used in address computations. Otherwise, all of the instructions listed in Figure 3.10 cause the condition codes to be set. 
+
+#### Accessing the Condition Codes
+
+Rather than reading the condition codes directly, there are three common ways of using the condition codes: 
+
+1. we can set a single byte to 0 or 1 depending on some combination of the condition codes
+   - the instructions described in Figure 3.14 set a single byte to 0 or to 1 depending on some combination of the condition codes.
+2. we can conditionally jump to some other part of the program
+3. we can conditionally transfer data
+
+![image-20210303161651980](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303161651980.png)
+
+#### Jump Instructions
+
+![image-20210303200142742](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303200142742.png)
+
+Figure 3.15 shows the different jump instructions. The `jmp` instruction jumps unconditionally. The remaining jump instructions in the table are *conditional*. There are two type of `jmp`:
+
+1. a *direct* jump, where the jump target is encoded as part of the instruction
+   - Direct jumps are written in assembly code by giving a *label* as the jump target.
+2. an *indirect* jump, where the jump target is read from a register or a memory location.
+   - using `*` followed by an operand specifier using one of the memory operand formats described in Figure 3.3. 
+   - `jmp *%rax` uses the value in register `%rax` as the jump target
+   - `jmp *(%rax)`reads the jump target from memory using the value in `%rax` as the read address.
+
+#### Implementing Conditional Branches with Conditional Control
+
+The most general way to translate conditional expressions and statements from C into machine code is to use combinations of conditional and unconditional jumps.
+
+For example, Figure 3.16 shows three version of a function that computes the absolute value of the difference of two numbers.
+
+![image-20210303201632151](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303201632151.png)
+
+#### Implementing Conditional Branches with Conditional Moves
+
+The conditional control is simple and general, but it can be very inefficient on modern processors. An alternate strategy is through a conditional transfer of *data*. This approach computes both outcomes of a conditional operation and then selects one based on whether or not the condition holds.
+
+This strategy makes sense only if running all operations outweighs the branch misprediction penalty(find out what is branch mispreidction at later chapter).
+
+Figure 3.17 shows same example as of previous example but compiled using a conditional move. The function computes the absolute value of its arguments x and y, as did our earlier example (Figure 3.16). 
+
+![image-20210303211433818](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303211433818.png)
+
+This approach achieves high performance by overlapping the steps of the successive instructions, such as fetching one instruction while performing the arithmetic operations for a previous instruction. To do this requires being able to determine the sequence of instructions to be executed well ahead of time in order to keep the pipeline full of instructions to be executed.
+
+Figure 3.18 illustrates some of the conditional move instructions available with x86-64. Each of these instructions has two operands: a source register or memory location *S*, and a destination register *R*. 
+
+![image-20210303212728123](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303212728123.png)
+
+> _**Note**_: Not all conditional expressions can be compiled using conditional moves. If one of those two expressions could possibly generate an error condition or a side effect, this could lead to invalid behavior.
+
+#### Loops
+
+C provides several looping constructs—namely, do-while, while, and for. No corresponding instructions exist in machine code. Instead, combinations of conditional tests and jumps are used to implement the effect of loops.
+
+##### Do-While Loops
+
+The general form of a do-while statement is as follows:
+
+```c
+do
+	body-statement 
+while (test-expr);
+```
+
+which can be translate to:
+
+```c
+loop:
+	body-statement 
+  t = test-expr;
+	if (t)
+		goto loop;
+```
+
+As an example, Figure 3.19  shows an implementation of a routine to compute the factorial of its argument with a do-while loop. 
+
+![image-20210303213908591](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303213908591.png)
+
+##### While Loops
+
+There are a number of ways to translate a while loop into machine code, two of which are used in code generated by gcc.
+
+1. *jump to middle*: performs the initial test by performing an unconditional jump to the test at the end of the loop. 
+
+   ```c
+   		goto test;
+   loop:
+   		body-statement
+   test:
+   		t = test-expr;
+   		if (t)
+   				goto loop;
+   ```
+
+   As an example, Figure 3.20 shows an implementation of the factorial function using a *jump to middle* while loop.
+
+   ![image-20210303214459012](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303214459012.png)
+
+2. *guarded do*: transforms the code into a do-while loop by using a conditional branch to skip over the loop if the initial test fails.
+
+   ```c
+   t = test-expr; 
+   if (!t)
+   	goto done;
+   loop:
+   	body-statement 
+     t = test-expr; 
+   	if (t)
+   		goto loop;
+   done:
+   ```
+
+   As an example, Figure 3.21 shows an implementation of the factorial function using a *guarded do* while loop.
+
+   ![image-20210303215342973](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303215342973.png)
+
+##### For Loops
+
+The general form of a for loop is as follows:
+
+```c
+for (init-expr; test-expr; update-expr) {
+  body-statement
+}
+```
+
+which is identical to the following code using a while loop:
+
+```c
+init-expr;
+while (test-expr) {
+	body-statement
+	update-expr; 
+}
+```
+
+##### Switch Statements
+
+A switch statement provides a multiway branching capability based on the value of an integer index. It is not only do they make the C code more readable, but they also allow an efficient implementation using a data structure called a *jump table*.
+
+A *jump table* is an array where entry `i` is the address of a code segment implementing the action the program should take when the switch index equals `i`. The code performs an array reference into the jump table using the switch index to determine the target for a jump instruction.
+
+The **advantage** of using a jump table over a long sequence of if-else statements is that the time taken to perform the switch is *independent* of the number of switch cases. 
+
+Figure 3.22 shows an example of a C switch statement. 
+
+![image-20210303220344440](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303220344440.png)
+
+Figure 3.23 shows the assembly code generated when compiling switch_eg.
+
+![image-20210303220507574](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303220507574.png)
+
+In the assembly code, the jump table is indicated by the following declarations:
+
+![image-20210303221103168](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303221103168.png)
+
+### Procedures

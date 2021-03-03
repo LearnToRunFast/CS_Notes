@@ -3173,7 +3173,18 @@ switch i {
   case 4: fmt.Println("Four")
   case 5: fmt.Println("Five")
   default: fmt.Println("Unknown Number")
-  }
+ }
+
+switch os := runtime.GOOS; os {
+	case "darwin":
+		fmt.Println("OS X.")
+	case "linux":
+		fmt.Println("Linux.")
+	default:
+		// freebsd, openbsd,
+		// plan9, windows...
+		fmt.Printf("%s.\n", os)
+	}
 ```
 
 A switch does not need an operand; it can just list the cases, each of which is a boolean expression: This form is called a *tagless switch*; it’s equivalent to switch true.
