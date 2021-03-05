@@ -3271,6 +3271,355 @@ func zero(ptr *[32]byte) {
 
 ### Interface as Contracts
 
+An interface is an *abstract type*.
+
+An example of `FPrintf`:
+
+```go
+package fmt
+type Writer interface {
+  Write(p []byte) (n int, err error)
+}
+
+func Fprintf(w io.Writer, format string, args ...interface{}) (int, error)
+func Printf(format string, args ...interface{}) (int, error) {
+  return Fprintf(os.Stdout, format, args...)
+}
+func Sprintf(format string, args ...interface{}) string {
+  var buf bytes.Buffer
+  Fprintf(&buf, format, args...)
+  return buf.String()
+}
+
+```
+
+The *io.Writer* interface defines the contract between *Fprintf* and its callers. Let’s test this out using a new type. 
+
+```go
+type ByteCounter int
+func (c *ByteCounter) Write(p []byte) (int, error) {
+  *c += ByteCounter(len(p)) // convert int to ByteCounter
+  return len(p), nil
+}
+
+var c ByteCounter
+c.Write([]byte("hello"))
+fmt.Println(c) // "5", = len("hello")
+c = 0 // reset the counter
+var name = "Dolly"
+fmt.Fprintf(&c, "hello, %s", name)
+fmt.Println(c) // "12", = len("hello, Dolly")
+
+```
+
+### Interface Types
+
+The *io.Writer* type is one of the most widely used interfaces because it provides an abstraction of all the types to which bytes can be written.
+
+```go
+type Reader interface {
+  Read(p []byte) (n int, err error)
+}
+type Closer interface {
+  Close() error
+}
+```
+
+We can implement ReadWriter and ReadWriteCloser with *io.Write*:
+
+```go
+type ReadWriter interface {
+  Reader
+  Writer
+}
+type ReadWriteCloser interface {
+  Reader
+  Writer
+  Closer
+}
+```
+
+Naming another interface as a shorthand for writing out all of its methods. This is called *embedding* an interface.
+
+### Interface Satisfaction
+
+A type *satisfies* an interface if it possesses all the methods the interface requires. For example, A **bytes.Buffer* satisfies Reader, Writer, and ReadWriter, but does not satisfy Closer because it does not have a Close method.
+
+The assignability rule (§2.4.2) for interfaces is very simple: an expression may be assigned to an interface only if its type satisfies the interface. So:
+
+```go
+var w io.Writer
+w = os.Stdout
+w = new(bytes.Buffer)
+w = time.Second
+// OK: *os.File has Write method
+// OK: *bytes.Buffer has Write method
+// compile error: time.Duration lacks Write method
+var rwc io.ReadWriteCloser
+rwc = os.Stdout         // OK: *os.File has Read, Write, Close methods
+rwc = new(bytes.Buffer) // compile error: *bytes.Buffer lacks Close method
+```
+
+This rule applies even when the right-hand side is itself an interface:
+
+```go
+w = rwc                 // OK: io.ReadWriteCloser has Write method
+rwc = w                 // compile error: io.Writer lacks Close method
+```
+
+For each named concrete type T, some of its methods have a receiver of type T itself whereas others require a *T pointer. It is legal to call a *T method on an argument of type T so long as the argument is a *variable*; the compiler implicitly takes its address. But this is mere *syntactic sugar*: a value of type T does not possess all the methods that a *T pointer does, and as a result it might satisfy fewer interfaces. 
+
+An example will make this clear. The String method of the IntSet type requires a pointer receiver, so we cannot call that method on a non-addressable IntSet value:
+
+```go
+type IntSet struct { /* ... */ }
+func (*IntSet) String() string
+var _ = IntSet{}.String() // compile error: String requires *IntSet receiver
+```
+
+but we can call it on an IntSet variable: 
+
+```go
+var s IntSet
+var _ = s.String() // OK: s is a variable and &s has a String method
+```
+
+However, since only *IntSet has a String method, only *IntSet satisfies the fmt.Stringer interface:
+
+```go
+var _ fmt.Stringer = &s // OK
+var _ fmt.Stringer = s  // compile error: IntSet lacks String method
+```
+
+An interface wraps and conceals the concrete type and value that it holds. Only the methods revealed by the interface type may be called, even if the concrete type has others:
+
+```go
+os.Stdout.Write([]byte("hello")) // OK: *os.File has Write method
+os.Stdout.Close()                // OK: *os.File has Close method
+
+var w io.Writer
+w = os.Stdout
+w.Write([]byte("hello")) // OK: io.Writer has Write method
+w.Close()                // compile error: io.Writer lacks Close method
+```
+
+> _**Note**_: The type *interface{}*, which is called the *empty interface* type. Because the empty interface type places no demands on the types that satisfy it, we can assign *any* value to the empty interface.
+
+### Parsing Flags with flag.Value
+
+In this section, we’ll see how another standard interface, flag.Value, helps us define new notations for command-line flags. Consider the program below, which sleeps for a specified period of time.
+
+
+
+```go
+var period = flag.Duration("period", 1*time.Second, "sleep period")
+func main() {
+  flag.Parse()
+  fmt.Printf("Sleeping for %v...", *period)
+  time.Sleep(*period)
+  fmt.Println()
+}
+```
+
+```bash
+$ go build gopl.io/ch7/sleep
+$ ./sleep
+Sleeping for 1s...
+$ ./sleep -period 50ms
+Sleeping for 50ms...
+$ ./sleep -period 2m30s
+Sleeping for 2m30s...
+$ ./sleep -period 1.5h
+Sleeping for 1h30m0s...
+$ ./sleep -period "1 day" invalid value "1 day" for flag -period: time: invalid duration 1 day
+```
+
+We need only define a type that satisfies the flag.Value interface, whose declaration is below:
+
+```go
+package flag
+// Value is the interface to the value stored in a flag.
+type Value interface {
+  String() string
+  Set(string) error
+}
+```
+
+The String method formats the flag’s value for use in command-line help messages; thus every flag.Value is also a fmt.Stringer. The Set method parses its string argument and updates the flag value. In effect, the Set method is the inverse of the String method, and it is good practice for them to use the same notation.
+
+Let’s define a celsiusFlag type that allows a temperature to be specified in Celsius, or in Fahrenheit with an appropriate conversion. Notice that celsiusFlag embeds a Celsius, thereby getting a String method for free. To satisfy flag.Value, we need only declare the Set method:
+
+```go
+// *celsiusFlag satisfies the flag.Value interface.
+type celsiusFlag struct{ Celsius }
+
+func (f *celsiusFlag) Set(s string) error {
+  var unit string
+  var value float64
+  fmt.Sscanf(s, "%f%s", &value, &unit) // no error check needed
+  switch unit {
+    case "C", "°C":
+      f.Celsius = Celsius(value)
+      return nil
+    case "F", "°F":
+      f.Celsius = FToC(Fahrenheit(value))
+      return nil
+  }
+  return fmt.Errorf("invalid temperature %q", s)
+}
+```
+
+The call to fmt.Sscanf parses a floating-point number (value) and a string (unit) from the input s.
+
+The CelsiusFlag function below wraps it all up. 
+
+```go
+// CelsiusFlag defines a Celsius flag with the specified name,
+// default value, and usage, and returns the address of the flag variable.
+// The flag argument must have a quantity and a unit, e.g., "100C".
+func CelsiusFlag(name string, value Celsius, usage string) *Celsius {
+  f := celsiusFlag{value}
+  flag.CommandLine.Var(&f, name, usage)
+  return &f.Celsius
+}
+```
+
+Now we can start using the new flag in our programs:
+
+```go
+gopl.io/ch7/tempflag
+var temp = tempconv.CelsiusFlag("temp", 20.0, "the temperature")
+func main() {
+  flag.Parse()
+  fmt.Println(*temp)
+}
+```
+
+Here’s a typical session:
+
+```zsh
+$ go build gopl.io/ch7/tempflag
+$ ./tempflag
+20°C
+$ ./tempflag -temp -18C
+-18°C
+$ ./tempflag -temp 212°F
+100°C
+$ ./tempflag -temp 273.15K
+invalid value "273.15K" for flag -temp: invalid temperature "273.15K"
+Usage of ./tempflag:
+-temp value
+the temperature (default 20°C)
+$ ./tempflag -help
+Usage of ./tempflag:
+-temp value
+the temperature (default 20°C)
+```
+
+### Interface Values
+
+Conceptually, a value of an interface type, or *interface value*, has two components, a concrete type and a value of that type. These are called the interface’s *dynamic type* and *dynamic value*.
+
+In our conceptual model, a set of values called *type descriptors* provide information about each type, such as its name and methods. In an interface value, the type component is represented by the appropriate type descriptor.
+
+In the four statements below, the variable w takes on three different values. (The initial and final values are the same.)
+
+```go
+var w io.Writer
+w = os.Stdout
+w = new(bytes.Buffer)
+w = nil
+```
+
+In Go, variables are always initialized to a well-defined value, and interfaces are no exception. The zero value for an interface has both its type and value components set to nil (Figure 7.1).
+
+<img src="Asserts/Go/image-20210305160257624.png" alt="image-20210305160257624" style="zoom:50%;" />
+
+An interface value is described as nil or non-nil based on its dynamic type, so this is a nil interface value. 
+
+When we assigns a value of type **os.File* to w:
+
+```go
+w = os.Stdout
+```
+
+This assignment involves an implicit conversion from a concrete type to an interface type, and is equivalent to the explicit conversion `io.Writer(os.Stdout)`. A conversion of this kind, whether explicit or implicit, captures the type and the value of its operand. The interface value’s dynamic type is set to the type descriptor for the pointer type `*os.File`, and its dynamic value holds a copy of `os.Stdout`, which is a pointer to the `os.File `variable representing the standard output of the process (Figure 7.2).
+
+![image-20210305160946624](Asserts/Go/image-20210305160946624.png)
+
+Calling the Write method on an interface value containing an \*os.File pointer causes the (\*os.File). Write method to be called. The call prints "hello".
+
+```go
+w.Write([]byte("hello")) // "hello"
+```
+
+The third statement assigns a value of type `*bytes.Buffer` to the interface value: 
+
+```go
+w = new(bytes.Buffer)
+```
+
+The dynamic type is now `*bytes.Buffer` and the dynamic value is a pointer to the newly allocated buffer (Figure 7.3).
+
+![image-20210305161517970](Asserts/Go/image-20210305161517970.png)
+
+#### Caveat: An Interface Containing a Nil Pointer Is Non-Nil
+
+A nil interface value, which contains no value at all, is not the same as an interface value containing a pointer that happens to be nil.
+
+Consider the program below:
+
+```go
+const debug = true
+func main() {
+  var buf *bytes.Buffer
+  if debug {
+    buf = new(bytes.Buffer) // enable collection of output
+  }
+  f(buf) // NOTE: subtly incorrect!
+  if debug {
+    // ...use buf...
+  } 
+}
+// If out is non-nil, output will be written to it.
+func f(out io.Writer) {
+  // ...do something...
+  if out != nil {
+    out.Write([]byte("done!\n"))
+  } 
+}
+```
+
+We might expect that changing debug to false would disable the collection of the output, but in fact it causes the program to panic during the `out.Write` call:
+
+```go
+if out != nil {
+  out.Write([]byte("done!\n")) // panic: nil pointer dereference
+}
+```
+
+When main calls f, it assigns a nil pointer of type `*bytes.Buffer` to the out parameter, so the dynamic value of out is nil. However, its dynamic type is `*bytes.Buffer`, meaning that out is a non-nil interface containing a nil pointer value (Figure 7.5), so the defensive check out != nil is still true.
+
+<img src="Asserts/Go/image-20210305162754472.png" alt="image-20210305162754472" style="zoom:50%;" />
+
+In particular, the call violates the implicit precondition of `(*bytes.Buffer).Write` that its receiver is not nil, so assigning the nil pointer to the interface was a mistake. The solution is to change the type of buf in main to io.Writer, thereby avoiding the assignment of the dysfunctional value to the interface in the first place:
+
+```go
+var buf io.Writer
+if debug {
+  buf = new(bytes.Buffer) // enable collection of output
+}
+f(buf) // OK
+```
+
+### Sorting with sort.Interface
+
+
+
+
+
+
+
 
 
 ## Concurrency

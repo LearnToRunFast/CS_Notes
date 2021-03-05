@@ -2,7 +2,7 @@
 
 # Designing Data Intensive Applications
 
-## Chapter 1
+##  Chapter 1
 
 we focus on three concerns that are important in most software systems:
 

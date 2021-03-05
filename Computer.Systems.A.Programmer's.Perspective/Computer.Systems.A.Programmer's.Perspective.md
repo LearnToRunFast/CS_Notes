@@ -1308,3 +1308,43 @@ In the assembly code, the jump table is indicated by the following declarations:
 ![image-20210303221103168](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210303221103168.png)
 
 ### Procedures
+
+Suppose procedure P calls procedure Q, and Q then executes and returns back to P. These actions involve one or more of the following mechanisms:
+
+- *Passing control.* The program counter must be set to the starting address of the code for Q upon entry and then set to the instruction in P following the call to Q upon return.
+
+- *Passing data.* P must be able to provide one or more parameters to Q, and Q must be able to return a value back to P.
+
+- *Allocating and deallocating memory.* Q may need to allocate space for local variables when it begins and then free that storage before it returns.
+
+#### The Run-Time Stack
+
+The x86-64 stack grows toward lower addresses and the stack pointer `%rsp `points to the top element of the stack. Data can be stored on and retrieved from the stack using the `pushq` and `popq` instructions.
+
+When an x86-64 procedure requires storage beyond what it can hold in registers, it allocates space on the stack. This region is referred to as the procedure’s *stack frame*.
+
+Figure 3.25 shows the overall structure of the run-time stack, including its partitioning into stack frames, in its most general form. The frame for the currently executing procedure is always at the top of the stack. 
+
+![image-20210305210322764](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210305210322764.png)
+
+When procedure P calls procedure Q, it will push the *return address* onto the stack, indicating where within P the program should resume execution once Q returns. We consider the return address to be part of P’s stack frame, since it holds state relevant to P. Procedure P can pass up to six integral values (i.e., pointers and integers) on the stack, but if Q requires more arguments, these can be stored by P within its stack frame prior to the call.
+
+However, sometimes functions do not even require a stack frame. This occurs when all of the local variables can be held in registers and the function does not call any other functions (sometimes referred to as a *leaf procedure*, in reference to the tree structure of procedure calls). 
+
+#### Control Transfer
+
+Passing control from function P to function Q involves:
+
+1. pushes an address A onto the stack
+2. setting the program counter (PC) to the starting address of the code for Q
+
+All of this can be done by simply calling instruction `call Q`. The address A is referred to as the *return address* and is computed as the address of the instruction immediately following the `call` instruction. The counterpart instruction `ret` pops an address A off the stack and sets the PC to A.
+
+The general forms of the call and ret instructions are described as follows:
+
+<img src="Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210305211819356.png" alt="image-20210305211819356" style="zoom:50%;" />
+
+Like jumps, a call can be either direct or indirect. Like jumps, a call can be either direct or indirect. In assembly code, the target of a direct call is given as a label, while the target of an indirect call is given by `*`followed by an operand specifier using one of the formats described in Figure 3.3.
+
+#### Data Transfer
+
