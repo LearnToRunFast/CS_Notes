@@ -1348,3 +1348,151 @@ Like jumps, a call can be either direct or indirect. Like jumps, a call can be e
 
 #### Data Transfer
 
+With x86-64, up to six integral (i.e., integer and pointer) arguments can be passed via registers. The registers are used in a specified order, with the name used for a register depending on the size of the data type being passed. These are shown in Figure 3.28. Arguments are allocated to these registers according to their ordering in the argument list.
+
+![image-20210305222029921](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210305222029921.png)
+
+Assume that procedure P calls procedure Q with n integral arguments, such that n > 6. Then the code for P must allocate a stack frame with enough storage for arguments 7 through n. It copies arguments 1–6 into the appropriate registers, and it puts arguments 7 through n onto the stack, with argument 7 at the top of the stack. When passing parameters on the stack, all data sizes are rounded up to be multiples of eight. With the arguments in place, the program can then execute a call instruction to transfer control to procedure Q.
+
+Consider the C function proc shown in Figure 3.29(a). This function has eight arguments, including integers with different numbers of bytes (8, 4, 2, and 1), as well as different types of pointers, each of which is 8 bytes. The assembly code generated for proc is shown in Figure 3.29(b). 
+
+![image-20210305222718364](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210305222718364.png)
+
+The first six arguments are passed in registers. The last two are passed on the stack, as documented by the diagram of Figure 3.30.
+
+![image-20210305222822879](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210305222822879.png)
+
+#### Local Storage on the Stack
+
+Additional to parameters, we have local data too, local data must be stored in memory. Common cases of this include these:
+
+- There are not enough registers to hold all of the local data.
+- The address operator `&` is applied to a local variable, and hence we must be able to generate an address for it.
+- Some of the local variables are arrays or structures and hence must be accessed by array or structure references. We will discuss this possibility when we describe how arrays and structures are allocated.
+
+As an example of the handling of the address operator, consider the two functions shown in Figure 3.31.
+
+![image-20210305225923145](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210305225923145.png)
+
+As a more complex example, the function call_proc, shown in Figure 3.32, illustrates many aspects of the x86-64 stack discipline.
+
+![image-20210305230547055](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210305230547055.png)
+
+As shown in Figure 3.30, arguments 7 and 8 are now at offsets 8 and 16 relative to the stack pointer, because the return address was pushed onto the stack.
+
+![image-20210305231524241](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210305231524241.png)
+
+#### Local Storage in Registers
+
+The set of program registers acts as a single resource shared by all of the procedures. When one procedure (the *caller*) calls another (the *callee*), the callee does not overwrite some register value that the caller planned to use later. For this reason, x86-64 adopts a uniform set of conventions for register usage that must be respected by all procedures, including those in program libraries.
+
+By convention, registers `%rbx`, `%rbp`, and `%r12–%r15` are classified as *callee-saved* registers. The *callee* must *preserve* the values of these registers for *caller*. The *callee* can preserve a register value by either not changing it at all or by pushing the original value on the stack. 
+
+All other registers, except for the stack pointer `%rsp`, are classified as *caller-saved* registers. This means that they can be modified by any function. The *caller* must save all the used registers before it makes the call.
+
+An example shown in Figure 3.34 using of callee-saved registers.
+
+![image-20210306223317799](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210306223317799.png)
+
+#### Recursive Procedures
+
+Figure 3.35 shows both the C code and the generated assembly code for a recursive factorial function. 
+
+![image-20210306223524931](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210306223524931.png)
+
+### Array Allocation and Access
+
+#### Basic Principles
+
+Consider the following declarations:
+
+```c
+char A[12];
+char *B[8];
+int C[6];
+double *D[5];
+```
+
+These declarations will generate arrays with the following parameters:
+
+![image-20210306224025325](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210306224025325.png)
+
+For example, the address of B(int array) is stored in register `%rdx` and i is stored in register `%rcx`. Below instruction will read B[i] and copy the result to register `%eax`.
+
+```assembly
+movl (%rdx,%rcx,4),%eax
+```
+
+#### Pointer Arithmetic
+
+The unary operators `&` and `*` allow the generation and dereferencing of pointers. For a variable A, `&A` is a pointer giving the address of the object. If A is a pointer, then `*A` gives the value at that address A. So `A` and `*&A` are equivalent.
+
+If $p$ is a pointer to data of type $T$, and the value of $p$ is $V_p$, then the expression $p+i$ has value $V_p +L\cdot i$, where $L$ is the size of data type $T$ .
+
+Suppose the starting address of integer array E and integer index i are stored in registers `%rdx` and `%rcx`, respectively. The following are some expressions involving E.
+
+![image-20210306225328001](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210306225328001.png)
+
+#### Nested Arrays
+
+The general principles of array allocation and referencing hold even when we create arrays of arrays. For example, the declaration
+
+```c
+int A[5][3];
+```
+
+is equivalent to the declaration
+
+```c
+typedef int row3_t[3];
+row3_t A[5];
+```
+
+The array elements are ordered in memory in *row-major* order, is illustrated in Figure 3.36.
+
+<img src="Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210306225757082.png" alt="image-20210306225757082" style="zoom:50%;" />
+
+In general, for an array declared as T D\[R\]\[C\] , array element D\[i\]\[j\] is at memory address $\&D[i][j]=x_D + L (C\cdot i + j)$.
+
+Consider the 5 × 3 integer array A defined earlier. Suppose $x_A$, i, and j are in registers `%rdi`, `%rsi`, and `%rdx`, respectively. Then array element A\[i\]\[j\] can be copied to register `%eax` by the following code:
+
+![image-20210306230219802](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210306230219802.png)
+
+### Heterogeneous Data Structures
+
+C provides two mechanisms for creating data types by combining objects of different types:
+
+1. *structures*, declared using the keyword `struct`, aggregate multiple objects into a single unit.
+2. *unions*, declared using the keyword `union`, allow an object to be referenced using several different types.
+
+### Structures
+
+Consider the following structure declaration:
+
+```c
+struct rec {
+    int i;
+    int j;
+    int a[2];
+    int *p;
+};
+```
+
+This structure contains four fields: two 4-byte values of type `int`, a two-element
+
+array of type `int`, and an 8-byte `integer pointer`, giving a total of 24 bytes:
+
+![image-20210306232423553](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210306232423553.png)
+
+For example, suppose variable r of type `struct rec *` is in register `%rdi`. Then the following code copies element r->i to element r->j:
+
+![image-20210306232618852](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210306232618852.png)
+
+We can generate the pointer value &(r->a[i]) with the single instruction:
+
+![image-20210306232730064](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210306232730064.png)
+
+As these examples show, the selection of the different fields of a structure is handled completely at compile time. The machine code contains no information about the field declarations or the names of the fields.
+
+#### Unions
+
