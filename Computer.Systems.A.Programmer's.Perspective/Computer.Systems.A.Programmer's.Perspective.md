@@ -1465,7 +1465,7 @@ C provides two mechanisms for creating data types by combining objects of differ
 1. *structures*, declared using the keyword `struct`, aggregate multiple objects into a single unit.
 2. *unions*, declared using the keyword `union`, allow an object to be referenced using several different types.
 
-### Structures
+#### Structures
 
 Consider the following structure declaration:
 
@@ -1495,4 +1495,119 @@ We can generate the pointer value &(r->a[i]) with the single instruction:
 As these examples show, the selection of the different fields of a structure is handled completely at compile time. The machine code contains no information about the field declarations or the names of the fields.
 
 #### Unions
+
+The syntax of a union declaration is identical to that for structures, but its semantics are very different. Rather than having the different fields reference different blocks of memory, they all reference the same block.
+
+Consider the following declarations:
+
+```c
+struct S3 {
+  char c;
+  int i[2];
+  double v; 
+};
+union U3 {
+  char c;
+  int i[2];
+  double v; 
+};
+```
+
+When compiled on an x86-64 Linux machine, the offsets of the fields, as well as the total size of data types S3 and U3, are as shown in the following table:
+
+![image-20210307105212476](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210307105212476.png)
+
+(We will see shortly why i has offset 4 in S3 rather than 1, and why v has offset 16, rather than 9 or 12.) Observe also that the overall size of a union equals the maximum size of any of its fields.
+
+#### Data Alignment
+
+Many computer systems place restrictions on requiring that the address for some objects must be a multiple of some value K (typically 2, 4, or 8). Such *alignment restrictions* simplify the design of the hardware forming the interface between the processor and the memory system. 
+
+For example, K = 8, due to double element
+
+```c
+struct S1 {
+  char c;
+  int i[2];
+  double v;
+} *p;
+```
+
+![image-20210307114352786](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210307114352786.png)
+
+For largest alignment requirement K, overall structure must be multiple of K:
+
+```c
+struct S2 {
+  double v;
+  int i[2];
+  char c;
+} *p;
+```
+
+![image-20210307114532418](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210307114532418.png)
+
+Arrays of Structures
+
+```c
+struct S2 {
+  double v;
+  int i[2];
+  char c;
+} a[10];
+```
+
+![image-20210307114923290](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210307114923290.png)
+
+So we can save space by **putting large data types first**.
+
+
+
+### Combining Control and Data in Machine-Level Programs
+
+#### Thwarting Buffer Overflow Attacks
+
+There are three mechanisms to deal with buffer overflow:
+
+1. *Stack Randomization*:  to make the position of the stack vary from one run of a program to another by allocating a random amount of space between 0 and n bytes on the stack at the start of a program. It greatly reduce the rate at which a virus or worm can spread, but it cannot provide a complete safeguard.
+
+2. *Stack Corruption Detection*: detect when a stack has been corrupted. The idea is to store a special *canary* value in the stack frame between any local buffer and the rest of the stack state, as illustrated in Figure 3.42. This canary value, also referred to as a *guard value*, is generated randomly each time the program runs, and so there is no easy way for an attacker to determine what it is. Before restoring the register state and returning from the function, the program checks if the canary has been altered by some operation of this function or one that it has called. If so, the program aborts with an error.
+
+   ![image-20210307133714635](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210307133714635-5095438.png)
+
+   Example with assembly code:
+
+   ![image-20210307133902742](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210307133902742.png)
+
+3. *Limiting Executable Code Regions*: limit which memory regions hold executable code.
+
+#### Supporting Variable-Size Stack Frames
+
+To manage a variable-size stack frame, x86-64 code uses register `%rbp` to serve as a *frame pointer* (sometimes referred to as a *base pointer*, and hence the letters bp in %rbp). When using a frame pointer, the stack frame is organized as shown for the case of function vframe in Figure 3.44.
+
+![image-20210307135559246](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210307135559246.png)
+
+Example of variable-size array:
+
+![image-20210307135651292](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210307135651292.png)
+
+
+
+### Floating-Point Code
+
+Since the introduction of the Pentium/MMX in 1997, both Intel and AMD have incorporated successive generations of *media* instructions to support graphics and image processing. These instructions originally focused on allowing multiple operations to be performed in a parallel mode known as *single instruction, multiple data,* or *SIMD* (pronounced sim-dee).
+
+In this mode the same operation is performed on a number of different data values in parallel. Over the years, there has been a progression of these extensions. The most recently is AVX (for “advanced vector extensions”).
+
+Within each generation, there have also been different versions.  Each of these extensions manages data in sets of registers, referred to as "YMM” for AVX. Each YMM register can hold eight 32-bit values, or four 64-bit values, where these values can be either integer or floating point.
+
+As is illustrated in Figure 3.45, the AVX floating-point architecture allows data to be stored in 16 YMM registers, named `%ymm0`–`%ymm15`. Each YMM register is 256 bits (32 bytes) long. When operating on scalar data, these registers only hold floating-point data, and only the low-order 32 bits (for float) or 64 bits (for double) are used. The assembly code refers to the registers by their SSE XMM register names `%xmm0`–`%xmm15`, where each XMM register is the low-order 128 bits (16 bytes) of the corresponding YMM register. All XMM registers are `caller-saved`.
+
+![image-20210307141913533](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210307141913533.png)
+
+Example of floating point addition:
+
+![image-20210307120319297](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210307120319297.png)
+
+## Optimizing Program Performance
 

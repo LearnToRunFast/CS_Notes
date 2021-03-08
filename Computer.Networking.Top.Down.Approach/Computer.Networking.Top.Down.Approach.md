@@ -1081,3 +1081,148 @@ while True:
 
 ## Transport Layer
 
+### Introduction and Transport-Layer Services
+
+A transport-layer protocol provides for **logical communication** between application processes running on different hosts; from an application’s perspective, it is as if the hosts running the processes were directly connected.
+
+Transport-layer protocols are implemented in the end systems but not in network routers.
+
+On the sending side, the transport layer converts the application-layer messages it receives from a sending application process into transport-layer packets, known as transport-layer **segments**. This is done by (possibly) breaking the application messages into smaller chunks and adding a transport-layer header to each chunk to create the transport-layer segment.
+
+On the receiving side, the network layer extracts the transport-layer segment from the datagram and passes the segment up to the transport layer. The transport layer then processes the received segment, making the data in the segment available to the receiving application.
+
+#### Relationship Between Transport and Network Layers
+
+Transport-layer protocol provides logical communication between *processes* running on different hosts, a network-layer protocol provides logical communication between *hosts*.
+
+#### Overview of the Transport Layer in the Internet
+
+The Internet makes two distinct transport-layer protocols available to the application layer. 
+
+- One of these protocols is **UDP** (User Datagram Protocol), which provides an unreliable, connectionless service to the invoking application. 
+- The second of these protocols is **TCP** (Transmission Control Protocol), which provides a reliable, connection-oriented service to the invoking application. 
+
+When designing a network application, the application developer must specify one of these two transport protocols. The transport-layer packet as a *segment*.
+
+These two minimal transport-layer services:
+
+- process-to-process data delivery
+  - The most fundamental responsibility of UDP and TCP is to extend IP’s delivery service between two end systems to a delivery service between two processes running on the end systems. Extending host-to-host delivery to process-to-process delivery is called **transport-layer multiplexing** and **demultiplexing**.
+- error checking
+  - UDP and TCP also provide integrity checking by including error-detection fields in their segments’ headers.
+
+which are the only two services that UDP provides.
+
+TCP offers several additional services to applications. 
+
+- provides **reliable data transfer**. TCP ensures that data is delivered from sending process to receiving process, correctly and in order. 
+- provides **congestion control**. TCP strives to give each connection traversing a congested link an equal share of the link bandwidth.
+
+
+
+### Multiplexing and Demultiplexing
+
+Transport-layer **multiplexing** and **demultiplexing** is extending the host-to-host delivery service provided by the network layer to a process-to-process delivery service for applications running on the hosts.
+
+This job of delivering the data in a transport-layer segment to the correct socket is called **demultiplexing**.
+
+The job of gathering data chunks at the source host from different sockets, encapsulating each data chunk with header information (that will later be used in demultiplexing) to create segments, and passing the segments to the network layer is called **multiplexing**.
+
+Shown in Figure 3.2, the transport layer in the receiving host does not actually deliver data directly to a process, but instead to an intermediary socket. Because at any given time there can be more than one socket in the receiving host, each socket has a unique identifier. The format of the identifier depends on whether the socket is a UDP or a TCP socket.
+
+![image-20210308121219890](Asserts/Computer.Networking.Top.Down.Approach/image-20210308121219890.png)
+
+> _**Note**_: Although we have introduced **multiplexing** and **demultiplexing** in the context of the Internet transport protocols, it’s important to realize that they are concerns whenever a single protocol at one layer (at the transport layer or elsewhere) is used by multiple protocols at the next higher layer.
+
+Illustrated in Figure 3.3, transport-layer multiplexing requires 
+
+1. sockets have unique identifiers 
+   - source port number field
+2. each segment have special fields that indicate the socket to which the segment is to be delivered. 
+   - destination port number field
+
+![image-20210308122048603](Asserts/Computer.Networking.Top.Down.Approach/image-20210308122048603.png)
+
+Each **port number** is a 16-bit number, ranging from 0 to 65535. The port numbers ranging from 0 to 1023 are called **well-known port numbers** and are restricted, which means that they are reserved for use by well-known application protocols such as HTTP (which uses port number 80) and FTP (which uses port number 21).
+
+**Demultiplexing**: Each socket in the host could be assigned a port number, and when a segment arrives at the host, the transport layer examines the destination port number in the segment and directs the segment to the corresponding socket. The segment’s data then passes through the socket into the attached process. 
+
+#### Connectionless Multiplexing and Demultiplexing
+
+UDP socket is fully identified by a two-tuple consisting of a destination IP address and a destination port number. As a consequence, if two UDP segments have different source IP addresses and/or source port numbers, but have the same *destination* IP address and *destination* port number, then the two segments will be directed to the same destination process via the same destination socket.
+
+With port numbers assigned to UDP sockets, we can now precisely describe UDP multiplexing/demultiplexing. The transport layer in Host A creates a transport-layer segment that includes the application data, the source port number, the destination port number, and two other values. The transport layer then passes the resulting segment to the network layer. The network layer encapsulates the segment in an IP datagram and makes a best-effort attempt to deliver the segment to the receiving host.
+
+#### Connection-Oriented Multiplexing and Demultiplexing
+
+TCP socket is identified by a four-tuple: (source IP address, source port number, destination IP address, destination port number). The newly created connection socket is identified by these four values; all subsequently arriving segments whose source port, source IP address, destination port, and destination IP address match these four values will be demultiplexed to this socket. 
+
+The situation is illustrated in Figure 3.5, in which Host C initiates two HTTP sessions to server B, and Host A initiates one HTTP session to B. The figure shows web server that spawns a new process for each connection. However, that there is not always a one-to-one correspondence between connection sockets and processes. Instead, it creating new process, a new thread with a new connection socket for each new client connection.
+
+![image-20210308124504007](Asserts/Computer.Networking.Top.Down.Approach/image-20210308124504007.png)
+
+### Connectionless Transport: UDP
+
+In fact, if the application developer chooses UDP instead of TCP, then the application is almost directly talking with IP. 
+
+> _**Note**_: UDP has no handshaking between sending and receiving transport-layer entities before sending a segment. For this reason, UDP is said to be *connectionless.*
+
+Some applications are better suited for UDP for the following reasons:
+
+- *Finer application-level control over what data is sent, and when.* Under UDP, as soon as an application process passes data to UDP, UDP will package the data inside a UDP segment and immediately pass the segment to the network layer.
+- *No connection establishment.*UDP does not introduce any delay to establish a connection.
+- *No connection state.* UDP does not maintain connection state and does not track any of these parameters. For this reason, a server devoted to a particular application can typically support many more active clients when the application runs over UDP rather than TCP.
+- *Small packet header overhead.* The TCP segment has 20 bytes of header over- head in every segment, whereas UDP has only 8 bytes of overhead.
+
+Running multimedia applications over UDP is controversial. Congestion control is needed to prevent the network from entering a congested state in which very little useful work is done. If everyone were to start streaming high-bit-rate video without using any congestion control, there would be so much packet overflow at routers that very few UDP packets would successfully traverse the source-to-destination path. 
+
+#### UDP Segment Structure
+
+The UDP segment structure, shown in Figure 3.7. The application data occupies the data field of the UDP segment. 
+
+![image-20210308185908693](Asserts/Computer.Networking.Top.Down.Approach/image-20210308185908693.png)
+
+The UDP header has only four fields, each consisting of two bytes. 
+
+- The port numbers allow the destination host to pass the application data to the correct process running on the destination end system. 
+- The length field specifies the number of bytes in the UDP segment (header plus data). 
+- The checksum is used by the receiving host to check whether errors have been introduced into the segment. In truth, the checksum is also calculated over a few of the fields in the IP header in addition to the UDP segment.
+
+#### UDP Checksum
+
+UDP at the sender side performs the 1s complement of the sum of all the 16-bit words in the segment, with any overflow encountered during the sum being wrapped around. This result is put in the checksum field of the UDP segment.
+
+Suppose that we have the following three 16-bit words:
+
+```
+0110011001100000
+0101010101010101
+1000111100001100
+```
+
+The sum of first two of these 16-bit words is
+
+```
+ 0110011001100000
+ 0101010101010101
+ ----------------
+ 1011101110110101
+```
+
+Adding the third word to the above sum gives
+
+```
+1011101110110101
+1000111100001100
+-----------------
+0100101011000010
+```
+
+This last addition had overflow, which was wrapped around. The 1s complement of the sum 0100101011000010 is 1011010100111101, which becomes the checksum. 
+
+At the receiver, all four 16-bit words are added, including the checksum. If no errors are introduced into the packet, then clearly the sum at the receiver will be 1111111111111111. If one of the bits is a 0, then we know that errors have been introduced into the packet.
+
+Although UDP provides error checking, it does not do anything to recover from an error. Some implementations of UDP simply discard the damaged segment; others pass the dam- aged segment to the application with a warning.
+
+### Principles of Reliable Data Transfer
+
