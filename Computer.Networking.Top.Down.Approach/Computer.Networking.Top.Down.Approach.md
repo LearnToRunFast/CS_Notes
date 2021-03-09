@@ -1226,3 +1226,159 @@ Although UDP provides error checking, it does not do anything to recover from an
 
 ### Principles of Reliable Data Transfer
 
+In a computer network setting, reliable data transfer protocols use **ARQ (Automatic Repeat reQuest) protocols** to retransmit the package.
+
+Fundamentally, three additional protocol capabilities are required in ARQ protocols to handle the presence of bit errors:
+
+- *Error detection.* a mechanism is needed to allow the receiver to detect when bit errors have occurred.
+- *Receiver feedback.* The receiver to provide explicit feedback to the sender whether it received the packet.
+- *Retransmission.* A packet that is received in error or lost at the receiver will be retransmitted by the sender.
+
+#### Go-Back-N (GBN)
+
+In a **Go-Back-N (GBN) protocol**, the sender is allowed to transmit multiple packets (when available) without waiting for an acknowledgment, but is constrained to have no more than some maximum allowable number, *N,* of unacknowledged packets in the pipeline. 
+
+Figure 3.19 shows the sender’s view of the range of sequence numbers in a GBN protocol. If we define base to be the sequence number of the oldest unacknowledged packet and nextseqnum to be the smallest unused sequence number, then four intervals in the range of sequence numbers can be identified. 
+
+- $[0,base-1]$: corresponds to packets that have already been transmitted and acknowledged.
+- $[base,nextseqnum-1]$ corresponds to packets that have been sent but not yet acknowledged. 
+- $[nextseqnum,base+N-1]$ corresponds to packets that can be sent immediately
+- $[base+N, ...]$ cannot be used until an unacknowledged packet currently in the pipeline has been acknowledged.
+
+![image-20210309100910422](Asserts/Computer.Networking.Top.Down.Approach/image-20210309100910422.png)
+
+As the protocol operates, this window slides forward over the sequence number space. For this reason, *N* is often referred to as the **window size** and the GBN protocol itself as a **sliding-window protocol**. 
+
+n practice, a packet’s sequence number is carried in a fixed-length field in the packet header. If *k* is the number of bits in the packet sequence number field, the range of sequence numbers is thus $[0,2^k - 1]$. It will wrap around to 0 when $2^k - 1$ reached.
+
+The GBN sender must respond to three types of events:
+
+- *Invocation from above.* The sender first checks to see if the window is full, that is, whether there are *N* outstanding, unacknowledged packets. If the window is not full, a packet is created and sent, and variables are appropriately updated. If the window is full, the sender simply returns the data back to the upper layer, an implicit indication that the window is full. In a real implementation, the sender would more likely have either buffered this data, or would have a synchronization mechanism that would allow the upper layer to resend it only when the window is not full.
+- *Receipt of an ACK.* The acknowledgment for a packet with sequence number *n* will be taken to be a **cumulative acknowledgment**, indicating that all packets with a sequence number up to and including *n* have been correctly received at the receiver.
+- *A timeout event.* Sender uses only a single timer for the oldest transmitted but not yet acknowledged packet. If an ACK is received but there are still additional transmitted but not yet acknowledged packets, the timer is restarted. If there are no outstanding, unacknowledged packets, the timer is stopped.
+
+In receiver’s side. If a packet with sequence number *n* is received correctly and is in order, the receiver sends an ACK for packet *n* and delivers the data portion of the packet to the upper layer. In all other cases, the receiver discards the packet and resends an ACK for the most recently received in-order packet. Note that since packets are delivered one at a time to the upper layer, if packet *k* has been received and delivered, then all packets with a sequence number lower than *k* have also been delivered.
+
+#### Selective Repeat (SR)
+
+GBN itself suffers from performance problems. Such as when the window size and bandwidth-delay product are both large, many packets can be in the pipeline. A single packet error can thus cause GBN to retransmit a large number of packets, many unnecessarily. As the probability of channel errors increases, the pipeline can become filled with these unnecessary retransmissions.
+
+Unlike GBN, the sender will have already received ACKs for some of the packets in the window.Figure 3.23 shows the SR sender’s view of the sequence number space. 
+
+![image-20210309105140475](Asserts/Computer.Networking.Top.Down.Approach/image-20210309105140475.png)
+
+The SR receiver will acknowledge a correctly received packet whether or not it is in order. Out-of-order packets are buffered until any lower sequence number missing packets are received, at which point a batch of packets can be delivered in order to the upper layer.
+
+The SR sender must respond to three types of events:
+
+1. *Data received from above.* When data is received from above, the SR sender checks the next available sequence number for the packet. If the sequence number is within the sender’s window, the data is packetized and sent; otherwise it is either buffered or returned to the upper layer for later transmission, as in GBN.
+
+2. *Timeout*. Timers are again used to protect against lost packets. However, each packet must now have its own logical timer, since only a single packet will be transmitted on timeout. A single hardware timer can be used to mimic the operation of multiple logical timers.
+
+3. *ACK received*. If an ACK is received, the SR sender marks that packet as having been received, provided it is in the window. If the packet’s sequence number is equal to send_base, the window base is moved forward to the unacknowledged packet with the smallest sequence number. If the window moves and there are untransmitted packets with sequence numbers that now fall within the window, these packets are transmitted.
+
+The SR receiver events and actions:
+
+1. Packet with sequence number in $[rcv\_base, rcv\_base+N-1]$ is correctly received. In this case, the received packet falls within the receiver’s window and a selective ACK packet is returned to the sender. If the packet was not previously received, it is buffered. If this packet has a sequence number equal to the base of the receive window, then this packet and previous buffered acknowledge packets in the range are delivered to the upper layer. The receiver window is then moved forward by the number of packets delivered to the upper layer.
+2. Packet with sequence number in $[rcv\_base-N, rcv\_base-1]$ is correctly received. In this case, an ACK must be generated, even though this is a packet that the receiver has previously acknowledged.
+
+3. *Otherwise.* Ignore the packet.
+
+> _**Note**_: The receiver reacknowledges (rather than ignores) already received packets with certain sequence numbers *below* the current window base. This is necessary consider the possibility that previous ACK was lost.
+
+The window size must be less than or equal to half the size of the sequence number space for SR protocols.
+
+### Connection-Oriented Transport: TCP
+
+TCP is said to be **connection-oriented**, it must establish connection first before client and server to talk to each other.
+
+A TCP connection provides a **full-duplex service**: Client and Server can send and receive data at the same time.
+
+The client process passes a stream of data through the socket and reached to TCP. As shown in Figure 3.28, TCP directs this data to the connection’s **send buffer**, which is one of the buffers that is set aside during the initial three-way handshake. From time to time, TCP will grab chunks of data from the send buffer and pass the data to the network layer. The maximum amount of data that can be grabbed and placed in a segment is limited by the **maximum segment size (MSS)**. The MSS is typically set by first determining the length of the largest link-layer frame that can be sent by the local sending host (the so-called **maximum transmission unit, MTU**), and then setting the MSS to ensure that a TCP segment (when encapsulated in an IP datagram) plus the TCP/IP header length (typically 40 bytes) will fit into a single link-layer frame. Both Ethernet and PPP link-layer protocols have an MTU of 1,500 bytes. Thus a typical value of MSS is 1460 bytes. 
+
+> _**Note**_: MSS is the maximum amount of application-layer data in the segment, not the maximum size of the TCP segment including headers.
+
+![image-20210309135157106](Asserts/Computer.Networking.Top.Down.Approach/image-20210309135157106.png)
+
+TCP pairs each chunk of client data with a TCP header, thereby forming **TCP segments**. The segments are passed down to the network layer, where they are separately encapsulated within network-layer IP datagrams. The IP datagrams are then sent into the network. When TCP receives a segment at the other end, the segment’s data is placed in the TCP connection’s receive buffer, as shown in Figure 3.28.
+
+#### TCP Segment Structure
+
+ The TCP segment consists of header fields and a data field. The MSS limits the maximum size of a segment’s data field. When TCP sends a large file, such as an image as part of a Web page, it typically breaks the file into chunks of size MSS.
+
+![image-20210309140232886](Asserts/Computer.Networking.Top.Down.Approach/image-20210309140232886.png)
+
+Figure 3.29 shows the structure of the TCP segment:
+
+- The 32-bit **sequence number field** and the 32-bit **acknowledgment number field** are used by the TCP sender and receiver in implementing a reliable data transfer service.
+- The 16-bit **receive window** field is used for flow control. It is used to indicate the number of bytes that a receiver is willing to accept.
+- The 4-bit **header length field** specifies the length of the TCP header in 32-bit words. The TCP header can be of variable length due to the TCP options field. (Typically, the options field is empty, so that the length of the typical TCP header is 20 bytes.)
+- The optional and variable-length **options field** is used when a sender and receiver negotiate the maximum segment size (MSS) or as a window scaling factor for use in high-speed networks. A time-stamping option is also defined. 
+- The **flag field** contains 6 bits. 
+  - The **ACK bit** is used to indicate that the value carried in the acknowledgment field is valid; that is, the segment contains an acknowledgment for a segment that has been successfully received. 
+  - The **RST**, **SYN**, and **FIN** bits are used for connection setup and teardown.
+  - The **CWR** and **ECE** bits are used in explicit congestion notification.
+  - Setting the **PSH** bit indicates that the receiver should pass the data to the upper layer immediately. 
+  - The **URG** bit is used to indicate that there is data in this segment that the sending-side upper-layer entity has marked as “urgent.” The location of the last byte of this urgent data is indicated by the 16-bit **urgent data pointer field**. TCP must inform the receiving-side upper-layer entity when urgent data exists and pass it a pointer to the end of the urgent data. 
+
+In practice, the **PSH**, **URG**, and the urgent data pointer are not used.
+
+![image-20210309141813490](Asserts/Computer.Networking.Top.Down.Approach/image-20210309141813490.png)
+
+TCP’s use of sequence numbers reflects the sequence numbers are over the stream of transmitted bytes and *not* over the series of transmitted segments.
+
+The **sequence number for a segment** is therefore the byte-stream number of the first byte in the segment. Suppose that the data stream consists of a file consisting of 500,000 bytes, that the MSS is 1,000 bytes. As shown in Figure 3.30, TCP constructs 500 segments out of the data stream. The first segment gets assigned sequence number 0, the second segment gets assigned sequence number 1,000.
+
+> _**Note**_: In Figure 3.30, we assumed that the initial sequence number was zero. In truth, both sides of a TCP connection randomly choose an initial sequence number. This is done to minimize the possibility that a segment that is still present in the network from an earlier, already-terminated connection between two hosts is mistaken for a valid segment in a later connection between these same two hosts
+
+Because TCP only acknowledges bytes up to the first missing byte in the stream, TCP is said to provide **cumulative acknowledgments**.
+
+![image-20210309143006154](Asserts/Computer.Networking.Top.Down.Approach/image-20210309143006154.png)
+
+As shown in Figure 3.31, we suppose the starting sequence numbers are 42 and 79 for the client and server, respectively. 
+
+- The **first segment** is sent from the client to the server, containing the 1-byte ASCII representation of the letter ‘C’ in its data field. This first segment also has 42 in its sequence number field. Because the client has not yet received any data from the server, this first segment will have 79 in its acknowledgment number field.
+- The **second segment** is sent from the server to the client. It serves a dual purpose.
+  - By putting 43 in the acknowledgment field, the server is telling the client that it has successfully received everything up through byte 42 and is now waiting for bytes 43 onward.
+  - The second purpose of this segment is to echo back the letter ‘C.’ Thus, the second segment has the ASCII representation of ‘C’ in its data field. This second segment has the sequence number 79, the initial sequence number of the server-to-client data flow of this TCP connection.
+
+- The **third segment** is sent from the client to the server. Its sole purpose is to acknowledge the data it has received from the server. This segment has an empty data field. The segment has 80 in the acknowledgment number field because the client has received the stream of bytes up through byte sequence number 79 and it is now waiting for bytes 80 onward. You might think it odd that this segment also has a sequence number since the segment contains no data. But because TCP has a sequence number field, the segment needs to have some sequence number.
+
+#### Round-Trip Time Estimation and Timeout
+
+TCP uses a timeout/retransmit mechanism to recover from lost segments. The timeout should be larger than the connection’s round-trip time (RTT),
+
+**Estimating the Round-Trip Time**
+
+The sample RTT, denoted **SampleRTT**, for a segment is the amount of time between when the segment is sent and when an acknowledgment for the segment is received. Most TCP implementations take SampleRTT value depended on currently unacknowledged segments. In order to estimate a typical RTT, it is therefore natural to take some sort of *average* of the **SampleRTT** values. TCP maintains an average, called **EstimatedRTT**, of the SampleRTT values. Upon obtaining a new SampleRTT, TCP updates EstimatedRTT according to the following formula:
+$$
+EstimatedRTT=(1–α)\cdot EstimatedRTT+α\cdot SampleRTT
+$$
+The recommended value of α is α = 0.125, which lead the formula to
+$$
+EstimatedRTT=(0.875)\cdot EstimatedRTT+0.125\cdot SampleRTT
+$$
+
+> _**Note**_: **EstimatedRTT** is a weighted average of the **SampleRTT** values. This weighted average puts more weight on recent samples than on old samples. As the more recent samples better reflect the current congestion in the network. In statistics, such an average is called an **exponential weighted moving average (EWMA)**.
+
+It is also valuable to have a measure of the variability of the RTT, defines the RTT variation, **DevRTT**, as an estimate of how much SampleRTT typically deviates from **EstimatedRTT**:
+$$
+DevRTT=(1–β)\cdot DevRTT+β \cdot |SampleRTT–EstimatedRTT|
+$$
+If the SampleRTT values have little fluctuation, then DevRTT will be small; on the other hand, if there is a lot of fluctuation, DevRTT will be large. The recommended value of β is 0.25.
+
+**Setting and Managing the Retransmission Timeout Interval**
+
+Given values of EstimatedRTT and DevRTT, the timeout interval should be greater than or equal to the EstimatedRTT. Let x be timeout Interval
+
+- if x < EstimatedRTT, it will causes unnecessary retransmissions
+- if x >> EstimatedRTT(>> means much larger), when a segment is lost, TCP would not quickly retransmit the segment, leading to large data transfer delays.
+
+It is therefore desirable to set the timeout equal to the EstimatedRTT plus some margin. The margin should be large when there is a lot of fluctuation in the SampleRTT values; it should be small when there is little fluctuation. The value of DevRTT should thus come into play here.
+
+All of these considerations are taken into account in TCP’s method for determining the retransmission timeout interval:
+$$
+TimeoutInterval = EstimatedRTT + 4 \cdot DevRTT
+$$
+
+#### Reliable Data Transfer
