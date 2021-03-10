@@ -2,9 +2,7 @@
 
 ## What is Internet
 
-Smart devices are refer as **hosts** or **end systems**.End systems are connected together by a network of **communication links** and **packet switches**. 
-
-Different links can transmit data at different rates, with the **transmission rate** of a link measured in bits/second.
+Smart devices are refer as **hosts** or **end systems**.End systems are connected together by a network of **communication links** and **packet switches**. Different links can transmit data at different rates, with the **transmission rate** of a link measured in bits/second.
 
 When one end system has data to send to another end system, the sending end system segments the data and adds header bytes to each segment. The resulting packages of information, known as **packets**.
 
@@ -17,7 +15,7 @@ End systems, packet switches, and other pieces of the Internet run **protocols**
 - The IP protocol specifies the format of the packets that are sent and received among routers and end systems. 
 - The Internet’s principal protocols are collectively known as **TCP/IP**.
 
-*A* **protocol** defines the format and the order of messages exchanged between two or more communicating entities, as well as the actions taken on the transmission and/or receipt of a message or other event.
+A **protocol** defines the format and the order of messages exchanged between two or more communicating entities, as well as the actions taken on the transmission and/or receipt of a message or other event.
 
 Two most prevalent types of broadband residential access are **digital subscriber line (DSL)** and cable. 
 
@@ -1382,3 +1380,72 @@ TimeoutInterval = EstimatedRTT + 4 \cdot DevRTT
 $$
 
 #### Reliable Data Transfer
+
+When TCP receives data from the application, encapsulates the data in a segment, and passes the segment to IP. If the timer is not running for some other segment, TCP starts the timer when the segment is passed to IP. (It is helpful to think of the timer as being associated with the oldest unacknowledged segment.) The expiration interval for this timer is the `TimeoutInterval`. When there is a timeout, TCP responds to the timeout event by retransmitting the segment that caused the timeout. TCP then restarts the timer.
+
+When TCP sender received ACK from the receiver. TCP compares the ACk value y with it's variable SendBase. The TCP state variable SendBase is the sequence number of the oldest unacknowledged byte. The y acknowledges the receipt of all bytes before byte number y. If y > SendBase, then the ACK is acknowledging one or more previously unacknowledged segments. Thus the sender updates its SendBase variable; it also restarts the timer if there currently are any not-yet-acknowledged segments.
+
+There are a few modifications that most TCP implementations employ. 
+
+**Doubling the Timeout Interval**
+
+Each time TCP retransmits, it sets the next timeout interval to twice the previous value. However, whenever the timer is started after either of the two other events (that is, data received from application above, and ACK received), the TimeoutInterval is derived from the most recent values of EstimatedRTT and DevRTT.
+
+**Fast Retransmit**
+
+The timeout-triggered retransmissions is that the timeout period can be relatively long. When a segment is lost, this long timeout period forces the sender to delay resending the lost packet, thereby increasing the end-to-end delay. The sender can often detect packet loss well before the timeout event occurs by noting so-called duplicate ACKs. A **duplicate ACK** is an ACK that reacknowledges a segment for which the sender has already received an earlier acknowledgment.
+
+Because a sender often sends a large number of segments back to back, if one segment is lost, there will likely be many back-to-back duplicate ACKs. If the TCP sender receives three duplicate ACKs for the same data, it takes this as an indication that the segment following the segment that has been ACKed three times has been lost. The TCP sender performs a **fast retransmit**, retransmitting the missing segment *before* that segment’s timer expires. This is shown in Figure 3.37, where the second segment is lost, then retransmitted before its timer expires.
+
+![image-20210310155911192](Asserts/Computer.Networking.Top.Down.Approach/image-20210310155911192.png)
+
+A proposed modification to TCP, the so-called **selective acknowledgment**, allows a TCP receiver to acknowledge out-of-order segments selectively rather than just cumulatively acknowledging the last correctly received, in-order segment. When combined with selective retransmission—skipping the retransmission of segments that have already been selectively acknowledged by the receiver— TCP looks a lot like our generic SR protocol. Thus, TCP’s error-recovery mechanism is probably best categorized as a hybrid of GBN and SR protocols.
+
+#### Flow Control
+
+When the TCP connection receives bytes that are correct and in sequence, it places the data in the receive buffer. The associated application process will read data from this buffer, but not necessarily at the instant the data arrives. If the application is relatively slow at reading the data, the sender can very easily overflow the connection’s receive buffer by sending too much data too quickly.
+
+TCP provides a **flow-control service** to its applications to eliminate the possibility of the sender overflowing the receiver’s buffer. TCP provides flow control by having the *sender* maintain a variable called the **receive window**. The receive window is used to give the sender an idea of how much free buffer space is available at the receiver.
+
+Suppose that Host A is sending a large file to Host B over a TCP connection. Host B allocates a receive buffer to this connection; denote its size by *RcvBuffer*. From time to time, the application process in Host B reads from the buffer. Define the following variables:
+
+• *LastByteRead*: the number of the last byte in the data stream read from the buffer by the application process in B
+
+• *LastByteRcvd*: the number of the last byte in the data stream that has arrived from the network and has been placed in the receive buffer at B
+
+Because TCP is not permitted to overflow the allocated buffer, we must have
+$$
+LastByteRcvd \ – LastByteRead \leq RcvBuffer
+$$
+The receive window, denoted rwnd is set to the amount of spare room in the buffer: 
+$$
+rwnd = RcvBuffer \ – [LastByteRcvd \ – LastByteRead]
+$$
+Because the spare room changes with time, *rwnd* is dynamic. The variable rwnd is illustrated in Figure 3.38.
+
+![image-20210310200643470](Asserts/Computer.Networking.Top.Down.Approach/image-20210310200643470.png)
+
+The TCP specification requires Host A to continue to send segments with one data byte when B’s receive window is zero in order for A to know the receive window of B is more than zero again.
+
+#### TCP Connection Management
+
+TCP connection establishment can significantly add to perceived delays. Suppose a process running in one host (client) wants to initiate a connection with another process in another host (server). The client application process first informs the client TCP that it wants to establish a connection to a process in the server. The TCP in the client then proceeds to establish a TCP connection with the TCP in the server in the following manner:
+
+1. The client-side TCP first sends a special TCP segment to the server-side TCP. An empty payload with SYN bit set to 1 in the segment's header is sent to server side TCP. This special segment is referred to as a *SYN segment*. The client also randomly chooses an initial sequence number in the sequence number field of the initial TCP SYN segment. This segment is encapsulated within an IP datagram and sent to the server. There has been considerable interest in properly randomizing the choice of the client_isn in order to avoid certain security attacks.
+2. After server TCP receives the TCP SYN segment, the server extracts the TCP SYN segment from the datagram, allocates the TCP buffers and variables to the connection(allocation of these buffers and variables before completing the third step of the three-way handshake makes TCP vulnerable to a *SYN flooding attack*), and sends a connection-granted segment to the client TCP. This connection-granted segment also contains the SYN bit is set to 1, the acknowledgment field of the TCP segment header is set to client_isn+1 and initial sequence number (server_isn). The connection-granted segment is referred to as a *SYNACK segment*.
+3. Upon receiving the SYNACK segment, the client also allocates buffers and variables to the connection. The client host then sends the server another segment to acknowledges the server’s connection-granted segment by putting the value server_isn+1 in the acknowledgment field of the TCP segment header and set SYN bit to zero. **This third stage of the three-way handshake may carry client-to-server data in the segment payload.**
+
+In each of these future segments, the SYN bit will be set to zero. The **three-way handshake** process is illustrated in Figure 3.39.
+
+![image-20210310202947425](Asserts/Computer.Networking.Top.Down.Approach/image-20210310202947425.png)
+
+When a connection ends, the “resources” (that is, the buffers and variables) in the hosts are deallocated. As an example, suppose the client decides to close the connection, as shown in Figure 3.40.
+
+![image-20210310203119078](Asserts/Computer.Networking.Top.Down.Approach/image-20210310203119078.png)
+
+The client TCP send a special TCP segment which set FIN bit to 1. When the server receives this segment, it sends the client an acknowledgment segment in return. The server then sends its own shutdown segment, which has the FIN bit set to 1. Finally, the client acknowledges the server’s shutdown segment. At this point, all the resources in the two hosts are now deallocated.
+
+> _**Note**_: When a host receives a TCP segment whose port numbers or source IP address do not match with any of the ongoing sockets in the host. The host will send a special reset segment to the source which has the RST flag bit set to 1 to indicating it does not have the corresponding socket.
+
+### Principles of Congestion Control
+
