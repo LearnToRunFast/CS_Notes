@@ -1449,3 +1449,109 @@ The client TCP send a special TCP segment which set FIN bit to 1. When the serve
 
 ### Principles of Congestion Control
 
+**Cost of a congested Network**
+
+1. Large queuing delays are experienced as the packet-arrival rate nears the link capacity.
+2. The sender must perform retransmissions in order to compensate for dropped (lost) packets due to buffer overflow.
+3. Unneeded retransmissions by the sender in the face of large delays may cause a router to use its link bandwidth to forward unneeded copies of a packet.
+4. When a packet is dropped along a path, the transmission capacity that was used at each of the upstream links to forward that packet to the point at which it is dropped ends up having been wasted.
+
+#### Approaches to Congestion Control
+
+There are two types of congestion-control:
+
+1. *End-to-end congestion control*. The network layer provides no explicit support to the transport layer for congestion-control purposes. Even the presence of network congestion must be inferred by the end systems based only on observed network behavior (for example, packet loss and delay). 
+   1. TCP segment loss (as indicated by a timeout or the receipt of three duplicate acknowledgments) is taken as an indication of network congestion, and TCP decreases its window size accordingly. 
+   2. Using increasing round-trip segment delay as an indicator of increased network congestion.
+2. *Network-assisted congestion control*. Routers provide explicit feedback to the sender and/or receiver regarding the congestion state of the network. This feedback may be as simple as a single bit indicating congestion at a link. More sophisticated feedback is also possible. For example, in **ATM Available Bite Rate (ABR)** congestion control, a router informs the sender of the maximum host sending rate it (the router) can support on an outgoing link. 
+
+> _**Note**_: The Internet-default versions of IP and TCP adopt an end-to-end approach towards congestion control. But IP and TCP may also optionally implement network-assisted congestion control.
+
+![image-20210311112515243](Asserts/Computer.Networking.Top.Down.Approach/image-20210311112515243.png)
+
+For network-assisted congestion control, congestion information is typically fed back from the network to the sender in one of two ways, as shown in Figure 3.49.
+
+1. Direct feedback may be sent from a network router to the sender. This form of notification typically takes the form of a choke packet (essentially saying, “I’m congested!”). 
+2. More common form of notification occurs when a router marks/updates a field in a packet flowing from sender to receiver to indicate congestion. Upon receipt of a marked packet, the receiver then notifies the sender of the congestion indication. 
+
+### TCP Congestion Control
+
+TCP must use end-to-end congestion control rather than network-assisted congestion control, since the IP layer provides no explicit feedback to the end systems regarding network congestion.
+
+The approach taken by TCP is to have each sender limit the rate at which it sends traffic into its connection as a function of perceived network congestion. 
+
+1. If a TCP sender perceives that there is little congestion on the path between itself and the destination, then the TCP sender increases its send rate.
+2. if the sender perceives that there is congestion along the path, then the sender reduces its send rate. 
+
+**Limit the Rate**
+
+TCP connection consists of a receive buffer, a send buffer, and several variables (LastByteRead, rwnd, and so on). The TCP congestion-control mechanism operating at the sender keeps track of an additional variable, the **congestion window**, denoted *cwnd* which imposes a constraint on the rate at which a TCP sender can send traffic into the network. Specifically, the amount of unacknowledged data at a sender may not exceed the minimum of *cwnd* and *rwnd*:
+$$
+LastByteSent \ – LastByteAcked = min(cwnd, rwnd)
+$$
+Assume *rwnd* is always greater than *cwnd*, then the amount of unacknowledged data at the sender is solely limited by *cwnd*. Consider a connection for which loss and packet transmission delays are negligible. Then at the beginning of every RTT, the constraint permits the sender to send *cwnd* bytes of data into the connection; at the end of the RTT the sender receives acknowledgments for the data. Thus the sender’s send rate is roughly cwnd/RTT bytes/sec. By adjusting the value of *cwnd*, the sender can therefore adjust the rate at which it sends data into its connection.
+
+**Perceive Congestion**
+
+When there is excessive congestion, then one (or more) router buffers along the path overflows, causing a datagram (containing a TCP segment) to be dropped. Resulting in a timeout or the receipt of three duplicate ACKs—which is taken by the sender to be an indication of congestion on the sender-to-receiver path.
+
+**Adjusting Congestion**
+
+TCP uses acknowledgments to trigger (or clock) its increase in congestion window size, TCP is said to be **self-clocking**. If acknowledgments arrive at a relatively slow rate, the congestion window will be increased at a relatively slow rate. On the other hand, if acknowledgments arrive at a high rate, then the congestion window will be increased more quickly.
+
+TCP following guiding principles below:
+
+- A lost segment implies congestion implies the TCP sender’s rate should be decreased when a segment is lost.
+- An acknowledged segment indicates that the network is delivering the sender’s segments to the receiver, and hence, the sender’s rate can be increased when an ACK arrives for a previously unacknowledged segment.
+- *Bandwidth probing*. TCP’s strategy for adjusting its transmission rate is to increase its rate in response to arriving ACKs until a loss event occurs and decreased the transmission rate. Keep increase and decrease to adjust the rate over time.
+
+#### TCP congestion-control algorithm
+
+ The algorithm has three major components: 
+
+**Slow Start**
+
+When a TCP connection begins, the value of *cwnd* is typically initialized to a small value of 1 MSS, resulting in an initial sending rate of roughly MSS/ RTT. It will increases by 1 MSS every time for each transmitted segment is first acknowledged. Figure 3.50 shows how the TCP send rate starts slow but grows exponentially during the slow start phase.
+
+![image-20210311123939026](Asserts/Computer.Networking.Top.Down.Approach/image-20210311123939026.png)
+
+If there is a loss event indicated by a timeout, the TCP sender sets the value of *cwnd* to 1 and begins the slow start process anew. It also sets the value of a second state variable, *ssthresh* (shorthand for “slow start threshold”) to *cwnd/2*. When the new value of *cwnd* equals *ssthresh*, slow start ends and TCP transitions into *congestion avoidance mode*.
+
+If three duplicate ACKs are detected, in which case TCP performs a fast retransmit and enters the fast recovery state.
+
+**Congestion Avoidance**
+
+TCP increases the value of *cwnd* by just a single MSS every RTT. A common approach is for the TCP sender to increase *cwnd* by MSS bytes (MSS/cwnd) whenever a new acknowledgment arrives. For example, if MSS is 1,460 bytes and cwnd is 14,600 bytes, then 10 segments are being sent within an RTT. Each arriving ACK (assuming one ACK per segment) increases the congestion window size by 1/10 MSS, and thus, the value of the congestion window will have increased by one MSS after ACKs when all 10 segments have been received.
+
+TCP’s congestion-avoidance algorithm behaves the same as slow start when a timeout occurs by updating the value of *cwnd*  to 1 MSS, and the value of *ssthresh* is  to half the value of *cwnd* when the loss event occurred. 
+
+When there is a triple duplicate ACK event, TCP halves the value of *cwnd* (adding in 3 MSS for good measure to account for the triple duplicate ACKs received) and records the value of ssthresh to be half the value of cwnd when the triple duplicate ACKs were received. The fast-recovery state is then entered.
+
+**Fast Recovery**
+
+In fast recovery, the value of *cwnd* is increased by 1 MSS for every duplicate ACK received for the missing segment that caused TCP to enter the fast-recovery state. Eventually, when an ACK arrives for the missing segment, TCP enters the congestion-avoidance state after deflating cwnd. 
+
+If a timeout event occurs, fast recovery transitions to the slow-start state after performing the same actions as in slow start and congestion avoidance: The value of *cwnd* is set to 1 MSS, and the value of *ssthresh* is set to half the value of *cwnd* when the loss event occurred.
+
+> _**Note**_: Fast recovery is a recommended, but not required, component of TCP
+
+Figure 3.51 presents the complete FSM description of TCP’s congestion-control algorithms—slow start, congestion avoidance, and fast recovery.
+
+![image-20210311143052790](Asserts/Computer.Networking.Top.Down.Approach/image-20210311143052790.png)
+
+#### Fairness
+
+Consider *K* TCP connections, each with a different end-to-end path, but all passing through a bottleneck link with transmission rate *R* bps.  Suppose each connection is transferring a large file and there is no UDP traffic passing through the bottleneck link. A congestion-control mechanism is said to be *fair* if the average transmission rate of each connection is approximately *R/K;* that is, each connection gets an equal share of the link bandwidth.
+
+#### Explicit Congestion Notification (ECN): Network-assisted Congestion Control
+
+![image-20210311144844608](Asserts/Computer.Networking.Top.Down.Approach/image-20210311144844608.png)
+
+Extensions to both IP and TCP have been proposed, implemented, and deployed that allow the network to explicitly signal congestion to a TCP sender and receiver. This form of network-assisted congestion control is known as **Explicit Congestion Notification**. As shown in Figure 5.56, the TCP and IP protocols are involved.
+
+At the network layer, two bits in the Type of Service field of the IP datagram header are used for *ECN*. One setting of the *ECN* bits is used by a router to indicate that it is experiencing congestion. This congestion indication is then carried in the marked IP datagram to the destination host, which then informs the sending host, as shown in Figure 3.56.
+
+A second setting of the *ECN* bits is used by the sending host to inform routers that the sender and receiver are ECN-capable, and thus capable of taking action in response to ECN-indicated network congestion.
+
+As shown in Figure 3.56, when the TCP in the receiving host receives an *ECN* congestion indication via a received datagram, the TCP in the receiving host informs the TCP in the sending host of the congestion indication by setting the ECE (Explicit Congestion Notification Echo) bit in a receiver-to-sender TCP ACK segment. The TCP sender reacts to an ACK with an ECE congestion indication by halving the congestion window, as it would react to a lost segment using fast retransmit, and sets the *CWR* (Congestion Window Reduced) bit in the header of the next transmitted TCP sender-to-receiver segment.
+
