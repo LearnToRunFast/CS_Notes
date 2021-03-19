@@ -271,6 +271,21 @@ Width is specified by an optional decimal number immediately preceding the verb.
 %9.f   width 9, precision 0
 ```
 
+### Print Object In Table Form
+
+```go
+func printTracks(tracks []*Track) {
+  const format = "%v\t%v\t%v\t%v\t%v\t\n"
+  tw := new(tabwriter.Writer).Init(os.Stdout, 0, 8, 2, ' ', 0)
+  fmt.Fprintf(tw, format, "Title", "Artist", "Album", "Year", "Length")
+  fmt.Fprintf(tw, format, "-----", "------", "-----", "----", "------")
+  for _, t := range tracks {
+    fmt.Fprintf(tw, format, t.Title, t.Artist, t.Album, t.Year, t.Length)
+  }
+  tw.Flush() // calculate column widths and print table
+}
+```
+
 ### Operand Selector
 
 You can select the variable to print in printf
@@ -3614,6 +3629,561 @@ f(buf) // OK
 
 ### Sorting with sort.Interface
 
+Go use `sort.Interface`, to specify the contract between the generic sort algorithm and each sequence type that may be sorted.
+
+An in-place sort algorithm needs three things—the length of the sequence, a means of comparing two elements, and a way to swap two elements—so they are the three methods of sort.Interface:
+
+```go
+package sort
+type Interface interface {
+  Len() int
+  Less(i, j int) bool // i, j are indices of sequence elements
+  Swap(i, j int)
+}
+```
+
+To sort any sequence, we need to define a type that implements these three methods, then apply sort.Sort to an instance of that type.
+
+```go
+type StringSlice []string
+func (p StringSlice) Len() int { return len(p) }
+func (p StringSlice) Less(i, j int) bool { return p[i] < p[j] }
+func (p StringSlice) Swap(i, j int)  { p[i], p[j] = p[j], p[i] }
+sort.Sort(StringSlice(names))
+```
+
+#### Reverse Sort
+
+The `sort.Reverse` uses composition, which is a struct that embeds a `sort.Interface`. 
+
+```go
+package sort
+type reverse struct{ Interface } // that is, sort.Interface
+func (r reverse) Less(i, j int) bool { 
+  return r.Interface.Less(j, i) 
+}
+func Reverse(data Interface) Interface { return reverse{data} }
+```
+
+Len and Swap, the other two methods of reverse, are implicitly provided by the original sort.Interface value because it is an embedded field. The exported function Reverse returns an instance of the reverse type that contains the original `sort.Interface` value.
+
+#### Sort only With Less
+
+We can create a struct that combines a slice with a function, letting us define a new sort order by writing only the comparison function.
+
+```go
+type customSort struct {
+  t    []*Track
+  less func(x, y *Track) bool
+}
+func (x customSort) Len() int
+func (x customSort) Less(i, j int) bool { return x.less(x.t[i], x.t[j]) }
+func (x customSort) Swap(i, j int)      { x.t[i], x.t[j] = x.t[j], x.t[i] }
+```
+
+Now we can specify the order during init:
+
+```go
+sort.Sort(customSort{tracks, func(x, y *Track) bool {
+  if x.Title != y.Title {
+    return x.Title < y.Title
+  }
+  if x.Year != y.Year {
+    return x.Year < y.Year
+  }
+  if x.Length != y.Length {
+    return x.Length < y.Length
+  }
+  return false
+}})
+```
+
+### The http.Handler Interface
+
+In the program below, we create a ServeMux and use it to associate the URLs with the corresponding handlers for the `/list` and `/price` operations, which have been split into separate methods. We then use the ServeMux as the main handler in the call to ListenAndServe.
+
+```go
+package http
+type HandlerFunc func(w ResponseWriter, r *Request)
+func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
+  f(w, r)
+}
+
+
+func main() {
+  db := database{"shoes": 50, "socks": 5}
+  mux := http.NewServeMux()
+  mux.Handle("/list", http.HandlerFunc(db.list))
+  mux.Handle("/price", http.HandlerFunc(db.price))
+//ServeMux has a convenience method called HandleFunc that does it for us, so we can simplify the handler registration code to this:
+  mux.HandleFunc("/list", db.list)
+  mux.HandleFunc("/price", db.price)
+  log.Fatal(http.ListenAndServe("localhost:8000", mux))
+}
+type database map[string]dollars
+func (db database) list(w http.ResponseWriter, req *http.Request) {
+  for item, price := range db {
+    fmt.Fprintf(w, "%s: %s\n", item, price)
+  } 
+}
+func (db database) price(w http.ResponseWriter, req *http.Request) {
+  item := req.URL.Query().Get("item")
+  price, ok := db[item]
+  if !ok {
+    w.WriteHeader(http.StatusNotFound) // 404
+    fmt.Fprintf(w, "no such item: %q\n", item)
+    return
+  }
+
+  fmt.Fprintf(w, "%s\n", price)
+}
+
+```
+
+`net/http` provides a global ServeMux instance called DefaultServeMux and package-level functions called http.Handle and http.HandleFunc. To use Default- ServeMux as the server’s main handler, we needn’t pass it to ListenAndServe; nil will do.
+
+```go
+func main() {
+  db := database{"shoes": 50, "socks": 5}
+  http.HandleFunc("/list", db.list)
+  http.HandleFunc("/price", db.price)
+  log.Fatal(http.ListenAndServe("localhost:8000", nil))
+}
+```
+
+> _**Note**_: the web server invokes each handler in a new goroutine, so handlers must take precautions such as *locking* when accessing variables that other goroutines, including other requests to the same handler.
+
+### The Error Interface
+
+```go
+package errors
+type error interface {
+  Error() string
+}
+type errorString struct { 
+  text string 
+}
+func New(text string) error { 
+  return &errorString{text} 
+}
+
+func (e *errorString) Error() string { 
+  return e.text 
+}
+```
+
+Calls to errors.New are relatively infrequent because there’s a convenient wrapper function, `fmt.Errorf`, that does string formatting too.
+
+```go
+package fmt
+import "errors"
+func Errorf(format string, args ...interface{}) error {
+  return errors.New(Sprintf(format, args...))
+}
+```
+
+The syscall package provides Go’s low-level system call API. On many platforms, it defines a numeric type Errno that satisfies error, and on Unix platforms, Errno’s Error method does a lookup in a table of strings, as shown below:
+
+```go
+
+package syscall
+type Errno uintptr // operating system error code
+var errors = [...]string{
+  1:   "operation not permitted",   // EPERM
+  2:   "no such file or directory", // ENOENT
+  3:   "no such process",           // ESRCH
+  // ...
+}
+func (e Errno) Error() string {
+  if 0 <= int(e) && int(e) < len(errors) {
+    return errors[e]
+  }
+  return fmt.Sprintf("errno %d", e)
+}
+
+var err error = syscall.Errno(2)
+fmt.Println(err.Error()) // "no such file or directory"
+fmt.Println(err)         // "no such file or directory"
+```
+
+The value of err is shown graphically in Figure 7.6.
+
+![image-20210318183147462](Asserts/Go/image-20210318183147462.png)
+
+Errno is an efficient representation of system call errors drawn from a finite set, and it satisfies the standard error interface. 
+
+### Example: Expression Evaluator
+
+```go
+// An Expr is an arithmetic expression.
+type Expr interface {
+  // Eval returns the value of this Expr in the environment env.
+  Eval(env Env) float64
+  // Check reports errors in this Expr and adds its Vars to the set.
+  Check(vars map[Var]bool) error
+}
+
+// A Var identifies a variable, e.g., x.
+type Var string
+// A literal is a numeric constant, e.g., 3.141.
+type literal float64
+// A unary represents a unary operator expression, e.g., -x.
+type unary struct {
+  op rune // one of '+', '-'
+  x  Expr
+}
+// A binary represents a binary operator expression, e.g., x+y.
+type binary struct {
+  op   rune // one of '+', '-', '*', '/'
+  x, y Expr
+}
+// A call represents a function call expression, e.g., sin(x).
+type call struct {
+  fn   string // one of "pow", "sin", "sqrt"
+  args []Expr
+}
+
+type Env map[Var]float64
+
+func (v Var) Eval(env Env) float64 {
+  return env[v]
+}
+func (l literal) Eval(_ Env) float64 {
+  return float64(l)
+}
+
+
+func (u unary) Eval(env Env) float64 {
+  switch u.op {
+    case '+':
+    return +u.x.Eval(env)
+    case '-':
+    return -u.x.Eval(env)
+  }
+  panic(fmt.Sprintf("unsupported unary operator: %q", u.op))
+}
+func (b binary) Eval(env Env) float64 {
+  switch b.op {
+    case '+':
+    return b.x.Eval(env) + b.y.Eval(env)
+    case '-':
+    return b.x.Eval(env) - b.y.Eval(env)
+    case '*':
+    return b.x.Eval(env) * b.y.Eval(env)
+    case '/':
+    return b.x.Eval(env) / b.y.Eval(env)
+  }
+  panic(fmt.Sprintf("unsupported binary operator: %q", b.op))
+}
+func (c call) Eval(env Env) float64 {
+  switch c.fn {
+    case "pow":
+    return math.Pow(c.args[0].Eval(env), c.args[1].Eval(env))
+    case "sin":
+    return math.Sin(c.args[0].Eval(env))
+    case "sqrt":
+    return math.Sqrt(c.args[0].Eval(env))
+  }
+  panic(fmt.Sprintf("unsupported function call: %s", c.fn))
+}
+
+// check
+func (v Var) Check(vars map[Var]bool) error {
+  vars[v] = true
+  return nil
+}
+func (literal) Check(vars map[Var]bool) error {
+  return nil
+}
+func (u unary) Check(vars map[Var]bool) error {
+  if !strings.ContainsRune("+-", u.op) {
+    return fmt.Errorf("unexpected unary op %q", u.op)
+  }
+  return u.x.Check(vars)
+}
+
+
+func (b binary) Check(vars map[Var]bool) error {
+  if !strings.ContainsRune("+-*/", b.op) {
+    return fmt.Errorf("unexpected binary op %q", b.op)
+  }
+  if err := b.x.Check(vars); err != nil {
+    return err
+  }
+  return b.y.Check(vars)
+}
+func (c call) Check(vars map[Var]bool) error {
+  arity, ok := numParams[c.fn]
+  if !ok {
+    return fmt.Errorf("unknown function %q", c.fn)
+  }
+  if len(c.args) != arity {
+    return fmt.Errorf("call to %s has %d args, want %d",
+                      c.fn, len(c.args), arity)
+  }
+  for _, arg := range c.args {
+    if err := arg.Check(vars); err != nil {
+      return err
+    } 
+  }
+  return nil
+}
+var numParams = map[string]int{"pow": 2, "sin": 1, "sqrt": 1}
+```
+
+#### Testing
+
+```go
+
+func TestEval(t *testing.T) {
+  tests := []struct {
+    expr string
+    env  Env
+    want string
+  }{
+
+    {"sqrt(A / pi)", Env{"A": 87616, "pi": math.Pi}, "167"},
+    {"pow(x, 3) + pow(y, 3)", Env{"x": 12, "y": 1}, "1729"},
+    {"pow(x, 3) + pow(y, 3)", Env{"x": 9, "y": 10}, "1729"},
+    {"5 / 9 * (F - 32)", Env{"F": -40}, "-40"},
+    {"5 / 9 * (F - 32)", Env{"F": 32}, "0"},
+    {"5 / 9 * (F - 32)", Env{"F": 212}, "100"},
+  }
+  var prevExpr string
+  for _, test := range tests {
+    // Print expr only when it changes.
+    if test.expr != prevExpr {
+      fmt.Printf("\n%s\n", test.expr)
+      prevExpr = test.expr
+    }
+    expr, err := Parse(test.expr)
+    if err != nil {
+      t.Error(err) // parse error
+      continue
+    }
+    got := fmt.Sprintf("%.6g", expr.Eval(test.env))
+    fmt.Printf("\t%v => %s\n", test.env, got)
+    if got != test.want {
+      t.Errorf("%s.Eval() in %v = %q, want %q\n",
+               test.expr, test.env, got, test.want)
+    } 
+  }
+}
+
+```
+
+The go test command runs a package’s tests:
+
+```bash
+$ go test -v gopl.io/ch7/eval
+```
+
+The `-v` flag lets us see the printed output of the test, which is normally suppressed for a successful test like this one. Here is the output of the test’s `fmt.Printf` statements:
+
+```
+     sqrt(A / pi)
+         map[A:87616 pi:3.141592653589793] => 167
+     pow(x, 3) + pow(y, 3)
+         map[x:12 y:1] => 1729
+         map[x:9 y:10] => 1729
+     5 / 9 * (F - 32)
+         map[F:-40] => -40
+         map[F:32] => 0
+         map[F:212] => 100
+```
+
+```go
+func parseAndCheck(s string) (eval.Expr, error) {
+  if s == "" {
+    return nil, fmt.Errorf("empty expression")
+  }
+
+  expr, err := eval.Parse(s)
+  if err != nil {
+    return nil, err
+  }
+  vars := make(map[eval.Var]bool)
+  if err := expr.Check(vars); err != nil {
+    return nil, err
+  }
+  for v := range vars {
+    if v != "x" && v != "y" && v != "r" {
+      return nil, fmt.Errorf("undefined variable: %s", v)
+    } 
+  }
+  return expr, nil
+}
+```
+
+To make this a web application, all we need is the plot function below, which has the familiar signature of an `http.HandlerFunc`:
+
+```go
+func plot(w http.ResponseWriter, r *http.Request) {
+  r.ParseForm()
+  expr, err := parseAndCheck(r.Form.Get("expr"))
+  if err != nil {
+    http.Error(w, "bad expr: "+err.Error(), http.StatusBadRequest)
+    return
+  }
+  w.Header().Set("Content-Type", "image/svg+xml")
+  surface(w, func(x, y float64) float64 {
+    r := math.Hypot(x, y) // distance from (0,0)
+    return expr.Eval(eval.Env{"x": x, "y": y, "r": r})
+  }) 
+}
+```
+
+### Type Assertions
+
+A *type assertion* is an operation applied to an interface value. Syntactically, it looks like x.(T), where x is an expression of an interface type and T is a type, called the ‘‘asserted’’ type. A type assertion checks that the dynamic type of its operand matches the asserted type.
+
+If the asserted type T is a concrete type, then the type assertion checks whether x’s dynamic type is *identical to* T.
+
+```go
+var w io.Writer
+w = os.Stdout
+f := w.(*os.File)      // success: f == os.Stdout
+c := w.(*bytes.Buffer) // panic: interface holds *os.File, not *bytes.Buffer
+```
+
+If instead the asserted type T is an interface type, then the type assertion checks whether x’s dynamic type *satisfies* T. 
+
+```go
+var w io.Writer
+w = os.Stdout
+rw := w.(io.ReadWriter) // success: *os.File has both Read and Write
+w = new(ByteCounter)
+rw = w.(io.ReadWriter) // panic: *ByteCounter has no Read method
+
+w = rw             // io.ReadWriter is assignable to io.Writer
+w = rw.(io.Writer) // fails only if rw == nil
+```
+
+Test whether it is some particular type:
+
+```go
+var w io.Writer = os.Stdout
+f, ok := w.(*os.File)      // success:  ok, f == os.Stdout
+b, ok := w.(*bytes.Buffer) // failure: !ok, b == nil
+```
+
+### Discriminating Errors with Type Assertions
+
+os package provides these three helper functions to classify the failure indicated by a given error value:
+
+```go
+package os
+func IsExist(err error) bool
+func IsNotExist(err error) bool
+func IsPermission(err error) bool
+```
+
+The os package defines a type called PathError to describe failures involving an operation on a file path, like Open or Delete, and a variant called LinkError to describe failures of operations involving two file paths, like Symlink and Rename. Here’s `os.PathError`:
+
+```go
+package os
+// PathError records an error and the operation and file path that caused it.
+type PathError struct {
+  Op   string
+  Path string
+  Err  error
+}
+func (e *PathError) Error() string {
+  return e.Op + " " + e.Path + ": " + e.Err.Error()
+}
+
+_, err := os.Open("/no/such/file")
+fmt.Println(err) // "open /no/such/file: No such file or directory"
+fmt.Printf("%#v\n", err)
+// Output:
+// &os.PathError{Op:"open", Path:"/no/such/file", Err:0x2}
+
+```
+
+For example, `IsNotExist`:
+
+```go
+import (
+  "errors"
+  "syscall"
+)
+var ErrNotExist = errors.New("file does not exist")
+// IsNotExist returns a boolean indicating whether the error is known to
+// report that a file or directory does not exist. It is satisfied by
+// ErrNotExist as well as some syscall errors.
+func IsNotExist(err error) bool {
+  if pe, ok := err.(*PathError); ok {
+    err = pe.Err
+  }
+  return err == syscall.ENOENT || err == ErrNotExist
+}
+_, err := os.Open("/no/such/file")
+fmt.Println(os.IsNotExist(err)) // "true"
+```
+
+### Querying Behaviors with Interface Type Assertions
+
+```go
+func writeHeader(w io.Writer, contentType string) error {
+  if _, err := w.Write([]byte("Content-Type: ")); err != nil {
+    return err
+  }
+  if _, err := w.Write([]byte(contentType)); err != nil {
+    return err
+  }
+  // ...
+}
+```
+
+Because the Write method requires a byte slice, and the value we wish to write is a string, a `[]byte(...)` conversion is required. This conversion allocates memory and makes a copy, but the copy is thrown away almost immediately after. 
+
+We cannot assume that an arbitrary `io.Writer` w also has the `WriteString` method. But we can define a new interface that has just this method and use a type assertion to test whether the dynamic type of w satisfies this new interface.
+
+```go
+// writeString writes s to w.
+// If w has a WriteString method, it is invoked instead of w.Write.
+func writeString(w io.Writer, s string) (n int, err error) {
+  type stringWriter interface {
+    WriteString(string) (n int, err error)
+  }
+  if sw, ok := w.(stringWriter); ok {
+    return sw.WriteString(s) // avoid a copy
+  }
+  return w.Write([]byte(s)) // allocate temporary copy
+}
+
+func writeHeader(w io.Writer, contentType string) error {
+  if _, err := writeString(w, "Content-Type: "); err != nil {
+    return err
+  }
+  if _, err := writeString(w, contentType); err != nil {
+    return err
+  }
+  // ...
+}
+```
+
+Within `fmt.Fprintf`, there is a step that converts a single operand to a string, something like this:
+
+```go
+package fmt
+func formatOneValue(x interface{}) string {
+  if err, ok := x.(error); ok {
+    return err.Error()
+  }
+  if str, ok := x.(Stringer); ok {
+    return str.String()
+  }
+  // ...all other types...
+}
+```
+
+### Type Switches
+
+
+
+
+
 
 
 
@@ -3623,6 +4193,8 @@ f(buf) // OK
 
 
 ## Concurrency
+
+
 
 Making progress run more than one task simultaneously is known as concurrency. Go has rich support for concurrency using goroutines and channels.
 

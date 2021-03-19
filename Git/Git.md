@@ -61,3 +61,22 @@ With `commit history`, we can execute `git push <upstream>` to push the changes 
 `git blame <file_name>`: check commit detail for specify file.
 
 `git bisect`: Use to find last commit that one specify unit test passed.
+
+### Events
+
+#### Merge Single Commit into Mater
+
+If you wanna merge one single commit into master.
+
+```bash
+git checkout master
+git cherry-pick 62dki
+```
+
+#### Merge Consecutive Commits
+
+```bash
+git checkout -b newBranch <hashcode of last commit>
+git rebase --onto master <first commit>^
+```
+

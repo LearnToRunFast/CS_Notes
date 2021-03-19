@@ -1,14 +1,16 @@
 [toc]
 
-# Virtualizaiton of CPU
+# Operation Sytem
 
-## Key CPU virtualization terms
+## Virtualizaiton of CPU
+
+### Key CPU virtualization terms
 
 The CPU should support at least two modes of execution:
 - **User mode:** The applications do not have full access to hardware resources(**restricted mode**).
 - **Kernel mode:** The OS has access to the full resources of the machine(**privileged mode**).
 
-### Instruction Flow
+#### Instruction Flow
 
 1. Typical user applications run in user mode, and use a system call to trap into the kernel to request operating system services.
 2. The trap instruction saves register state carefully, changes the hardware status to kernel mode, and jumps into the OS to a pre-specified destination: the **trap table**.
@@ -19,18 +21,18 @@ The CPU should support at least two modes of execution:
 
 > _**NOTE**:_ The trap tables must be set up by the OS at boot time, and make sure that they cannot be readily modified by user programs. All of this is part of the limited direct execution protocol which runs programs efficiently but without loss of OS control.
 
-### Cooperative & Non-Cooperative
+#### Cooperative & Non-Cooperative
 
 Once a program is running, the OS must use hardware mechanisms to ensure the user program does not run forever, namely the **timer interrupt**. This approach is a **non-cooperative** approach to CPU scheduling.
 
 - **Cooperative:** Program volunteering give up CPU so that the OS can devide to run some other task.
 - **Non-cooperative:** A timer device can be programmed to raise an interrupt periodically; when the interrupt is raised, the currently running process is halted, and a pre-configured interrupt handler in the OS runs. The OS has regained control of the CPU.
 
-### Context Switch
+#### Context Switch
 
 Sometimes the OS, during a timer interrupt or system call, might wish to switch from running the current process to a different one, a low-level technique known as a **context switch** .
 
-## Limited Direct Exectuion
+### Limited Direct Exectuion
 
 1. The OS boots by initializing **trap table** and the hardware will remember addresses of syscall handler and timer handler.
 2. The OS start interrupt timer and handware will start timer interrupt CPU in X ms.
@@ -38,19 +40,19 @@ Sometimes the OS, during a timer interrupt or system call, might wish to switch 
 4. The OS will handle the trap by calling switch(). It will save register values of A to process structure of A, restore correpoding values from process structure of B and switch to kernel stack of B. Finally **return-from-trap** into B.
 5. The hardware will restore register valus of B from kernel stack of B and move to user mode and jump to B's PC then process B will start running.
 
-## Scheduling
+### Scheduling
 
-### Turnaround time
+#### Turnaround time
 
 The turnaround time of a job is defined as the time at which the job completes minus the time at which the job arrived in the system.
 
-### Response time
+#### Response time
 
 The time from when the job arrives in a system to the first time it is scheduled.
 
-### Types of Scheduler
+#### Types of Scheduler
 
-#### First In, First Out(FIFO)
+##### First In, First Out(FIFO)
 
 Early arrive process will get executed first.
 
@@ -58,15 +60,15 @@ Early arrive process will get executed first.
 
 > **_Convoy Effect:_** Convoy Effect is phenomenon associated with the First Come First Serve (FCFS) algorithm, in which the whole Operating System slows down due to few slow processes. 
 
-#### Shortest Job First(SJF, non-preemptive)
+##### Shortest Job First(SJF, non-preemptive)
 
 Shortest process get executed first.But this algorithm still does not solve the problem when heavy process run first, as it is **non-preemptive** the short process which arrive late will still suffer from **convoy effect**.
 
-#### Shortest Time-to-Completion First (STCF, preemptive)
+##### Shortest Time-to-Completion First (STCF, preemptive)
 
 Preemptive version of **SJF**. The **STCF** scheduler determines which of the remaining jobs (including the new job) has the least time left, and schedules that one.
 
-#### Round Robin
+##### Round Robin
 
 Instead of running jobs to completion, **RR** runs a job for a time slice (sometimes called a scheduling quantum) and then switches to the next job in the run queue. It repeatedly does so until the jobs are finished. RR is sometimes called time-slicing. 
 
@@ -74,7 +76,7 @@ Instead of running jobs to completion, **RR** runs a job for a time slice (somet
 
 **SJF** or **STCS** has less turnaround time but suffer from bad response time compare to **RR**. **RR** has a great response time but has worst turnaround time. Either good at turnaround time or response time, but not both. Such **trade-off** is common in systems.
 
-#### Multi-Level Feefback Queue(MLFQ)
+##### Multi-Level Feefback Queue(MLFQ)
 
 **Multilevel Feedback Queue** scheduling allows a process to move between queues. This movement is facilitated by the characteristic of the CPU burst of the process. If a process uses too much CPU time, it will be moved to a lower-priority queue. This scheme leaves I/O-bound and interactive processes in the higher priority queues. 
 
@@ -89,13 +91,13 @@ Instead of running jobs to completion, **RR** runs a job for a time slice (somet
 - Rule 5: After some time period S, move all the jobs in the system
   to the topmost queue.
 
-### Proportional-Share Scheduler:(Fair-Share Scheduler)
+#### Proportional-Share Scheduler:(Fair-Share Scheduler)
 
-#### Lottery Scheduling
+##### Lottery Scheduling
 
 Programs have tickets, scheduler will draw the ticket and decide which program should run
 
-##### Ticket Mechanisms
+###### Ticket Mechanisms
 
 - **Ticket currency**
   - Programs can have currency to their sub-jobs, system can converts currency to global ticket
@@ -107,23 +109,23 @@ Programs have tickets, scheduler will draw the ticket and decide which program s
 - **Stride scheduling**
 - Processes get a stride value which is inverse propotional to their tickets.All processes will have a global value of 0,the process who has lower global value runs and increase it's global value by it's stride
 
-#### The Linux Completely Fair Scheduler(CFS)
+##### The Linux Completely Fair Scheduler(CFS)
 
 Highly efficient and scalable.CFS aims to spend very little time making scheduling decisions, through both its inherent design and its clever use of data structures well-suited to the task.
 
-##### virtual runtime
+###### virtual runtime
 
 It fairly divide a CPU evenly among all competing processes. It does so through a simple counting-based technique known as **virtual runtime** (**vruntime**).As each process runs, it accumulates vruntime.CFS will pick the process with the lowest vruntime to run next.
 
-##### Sched latency
+###### Sched latency
 
 Sched latency (usually 48ms), CFS uses this value to determine how long one process should run before considering a switch. The time slice will be **shce latency** / n where n is number of processes.
 
-##### Small Time Slice
+###### Small Time Slice
 
 To prevent too small time slice, **min granularity** was introduced, which is usually set to a value like 6 ms.CFS will never set the time slice of a process to less than this value, ensuring that not too much time is spent in scheduling overhead.
 
-##### Weighting
+###### Weighting
 
 CFS also enables controls over process priority, enabling users or admin- istrators to give some processes a higher share of the CPU through UNIX mechanism known as **nice** level of a process. The nice parameter is from -20 to +19 with a deafult 0.Positive nice values imply lower priority and negative values imply higher priority.It follows below formula below
 $$
@@ -134,53 +136,53 @@ $$
 vruntime_i = vruntime_i + \frac{weight_0}{weight_i}\times runtime_i
 $$
 
-##### Red-Black Tree
+###### Red-Black Tree
 
 By keeping processes in a Red-Black tree to find the next job to run as quickly as possible.
 
 - CFS does not keep all process in this structure; rather, only running (or runnable) processes are kept therein.If a process goes to sleep, it will be removed from the tree and kept track of elsewhere.
 - Processes are ordered in the tree by **vruntime**, and most operations (such as insertion and deletion) are logarithmic in time, i.e., O(log n)
 
-##### Dealing with I/O and sleeping processes
+###### Dealing with I/O and sleeping processes
 
 The process may monopolize the CPU for the duration of it's sleep time while it catches up, effectively starving A.
 
 - CFS handles this case by altering the vruntime of a job when it wakes up. Specifically, CFS sets the **vruntime** of that job to the minimum value found in the tree. In this way, CFS avoids starvation, but not without a cost: jobs that sleep for short periods of time frequently do not ever get their fair share of the CPU.
 
-## Multiprocessor Scheduling
+### Multiprocessor Scheduling
 
 TODO. Section 10 -12
 
-# Virtualizaiton of Memory
+## Virtualizaiton of Memory
 
 The VM system is responsible for providing the illusion of a large, sparse, private address space to programs, which hold all of their instructions and data therein. The OS, with some serious hardware help, will take each of these virtual memory references, and turn them into physical addresses, which can be presented to the physical memory in order to fetch the desired information. The OS will do this for many processes at once, making sure to protect programs from one another, as well as protect the OS. The entire approach requires a great deal of mechanism (lots of low-level machinery) as well as some critical policies to work.
 
-## Type of Memory
+### Type of Memory
 
 We use C as a example when talking about stack and heap.
 
-### Stack
+#### Stack
 
 Allocations and deallocations of Stack memory is implicitly by the compiler. In C, the `func` is stoed in stack, when you return from the function, the compiler deallocates the memory for you(**it means you can access the data inside the function after your return**).
 
-### Heap
+#### Heap
 
 The heap memory, the programmers are responsible for allocating and deallocating the memory. In C, declare the data into heap by using `malloc(...)` function call.
 
-#### Compile Time operator
+##### Compile Time operator
 
 `sizeof()` is compile time operator(not a function call) which means the size is known at **compile time**. A function call would take place at run time.
 
-## Common Errors Memory Management
+### Common Errors Memory Management
 
-### Forgetting To Allocate Memory
+#### Forgetting To Allocate Memory
 
 ```c
 char *c;
 c = "a"; // will lead to Segmentation fault
 ```
 
-### Not Allocating Enough Memory
+#### Not Allocating Enough Memory
 
 ```c
 char src = "hello"
@@ -188,108 +190,132 @@ char *c = (char *) malloc (strlen(src));   // too small, you need to extra 1 len
 strcpy(c, src); // such error called buffer overflow
 ```
 
-### Forgetting to Initialize Allocated Memory
+#### Forgetting to Initialize Allocated Memory
 
 ```c
 char *c = malloc() // uninitialized read
 ```
 
-### Forgetting To Free Memory
+#### Forgetting To Free Memory
 
 Forget to call `free(x)` after using of pointer `x` will lead to **memory leak**.
 
-### Freeing Memory Before You Are Done With It
+#### Freeing Memory Before You Are Done With It
 
 Sometimes a program will free memory before it is finished using it; such a mistake is called a **dangling pointer**.
 
-### Freeing Memory Repeatedly
+#### Freeing Memory Repeatedly
 
 Programs also sometimes free memory more than once; this is known as the **double free**. The result of doing so is undefined.
 
-### Calling free() Incorrectly
+#### Calling free() Incorrectly
 
 When you pass in some other value, bad things can (and do) happen. Thus, such invalid frees are dangerous and of course should also be avoided.
 
 > **_NOTE:_**  Underlying OS Support, OS is responsbile for clean up the unused memeory when a process exited. So technically, you can don't free the memory for a short-lived program which OS will help you clean up the memory for you. **BUT!!!** It always a good habit to learn and free the memory whenever you can.
 
-## Address Translation
+### Address Translation
 
 With address translation, the OS can control each and every memory access from a process, ensuring the accesses stay within the bounds of the address space. Key to the efficiency of this technique is hardware support, which performs the translation quickly for each access, turning virtual addresses (the process’s view of memory) into physical ones (the actual view). All of this is performed in a way that is transparent to the process that has been relocated; the process has no idea its memory references are being translated, making for a wonderful illusion.
 
-### Dynamic Relocation
+#### Dynamic Relocation
 
 **Base and bounds** or **dynamic relocation** require two registers, one register stores base address and another one stores the size of the allocated memeory. 
 
-#### Advantage
+##### Advantage
 
 - **Efficient**: Base-and-bounds virtualization is quite efficient, as only a little more hardware logic is required to add abase register to the virtual address and check that the address generated by the process is in bounds. 
 - **Protection**: Base-and-bounds also offers protection; the OS and hardware combine to ensure no process can generate memory references outside its own address space. Protection is certainly one of the most important goals of the OS; without it, the OS could not control the machine (if processes were free to overwrite memory, they could easily do nasty things like overwrite the trap table and take over the system).
 
-#### Disadvantage
+##### Disadvantage
 
 - **Internal fragmentation**: The space between two process maybe wasted(if it is too small to fit one process)
 
-# Segmentation
+## Segmentation
 
-With the **Dynamic relocation** we mentioned above, there is one issue.As you can imagine from Figure 16.1, although the space between the stack and heap is not being used by the process, it is still taking up physical memory when we relocate the entire address space somewhere in physical memory; thus, the simple approach of using a base and bounds register pair to virtualise memory is wasteful.
+With the base and bounds registers, the OS can easily relocate processes to different parts of physical memory. However, as you can imagine from Figure 16.1, although the space between the stack and heap is not being used by the process, it is still taking up physical memory when we relocate the entire address space somewhere in physical memory; thus, the simple approach of using a base and bounds register pair to virtualise memory is wasteful.
 
-![image-20210109191938298](Asserts/OS/image-20210109191938298.png)
+<img src="Asserts/OS/image-20210109191938298.png" alt="image-20210109191938298" style="zoom:50%;" />
 
-To solve this problem, an idea was born, and it is called `segmentation`.
-
-The idea is simple: instead of having just one base and bounds pair in our MMU, why not have a base and bounds pair per logical segment of the address space. A `segment` is just a contiguous portion of the address space of a particular length, and in our canonical address space, we have three logically-different segments: `code`, `stack`, and `heap`.
+A `segment` is just a contiguous portion of the address space of a particular length, and in our canonical address space, we have three logically-different segments: `code`, `stack`, and `heap`. Instead of having just one base and bounds pair in our MMU, every logical segment of have a base and bounds.
 
 What segmentation allows the OS to do is to place each one of those segments in different parts of physical memory, and thus avoid filling physical memory with unused virtual address space.
 
-![image-20210109192347092](Asserts/OS/image-20210109192347092.png)
+<img src="Asserts/OS/image-20210109192347092.png" alt="image-20210109192347092" style="zoom:50%;" />
 
-![image-20210109192702890](Asserts/OS/image-20210109192702890.png)
+The hardware structure in our MMU required to support segmentation by providing a set of three base and bounds register pairs which show in Figure 16.3
+
+<img src="Asserts/OS/image-20210109192702890.png" alt="image-20210109192702890" style="zoom:50%;" />
 
 > _**Note:**_ **Segmentation fault** arises from a memory access on a segmented machine to an illegal address.
 
-## Segmentation Referring
+### Segmentation Referring
 
-### Use Top Bit
+#### Explicit Approach
 
-If we use the top two bits of our 14-bit virtual address to select the segment, our virtual address.Let’s take our example heap virtual address from above (4200) and translate it, just to make sure this is clear. The virtual address 4200, in binary form, can be seen here:
+In our example above, we have three segments; thus we need two bits to accomplish our task. If we use the top two bits of our 14-bit virtual address to select the segment. If the top two bits are 01, the hardware knows the address is in the heap, and thus uses the heap base and bounds.
 
-![image-20210109193818692](Asserts/OS/image-20210109193818692.png)
+<img src="Asserts/OS/image-20210109193818692.png" alt="image-20210109193818692" style="zoom:50%;" />
 
 **Issue of such approach**:
 
-1. We use two bits to holds three segments(code, heap , stack)
-2. It limits use of t he virtual address space.
+1. We use two bits to holds three segments(code, heap , stack), unused of bit `11`
+   - Some systems put code in the same segment as the heap and thus use only one bit to select which segment to use.
+2. It limits use of the virtual address space.
+   - 16KB address space gets chopped into four pieces.
 
-### Implicit Approach
+#### Implicit Approach
 
 The hardware determines the segment by noticing how the address was formed. 
 
-If, for example, the address was generated from the program counter (i.e., it was an instruction fetch), then the address is within the code segment; if the address is based off of the stack or base pointer, it must be in the stack segment; any other address must be in the heap.
+- If the address was generated from the program counter (i.e., it was an instruction fetch), then the address is within the code segment 
+- if the address is based off of the stack or base pointer, it must be in the stack segment
+- any other address must be in the heap.
 
 ### Backward Growing Stack
 
-The stack is grows backwards, it must be handle differently.We meed hardware support to know the segment grow direction.
+The stack is grows backwards, it must be handle differently. We meed hardware support to know the segment grow direction which is another bit to indicate the direction.
 
-![image-20210109211224863](Asserts/OS/image-20210109211224863.png)
+<img src="Asserts/OS/image-20210109211224863.png" alt="image-20210109211224863" style="zoom:50%;" />
 
-## Support For Sharing
+Assume we wish to access virtual address 15KB, which should map to physical address 27KB. The address 11 1100 0000 0000 (hex 0x3C00);
 
-It is useful to share certain memory segments between address spaces. In particular, code sharing is common and still in use in systems today.
+- `11` indicate is stack
+- `1100 0000 0000` is 3KB offset. 
+- Max segment size if 4KB
+- negative offset is 3KB - 4KB = -1 KB
+- Add -1KB to 28KB, we get physical address of 27KB
+- bound check: abs(negative offset) <= Segement Size
 
-we need a little extra support from the hardware, in the form of `protection bits`. Basic support adds a few bits per segment, indicating whether or not a program can read or write a segment, or perhaps execute code that lies within the segment.
+### Support For Sharing
 
-![image-20210109212121051](Asserts/OS/image-20210109212121051.png)
+To save memory, It is useful to share certain memory segments between address spaces. In particular, *code sharing* is common.
+
+Basic support adds a few bits(`Protection bits`) per segment, indicating whether or not a program can read or write a segment, or perhaps execute code that lies within the segment.
+
+<img src="Asserts/OS/image-20210109212121051.png" alt="image-20210109212121051" style="zoom:50%;" />
 
 By setting a code segment to read-only, the same code can be shared across multiple processes, without worry of harming isolation.
 
-## OS Support
+### Fine-grained vs. Coarse-grained Segmentation
+
+Systems with just a few segments (i.e., code, stack, heap); we can think of this segmentation as **coarse-grained**.
+
+The address spaces to consist of a large number of smaller segments, referred to as **fine-grained** segmentation. Supporting many segments requires a **segment table** of some kind stored in memory.
+
+### OS Support
 
 Segmentation raises a number of new issues for the operating system. 
 
-1. what should the OS do on a context switch?The segment registers must be saved and restored. Clearly, each process has its own virtual address space, and the OS must make sure to set up these registers correctly before letting the process run again.
-2. OS interaction when segments grow (or perhaps shrink).Malloc for variables or maybe the heap itself need grows.
-3. Managing free space in physical memory. We have a number of segments per process, and each segment might be a different size.
+1. The segment registers must be saved and restored during context switching. Each process has its own virtual address space, and the OS must make sure to set up these registers correctly before letting the process run again.
+2. When segments grow (or perhaps shrink):
+   - if the heap segment itself may need to grow, the memory-allocation library will perform a system call to grow the heap. The OS will then (usually) provide more space, updating the segment size register to the new (bigger) size, and informing the library of success; the library can then allocate space for the new object and return successfully to the calling program. 
+3. Managing free space in physical memory. When a new address space is created, the OS has to be able to find space in physical memory for its segments. We have a number of segments per process, and each segment might be a different size.
 
-> _**Note:**_ The general problem that arises is that physical memory quickly becomes full of little holes of free space, making it difficult to allocate new segments, or to grow existing ones. We call this problem **external fragmentation**.
+> _**Note:**_ The general problem that arises is that physical memory quickly becomes full of little holes of free space, making it difficult to allocate new segments, or to grow existing ones. We call this problem **external fragmentation**. Show in Figure 16.6(left)
 
-A simple approach to `external fragmentation` is to use algorithm to choose the free spaces. Such as the `best-fit`(the closest free spaces in size that satisfies the desired allocation) free spaces, `worst-fit`, `first-fit` or more complex schemes like `buddy algorithm`.Unfortunately, though, no matter how smart the algorithm, external fragmentation will still exist; thus, a good algorithm simply attempts to minimize it.
+<img src="Asserts/OS/image-20210319165216985.png" alt="image-20210319165216985" style="zoom:50%;" />
+
+One solution to this problem would be to **compact** physical memory by rearranging the existing segments. However, compaction is expensive, as copying segments is memory-intensive and generally uses a fair amount of processor time. Compaction also (ironically) makes requests to grow existing segments hard to serve, and may thus cause further rearrangement to accommodate such requests.
+
+A simpler approach might instead be to use a free-list management algorithm that tries to keep large extents of memory available for allocation.  Such as the `best-fit`(the closest free spaces in size that satisfies the desired allocation) free spaces, `worst-fit`, `first-fit` or more complex schemes like `buddy algorithm`.Unfortunately, though, no matter how smart the algorithm, external fragmentation will still exist; thus, a good algorithm simply attempts to minimize it.

@@ -1611,3 +1611,517 @@ Example of floating point addition:
 
 ## Optimizing Program Performance
 
+### Eliminating Loop Inefficiencies
+
+Assign value to local variable if the evaluation of some functions will not change inside a loop
+
+```c
+// instead of this
+for (i= 0; i < strlen("abc"); i++) {
+  //...
+}
+// do this
+long len = strlen("abc")
+for (i= 0; i < len; i++) {
+  //...
+}
+```
+
+### Reducing Procedure Calls
+
+```c
+#define IDENT 0
+#define OP  +
+
+typedef struct {
+long len;
+    data_t *data;
+} vec_rec, *vec_ptr;
+
+void combine2(vec_ptr v, data_t *dest)
+{
+  long i;
+  long length = vec_length(v);
+  
+  *dest = INDENT;
+  for (i = 0; i < length; i++) {
+    data_t val;
+    get_vec_element(v, i, &val);
+    *dest = *dest OP val;
+  }
+}
+```
+
+We can see in the code for combine2 that *get_vec_element* is called on every loop iteration to retrieve the next vector element. This function checks the vector index i against the loop bounds with every vector reference, a clear source of inefficiency. Bounds checking might be a useful feature when dealing with arbitrary array accesses, but a simple analysis of the code for combine2 shows that all references will be valid.
+
+```c
+void combine3(vec_ptr v, data_t *dest)
+{
+  long i;
+  long length = vec_length(v);
+  data_t *data = get_vec_start(v);
+  *dest = IDENT; for(i=0;i<length;i++){
+    *dest = *dest OP data[i];
+  }
+}
+```
+
+Instead that we add a function *get_vec_start* to our abstract data type. This function returns the starting address of the data array as showing combine3. Rather than making a function call to retrieve each vector element, it accesses the array directly.
+
+### Eliminating Unneeded Memory References
+
+Eliminating Unneeded Memory References by introducing local variables, as local variables. In the case of combine3:
+
+```c
+void combine3(vec_ptr v, data_t *dest)
+{
+  long i;
+  long length = vec_length(v);
+  data_t *data = get_vec_start(v);
+  *dest = IDENT; for(i=0;i<length;i++){
+    *dest = *dest OP data[i];
+  }
+}
+```
+
+The corresponding machine level code
+
+![image-20210317105243298](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210317105243298.png)
+
+
+
+The pointer dest is held in register `%rbx`. It has also transformed the code to maintain a pointer to the $i^{th}$ data element in register `%rdx`, shown in the annotations as data+i. This pointer is incremented by 8 on every iteration. The loop termination is detected by comparing this pointer to one stored in register `%rax`. We can see that the accumulated value is read from and written to memory on each iteration. This reading and writing is wasteful, since the value read from dest at the beginning of each iteration should simply be the value written at the end of the previous iteration.
+
+```c
+/* Accumulate result in local variable */
+void combine4(vec_ptr v, data_t *dest)
+{
+  long i;
+  long length = vec_length(v);
+  data_t *data = get_vec_start(v);
+  data_t acc =IDENT;
+
+  for(i=0;i<length;i++){
+    acc = acc OP data[i];
+  }
+  *dest = acc;
+}
+```
+
+![image-20210317105657717](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210317105657717.png)
+
+In combine4, a temporary variable acc that is used in the loop to accumulate the computed value. The result is stored at dest only after the loop has been completed. The compiler can now use register `%xmm0` to hold the accumulated value. Compared to the loop in combine3, we have reduced the memory operations per iteration from two reads and one write to just a single read.
+
+### Understanding Modern Processors
+
+At the code level, it appears as if instructions are executed one at a time, where each instruction involves fetching values from registers or memory, performing an operation, and storing results back to a register or memory location. In the actual processor, a number of instructions are evaluated simultaneously, a phenomenon referred to as *instruction-level parallelism*.
+
+We will find that two different lower bounds characterize the maximum performance of a program. 
+
+1. The *latency bound* is encountered when a series of operations must be performed in strict sequence. This bound can limit program performance when the data dependencies in the code limit the ability of the processor to exploit instruction-level parallelism. 
+2. The *throughput bound* characterizes the raw computing capacity of the processor’s functional units. This bound becomes the ultimate limit on program performance.
+
+#### Overall Operation
+
+Figure 5.11 shows a very simplified view of a modern microprocessor. These processors are described in the industry as being *superscalar*, which means they can perform multiple operations on every clock cycle and *out of order*.
+
+The overall processor design has two main parts: the *instruction control unit* (ICU), which is responsible for reading a sequence of instructions from memory and generating from these a set of primitive operations to perform on program data, and the *execution unit* (EU), which then executes these operations.
+
+![image-20210315200231993](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210315200231993.png)
+
+The ICU reads the instructions from an *instruction cache*—a special high-speed memory containing the most recently accessed instructions. In general, the ICU fetches well ahead of the currently executing instructions, so that it has enough time to decode these and send operations down to the EU. 
+
+Modern processors employ *branch prediction*, in which they guess whether or not a branch will be taken and also predict the target address for the branch. Using a technique known as *speculative execution*, the processor begins fetching and decoding instructions at where it predicts the branch will go, and even begins executing these operations before it has been determined whether or not the branch prediction was correct. If it later determines that the branch was predicted incorrectly, it resets the state to that at the branch point and begins fetching and executing instructions in the other direction. The block labeled “Fetch control” incorporates branch prediction to perform the task of determining which instructions to fetch.
+
+The *instruction decoding* logic takes the actual program instructions and converts them into a set of primitive *operations* (sometimes referred to as *micro-operations*). Each of these operations performs some simple computational task such as adding two numbers, reading data from memory, or writing data to memory.
+
+In a typical x86 implementation, an instruction that only operates on registers, such as
+
+```assembly
+addq %rax,%rdx
+```
+
+is converted into a single operation. On the other hand, an instruction involving one or more memory references, such as
+
+```assembly
+addq %rax,8(%rdx)
+```
+
+yields multiple operations, separating the memory references from the arithmetic operations. This particular instruction would be decoded as three operations: 
+
+1. one to *load* a value from memory into the processor
+2. one to add the loaded value to the value in register `%eax`
+3. one to *store* the result back to memory. 
+
+The decoding splits instructions to allow a division of labor among a set of dedicated hardware units. These units can then execute the different parts of multiple instructions in parallel.
+
+The EU receives operations from the instruction fetch unit. Typically, it can receive a number of them on each clock cycle. These operations are dispatched to a set of *functional units* that perform the actual operations. These functional units are specialized to handle different types of operations.
+
+Reading and writing memory is implemented by the load and store units. 
+
+1. The load unit handles operations that read data from the memory into the processor. This unit has an adder to perform address computations. 
+2. Similarly, the store unit handles operations that write data from the processor to the memory. It also has an adder to perform address computations. 
+
+As shown in the figure, the load and store units access memory via a *data cache*, a high-speed memory containing the most recently accessed data values.
+
+With speculative execution, the operations are evaluated, but the final results are not stored in the program registers or data memory until the processor can be certain that these instructions should actually have been executed. Branch operations are sent to the EU, not to determine where the branch should go, but rather to determine whether or not they were predicted correctly. If the prediction was incorrect, the EU will discard the results that have been computed beyond the branch point. It will also signal the branch unit that the prediction was incorrect and indicate the correct branch destination. In this case, the branch unit begins fetching at the new location. Such a *misprediction* incurs a significant cost in performance. It takes a while before the new instructions can be fetched, decoded, and sent to the functional units.
+
+The most common mechanism for controlling the communication of operands among the execution units is called *register renaming*. When an instruction that updates register r is decoded, a *tag* t is generated giving a unique identifier to the result of the operation. An entry (r, t) is added to a table maintaining the association between program register r and tag t for an operation that will update this register. When a subsequent instruction using register r as an operand is decoded, the operation sent to the execution unit will contain t as the source for the operand value. When some execution unit completes the first operation, it generates a result (v, t), indicating that the operation with tag t produced value v. Any operation waiting for t as a source will then use v as the source value, a form of data forwarding. 
+
+By this mechanism, values can be forwarded directly from one operation to another, rather than being written to and read from the register file, enabling the second operation to begin as soon as the first has completed. The renaming table only contains entries for registers having pending write operations. When a decoded instruction requires a register r, and there is no tag associated with this register, the operand is retrieved directly from the register file. With register renaming, an entire sequence of operations can be performed speculatively, even though the registers are updated only after the processor is certain of the branch outcomes.
+
+#### Functional Unit Performance
+
+![image-20210315235009617](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210315235009617.png)
+
+Figure 5.12 documents the performance of some of the arithmetic operations in CPF(cycles per element) for our Intel Core i7 Haswell reference machine. Each operation is characterized by
+
+1.  *latency*, meaning the total time required to perform the operation
+2. *issue time*, meaning the minimum number of clock cycles between two independent operations of the same type
+3. *capacity*, indicating the number of functional units capable of performing that operation.
+
+For Integer multiplication, the latency is 3 but the issue is 1. This short issue time is achieved through the use of *pipelining*. A pipelined function unit is implemented as a series of *stages*, each of which performs part of the operation.
+
+Functional units with issue times of 1 cycle are said to be *fully pipelined:* they can start a new operation every clock cycle. Operations with capacity greater than 1 arise due to the capabilities of the multiple functional units.
+
+The divider (used for integer and floating-point division, as well as floating-point square root) is not pipelined—its issue time equals its latency. What this means is that the divider must perform a complete division before it can begin a new one. We also see that the latencies and issue times for division are given as ranges, because some combinations of dividend and divisor require more steps than others. The long latency and issue times of division make it a comparatively costly operation.
+
+For an operation with capacity C and issue time I , the processor can potentially achieve a throughput of C/I operations per clock cycle. For example, our reference machine is capable of performing floating-point multiplication operations at a rate of 2 per clock cycle.
+
+> _**Note**_: Creating a unit with short latency or with pipelining requires more hardware, especially for more complex functions such as multiplication and floating-point operations. Since there is only a limited amount of space for these units on the microprocessor chip, CPU designers must carefully balance the number of functional units and their individual performance to achieve optimal overall performance. As Figure 5.12 indicates, integer multiplication and floating-point multiplication and addition were considered important operations in the design of the Core i7 Haswell processor, even though a significant amount of hardware is required to achieve the low latencies and high degree of pipelining shown. On the other hand, division is relatively infrequent and difficult to implement with either short latency or full pipelining.
+
+The *latencies*, *issue times*, and *capacities* of these arithmetic operations can affect the performance of our combining functions. We can express these effects in terms of two fundamental bounds on the CPE values:
+
+<img src="Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210316152447774.png" alt="image-20210316152447774" style="zoom:50%;" />
+
+The *latency bound* gives a minimum value for the CPE for any function that must perform the combining operation in a strict sequence. 
+
+The *throughput bound* gives a minimum bound for the CPE based on the maximum rate at which the functional units can produce results. 
+
+For example, since there is only one integer multiplier, and it has an issue time of 1 clock cycle, the processor cannot possibly sustain a rate of more than 1 multiplication per clock cycle. On the other hand, with four functional units capable of performing integer addition, the processor can potentially sustain a rate of 4 operations per cycle. Unfortunately, the need to read elements from memory creates an additional throughput bound. The two load units limit the processor to reading at most 2 data values per clock cycle, yielding a throughput bound of 0.50. 
+
+### Loop Unrolling
+
+Loop unrolling is a program transformation that reduces the number of iterations for a loop by increasing the number of elements computed on each iteration.Loop unrolling can improve performance in two ways. 
+
+1. it reduces the number of operations that do not contribute directly to the program result, such as loop indexing and conditional branching. 
+2. it exposes ways in which we can further transform the code to reduce the number of operations in the critical paths of the overall computation. 
+
+
+
+```c
+/* Compute prefix sum of vector a */
+void psum1(float a[], float p[], long n)
+{
+  long i;
+  p[0] = a[0];
+  for(i=1;i<n;i++)
+    p[i] = p[i-1] + a[i];
+}
+// unrolling
+void psum2(float a[], float p[], long n)
+{
+  long i;
+  p[0] = a[0]; for(i=1;i<n-1;i+=2){
+    float mid_val = p[i-1] + a[i];
+    p[i]    = mid_val;
+    p[i+1]  = mid_val + a[i+1];
+  }
+  /* For even n, finish remaining element */ 
+  if(i<n) {
+    p[i] = p[i - 1] + a[i]
+  }
+}
+```
+
+### Enhancing Parallelism
+
+![image-20210317144932942](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210317144932942.png)
+
+```c
+/* Accumulate result in local variable */
+void combine4(vec_ptr v, data_t *dest)
+{
+  long i;
+  long length = vec_length(v);
+  data_t *data = get_vec_start(v);
+  data_t acc =IDENT;
+
+  for(i=0;i<length;i++){
+    acc = acc OP data[i];
+  }
+  *dest = acc;
+}
+/* 2 x 1 loop unrolling */
+void combine5(vec_ptr v, data_t *dest)
+{
+  long i;
+  long length = vec_length(v);
+  long limit = length-1;
+  data_t *data = get_vec_start(v);
+  data_t acc = IDENT;
+
+  /* Combine 2 elements at a time */
+  for(i=0;i<limit;i+=2){
+    acc = (acc OP data[i]) OP data[i+1];
+  }
+
+  /* Finish any remaining elements */
+  for (; i < length; i++) {
+    acc = acc OP data[i];
+  }
+  *dest = acc;
+}
+/* 2 x 1a loop unrolling */
+void combine5(vec_ptr v, data_t *dest)
+{
+  long i;
+  long length = vec_length(v);
+  long limit = length-1;
+  data_t *data = get_vec_start(v);
+  data_t acc = IDENT;
+
+  /* Combine 2 elements at a time */
+  for(i=0;i<limit;i+=2){
+    acc = acc OP (data[i] OP data[i+1]);
+  }
+
+  /* Finish any remaining elements */
+  for (; i < length; i++) {
+    acc = acc OP data[i];
+  }
+  *dest = acc;
+}
+/* 2 x 2 loop unrolling */
+void combine6(vec_ptr v, data_t *dest)
+{
+  long i;
+  long length = vec_length(v);
+  long limit = length-1;
+  data_t *data = get_vec_start(v);
+  data_t acc0 = IDENT;
+  data_t acc1 = IDENT;
+
+  /* Combine 2 elements at a time */
+  for(i=0;i<limit;i+=2){
+    acc0 = acc0 OP data[i];
+    acc1 = acc1 OP data[i+1];
+  }
+
+  /* Finish any remaining elements */
+  for (; i < length; i++) {
+    acc0 = acc0 OP data[i];
+  }
+  *dest = acc0 OP acc1;
+}
+```
+
+### Some Limiting Factors
+
+#### Register Spilling
+
+The benefits of loop parallelism are limited by the ability to express the computation in assembly code. If a program has a degree of parallelism P that exceeds the number of available registers, then the compiler will resort to *spilling*, storing some of the temporary values in memory, typically by allocating space on the run-time stack. 
+
+#### Write Code Suitable for Implementation with Conditional Moves
+
+Suppose we are given two arrays of integers a and b, and at each position i, we want to set a[i] to the minimum of a[i] and b[i], and b[i] to the maximum. 
+
+An imperative style of implementing this function is to check at each position i and swap the two elements if they are out of order:
+
+```c
+/* Rearrange two vectors so that for each i, b[i] >= a[i] */
+void minmax1(long a[], long b[], long n) {
+  long i;
+  for (i = 0; i < n; i++) {
+    if (a[i] > b[i]) {
+      long t = a[i];
+      a[i] = b[i];
+      b[i] = t;
+    }
+  }
+}
+```
+
+This function show a CPE of around 13.5 for random data and 2.5–3.5 for predictable data, an indication of a misprediction penalty of around 20 cycles.
+
+A functional style of implementing this function is to compute the minimum and maximum values at each position i and then assign these values to a[i] and b[i], respectively:
+
+```c
+/* Rearrange two vectors so that for each i, b[i] >= a[i] */
+void minmax2(long a[], long b[], long n) {
+  long i;
+  for 
+    (i = 0; i < n; i++) {
+    long min = a[i] < b[i] ? a[i] : b[i];
+    long max = a[i] < b[i] ? b[i] : a[i];
+    a[i] = min;
+    b[i] = max;
+  }
+}
+```
+
+This function show a CPE of around 4.0 regardless of whether the data are arbitrary or predictable. (We also examined the generated assembly code to make sure that it indeed uses conditional moves.)
+
+A little cleverness on the part of the programmer can sometimes make code more amenable to translation into conditional data transfers. This requires some amount of experimentation, writing different versions of the function and then examining the generated assembly code and measuring performance.
+
+### Performance Improvement Techniques
+
+We have described a number of basic strategies for optimizing program performance:
+
+- *High-level design.* Choose appropriate algorithms and data structures for the problem at hand. Be especially vigilant to avoid algorithms or coding techniques that yield asymptotically poor performance.
+
+- *Basic coding principles.* Avoid optimization blockers so that a compiler can generate efficient code.
+  - Eliminate excessive function calls. Move computations out of loops when possible. Consider selective compromises of program modularity to gain greater efficiency.
+  - Eliminate unnecessary memory references. Introduce temporary vari- ables to hold intermediate results. Store a result in an array or global variable only when the final value has been computed.
+
+- *Low-level optimizations.* Structure code to take advantage of the hardware capabilities.
+  - Unroll loops to reduce overhead and to enable further optimizations. 
+  - Find ways to increase instruction-level parallelism by techniques such as multiple accumulators and reassociation.
+  - Rewrite conditional operations in a functional style to enable compilation via conditional data transfers.
+
+### Identifying and Eliminating Performance Bottlenecks
+
+#### Program Profiling
+
+Unix systems provide the profiling program `gprof`. This program generates two forms of information. First, it determines how much CPU time was spent for each of the functions in the program. Second, it computes a count of how many times each function gets called, categorized by which function performs the call. Both forms of information can be quite useful. The timings give a sense of the relative importance of the different functions in determining the overall run time. The calling information allows us to understand the dynamic behavior of the program.
+
+Profiling with gprof requires three steps, as shown for a C program prog.c, which runs with command-line argument file.txt:
+
+- The program must be compiled and linked for profiling. With gcc (and other C compilers), this involves simply including the run-time flag `-pg` on the command line. It is important to ensure that the compiler does not attempt to perform any optimizations via inline substitution, or else the calls to functions may not be tabulated accurately. We use optimization flag `-Og`, guaranteeing that function calls will be tracked properly.
+
+  ```c
+  linux> gcc -Og -pg prog.c -o prog
+  ```
+
+- The program is then executed as usual and generates a file gmon.out.
+
+  ```c
+  linux> *./prog file.txt3
+  ```
+
+- gprof is invoked to analyze the data in gmon.out:
+
+  ```c
+  linux> gprof prog
+  ```
+
+## Memory Hierarchy
+
+In practice, a *memory system* is a hierarchy of storage devices with different capacities, costs, and access times. CPU registers hold the most frequently used data. Small, fast *cache memories* nearby the CPU act as staging areas for a subset of the data and instructions stored in the relatively slow main memory. 
+
+As a programmer, it is to understand the memory hierarchy because it has a big impact on the performance of your applications. If the data your program needs are stored in a CPU register, then they can be accessed in 0 cycles during the execution of the instruction. If stored in a cache, 4 to 75 cycles. If stored in main memory, hundreds of cycles. And if stored in disk, tens of millions of cycles!
+
+This idea centers around a fundamental property of computer programs known as *locality*. Programs with good locality tend to access the same set of data items over and over again, or they tend to access sets of nearby data items.
+
+### Storage Technologies
+
+#### Random Access Memory
+
+*Random access memory (RAM)* comes in two varieties—static and dynamic. 
+
+- *Static RAM (SRAM)* is faster and significantly more expensive than *dynamic RAM (DRAM)*. SRAM is used for cache memories, both on and off the CPU chip. 
+
+  - SRAM stores each bit in a *bistable* memory cell. Each cell is implemented with a six-transistor circuit. This circuit has the property that it can stay indefinitely in either of two different voltage configurations, or *states.* Any other state will be unstable—starting from there, the circuit will quickly move toward one of the stable states. Such a memory cell is analogous to the inverted pendulum illustrated in Figure 6.1.
+
+    <img src="Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210319204615297.png" alt="image-20210319204615297" style="zoom:50%;" />
+
+- DRAM is used for the main memory plus the frame buffer of a graphics system.
+
+  - DRAM stores each bit as charge on a capacitor. This capacitor is very small— typically around 30 femtofarads—that is, 30 × 10−15 farads. 
+  - DRAM storage can be made very dense— each cell consists of a capacitor and a single access transistor.
+  - Unlike SRAM, however, a DRAM memory cell is very sensitive to any disturbance. 
+  - The memory system must periodically refresh every bit of memory by reading it out and then rewriting it.
+
+Figure 6.2 summarizes the characteristics of SRAM and DRAM memory.
+
+![image-20210319205058912](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210319205058912.png)
+
+##### Conventional DRAMs
+
+The cells (bits) in a DRAM chip are partitioned into d *supercells*, each consisting of w DRAM cells. A d × w DRAM stores a total of dw bits of information. The supercells are organized as a rectangular array with r rows and c columns, where r c = d . Each supercell has an address of the form (i, j ), where i denotes the row and j denotes the column.
+
+![image-20210319205957028](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210319205957028.png)
+
+For example, Figure 6.3 shows the organization of a 16 × 8 DRAM chip with d = 16 supercells, w = 8 bits per supercell, r = 4 rows, and c = 4 columns. The shaded box denotes the supercell at address (2, 1). Information flows in and out of the chip via external connectors called *pins*. Each pin carries a 1-bit signal. Figure 6.3 shows two of these sets of pins: eight data pins that can transfer 1 byte in or out of the chip, and two addr pins that carry two-bit row and column supercell addresses. Other pins that carry control information are not shown.
+
+Each DRAM chip is connected to some circuitry, known as the *memory controller*, that can transfer w bits at a time to and from each DRAM chip. To read the contents of supercell (i, j ), the memory controller sends the row address i to the DRAM, followed by the column address j . The DRAM responds by sending the contents of supercell (i, j ) back to the controller. The row address i is called a *RAS (row access strobe) request*. The column address j is called a *CAS (column access strobe) request*. Notice that the RAS and CAS requests share the same DRAM address pins.
+
+For example, to read supercell (2, 1) from the 16 × 8 DRAM in Figure 6.3, the memory controller sends row address 2, as shown in Figure 6.4(a). The DRAM responds by copying the entire contents of row 2 into an internal row buffer. Next, the memory controller sends column address 1, as shown in Figure 6.4(b). The DRAM responds by copying the 8 bits in supercell (2, 1) from the row buffer and sending them to the memory controller.
+
+![image-20210319210705413](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210319210705413.png)
+
+##### Memory Modules
+
+DRAM chips are packaged in *memory modules* that plug into expansion slots on the main system board (motherboard). Core i7 systems use the 240-pin *dual inline memory module (DIMM),* which transfers data to and from the memory controller in 64-bit chunks.
+
+Figure 6.5 shows the basic idea of a memory module. The example module stores a total of 64 MB (megabytes) using eight 64-Mbit 8M × 8 DRAM chips, numbered 0 to 7. Each supercell stores 1 byte of *main memory*, and each 64-bit word at byte address A in main memory is represented by the eight supercells whose corresponding supercell address is (i,j). In the example in Figure 6.5, DRAM 0 stores the first (lower-order) byte, DRAM 1 stores the next byte, and so on.
+
+![image-20210319211319737](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210319211319737.png)
+
+To retrieve the word at memory address A, the memory controller converts A to a supercell address (i, j ) and sends it to the memory module, which then broadcasts i and j to each DRAM. In response, each DRAM outputs the 8-bit contents of its (i, j ) supercell. Circuitry in the module collects these outputs and forms them into a 64-bit word, which it returns to the memory controller.
+
+##### Enhanced DRAMs
+
+- *Fast page mode DRAM (FPM DRAM).*: FPM DRAM improves allowing consecutive accesses to the same row to be served directly from the row buffer. To read supercells from the same row of an FPM DRAM, the memory controller sends an initial RAS/CAS request, followed by three CAS requests. The initial RAS/CAS request copies row i into the row buffer and returns the supercell addressed by the CAS. The next three supercells are served directly from the row buffer, and thus are returned more quickly than the initial supercell.
+- *Extended data out DRAM (EDO DRAM).* An enhanced form of FPM DRAM that allows the individual CAS signals to be spaced closer together in time.
+- *Synchronous DRAM (SDRAM)*: Conventional, FPM, and EDO DRAMs are asynchronous in the sense that they communicate with the memory con- troller using a set of explicit control signals. SDRAM replaces many of these control signals with the rising edges of the same external clock signal that drives the memory controller. An SDRAM can output the contents of its supercells at a faster rate than its asynchronous counterparts.
+- *Double Data-Rate Synchronous DRAM (DDR SDRAM).* DDR SDRAM is an enhancement of SDRAM that doubles the speed of the DRAM by using both clock edges as control signals. Different types of DDR SDRAMs are characterized by the size of a small prefetch buffer that increases the effective bandwidth: DDR (2 bits), DDR2 (4 bits), and DDR3 (8 bits).
+- *Video RAM (VRAM).* Used in the frame buffers of graphics systems. VRAM is similar in spirit to FPM DRAM. Two major differences are that (1) VRAM output is produced by shifting the entire contents of the internal buffer in sequence and (2) VRAM allows concurrent reads and writes to the memory. Thus, the system can be painting the screen with the pixels in the frame buffer (reads) while concurrently writing new values for the next update (writes).
+
+##### Nonvolatile Memory
+
+DRAMs and SRAMs are *volatile*; they lose their information if the supply voltage is turned off. There are a variety of nonvolatile memories. For historical reasons, they are referred to collectively as *read-only memories* (ROMs), even though some types of ROMs can be written to as well as read. ROMs are distinguished by the number of times they can be reprogrammed (written to) and by the mechanism for reprogramming them.
+
+- A *programmable ROM (PROM)* can be programmed exactly once. PROMs include a sort of fuse with each memory cell that can be blown once by zapping it with a high current.
+- An *erasable programmable ROM (EPROM)* has a transparent quartz window that permits light to reach the storage cells. The EPROM cells are cleared to zeros by shining ultraviolet light through the window. Programming an EPROM is done by using a special device to write ones into the EPROM. An EPROM can be erased and reprogrammed on the order of 1,000 times. 
+- An *electrically erasable PROM (EEPROM)* is akin to an EPROM, but it does not require a physically separate programming device, and thus can be reprogrammed in-place on printed circuit cards. An EEPROM can be reprogrammed on the order of $10^5$ times before it wears out.
+  - *Flash memory* is a type of nonvolatile memory, based on EEPROMs, that has become an important storage technology.
+
+Programs stored in ROM devices are often referred to as *firmware*. When a computer system is powered up, it runs firmware stored in a ROM. Some systems provide a small set of primitive input and output functions in firmware—for example, a PC’s BIOS (basic input/output system) routines. Complicated devices such as graphics cards and disk drive controllers also rely on firmware to translate I/O (input/output) requests from the CPU.
+
+##### Accessing Main Memory
+
+Data flows back and forth between the processor and the DRAM main memory over shared electrical conduits called *buses*. 
+
+- A *bus* is a collection of parallel wires that carry address, data, and control signals. Depending on the particular bus design, data and address signals can share the same set of wires or can use different sets. 
+
+Each transfer of data between the CPU and memory is accomplished with a series of steps called a *bus transaction*. 
+
+- A *read transaction* transfers data from the main memory to the CPU. 
+- A *write transaction* transfers data from the CPU to the main memory.
+
+![image-20210319214557116](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210319214557116.png)
+
+Figure 6.6 shows the configuration of an example computer system. The main components are the 
+
+- CPU chip
+- a chipset that we will call an *I/O bridge* (which includes the memory controller)
+  - The I/O bridge translates the electrical signals of the system bus into the electrical signals of the memory bus. 
+  - the I/O bridge also connects the system bus and memory bus to an *I/O bus* that is shared by I/O devices such as disks and graphics cards. 
+- the DRAM memory modules that make up main memory. 
+- These components are connected by a pair of buses: 
+  - a *system bus* that connects the CPU to the I/O bridge
+  - a *memory bus* that connects the I/O bridge to the main memory
+
+When the CPU performs a load operation such as
+
+```assembly
+movq A,%rax
+```
+
+where the contents of address A are loaded into register `%rax`. Circuitry on the CPU chip called the *bus interface* initiates a read transaction on the bus. The read transaction consists of three steps. 
+
+1. The CPU places the address A on the system bus. The I/O bridge passes the signal along to the memory bus (Figure 6.7(a))
+2. The main memory senses the address signal on the memory bus, reads the address from the memory bus, fetches the data from the DRAM, and writes the data to the memory bus. The I/O bridge translates the memory bus signal into a system bus signal and passes it along to the system bus (Figure 6.7(b)).
+3. The CPU senses the data on the system bus, reads the data from the bus, and copies the data to register `%rax` (Figure 6.7(c)).
+
+![image-20210319215453172](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210319215453172.png)
+
+Conversely, when the CPU performs a store operation such as where the contents of register `%rax` are written to address A, the CPU initiates a write transaction. Again, there are three basic steps. 
+
+1. The CPU places the address on the system bus. The memory reads the address from the memory bus and waits for the data to arrive (Figure 6.8(a)).
+2. The CPU copies the data in `%rax` to the system bus (Figure 6.8(b)). 
+3. The main memory reads the data from the memory bus and stores the bits in the DRAM (Figure 6.8(c)).
+
+![image-20210319215630452](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210319215630452.png)
+
