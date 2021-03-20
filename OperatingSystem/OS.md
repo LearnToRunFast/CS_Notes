@@ -319,3 +319,113 @@ Segmentation raises a number of new issues for the operating system.
 One solution to this problem would be to **compact** physical memory by rearranging the existing segments. However, compaction is expensive, as copying segments is memory-intensive and generally uses a fair amount of processor time. Compaction also (ironically) makes requests to grow existing segments hard to serve, and may thus cause further rearrangement to accommodate such requests.
 
 A simpler approach might instead be to use a free-list management algorithm that tries to keep large extents of memory available for allocation.  Such as the `best-fit`(the closest free spaces in size that satisfies the desired allocation) free spaces, `worst-fit`, `first-fit` or more complex schemes like `buddy algorithm`.Unfortunately, though, no matter how smart the algorithm, external fragmentation will still exist; thus, a good algorithm simply attempts to minimize it.
+
+## Free-Space Management
+
+Free-space management becomes more difficult when it consists of variable-sized units; this arises in a user-level memory-allocation library (as in malloc() and free()) and in an OS managing physical memory when using **segmentation** to implement virtual memory. In either case, the problem that exists is known as **external fragmentation**: the free space gets chopped into little pieces of different sizes and is thus fragmented; subsequent requests may fail because there is no single contiguous space that can satisfy the request, even though the total amount of free space exceeds the size of the request.
+
+`void *malloc(size t size)` takes a single parameter, size, which is the number of bytes requested by the application; it hands back a pointer (of no particular type, or a **void pointer** in C lingo) to a region of that size (or greater). The complementary routine `void free(void *ptr)` takes a pointer and frees the corresponding chunk. 
+
+The space that this library manages is known historically as the heap, and the generic data structure used to manage free space in the heap is some kind of **free list**. This structure contains references to all of the free chunks of space in the managed region of memory. Of course, this data structure need not be a list *perse*, but just some kind of data structure to track free space.
+
+> _**Note**_: There is **internal fragmentation** when user requests memories that is more than what they need. we’ll mostly focus on **external fragmentation** only.
+
+### Splitting and Coalescing
+
+A free list contains a set of elements that describe the free space still remaining in the heap. Thus, assume the following 30-byte heap:
+
+<img src="Asserts/image-20210320151427974.png" alt="image-20210320151427974" style="zoom:50%;" />
+
+The free list for this heap would have two elements on it. One entry describes the first 10-byte free segment (bytes 0-9), and one entry describes the other free segment (bytes 20-29):
+
+<img src="Asserts/image-20210320151453630.png" alt="image-20210320151453630" style="zoom:50%;" />
+
+Assume we have a request for just a single byte of memory. In this case, the allocator will perform an action known as **splitting**: it will find a free chunk of memory that can satisfy the request and split it into two. The first chunk it will return to the caller; the second chunk will remain on the list. Thus, in our example above, if a request for 1 byte were made, and the allocator decided to use the second of the two elements on the list to satisfy the request, the call to `malloc()` would return 20 (the address of the 1-byte allocated region) and the list would end up looking like this:
+
+<img src="Asserts/image-20210320151657086.png" alt="image-20210320151657086" style="zoom:50%;" />
+
+A corollary mechanism found in many allocators is known as **coalescing** of free space. When User free the `Addr 10`, if any free space nearby the free Addr, merge them into a single larger free chunk. Thus, with coalescing, our final list should look like this:
+
+<img src="Asserts/image-20210320152114065.png" alt="image-20210320152114065" style="zoom:50%;" />
+
+Most allocators store a little bit of extra information in a **header** block which is kept in memory, usually just before the handed-out chunk of memory of the `void *maclloc()`. Thus, when a user requests N bytes of memory, the library searches for a free chunk of size N plus the size of the header. A simple header looks like:
+
+```c
+typedef struct {
+    int size;
+    int magic;
+} header_t;
+```
+
+When the user calls `free(ptr)`, the library then uses simple pointer arithmetic to figure out where the header begins:
+
+```c
+void free(void *ptr) {
+    header_t *hptr = (header_t *) ptr - 1;
+    //...
+}
+```
+
+Assume we have a 4096-byte chunk of memory to manage (i.e., the heap is 4KB). To manage this as a free list, we first have to initialize a list, it should have one entry, of size 4096 (minus the header size). Here is the description of a node of the list:
+
+```c
+typedef struct __node_t {
+  int              size;
+  struct __node_t *next;
+} node_t;
+```
+
+Now let’s look at some code that initializes the heap and puts the first element of the free list inside that space.
+
+```c
+// mmap() returns a pointer to a chunk of free space
+node_t *head = mmap(NULL, 4096, PROT_READ|PROT_WRITE,
+                    MAP_ANON|MAP_PRIVATE, -1, 0);
+head->size= 4096 - sizeof(node_t);
+head->next=NULL;
+```
+
+<img src="Asserts/image-20210320154257151.png" alt="image-20210320154257151" style="zoom:50%;" />
+
+After running this code, the status of the list is that it has a single entry, of size 4088. Visually, the heap thus looks like what you see in Figure 17.3.
+
+Assume a chunk of memory of 100 bytes is requested. The library will first find a chunk that is large enough to accommodate the request; because there is only one free chunk (size: 4088), this chunk will be chosen. Then, the chunk will be **split** into two: one chunk big enough to service the request (and header, as described above), and the remaining free chunk. Assuming an 8-byte header (an integer size and an integer magic number), the space in the heap now looks like what you see in Figure 17.4.
+
+<img src="Asserts/image-20210320154446802.png" alt="image-20210320154446802" style="zoom:50%;" />
+
+When the memory is been freed, go through the list and **merge** neighboring chunks.
+
+### Basic Strategies
+
+There are many strategies to minimize the external fragmentation:
+
+- **Best Fit**:  search through the free list and return the smallest chunk that can fit the request.
+- **Worst Fit**: The **worst fit** approach is the opposite of best fit; find the largest chunk and return the requested amount.
+- **First Fit**: The **first fit** method simply finds the first block that is big enough and returns the requested amount to the user.
+  - First fit has the advantage of speed.
+- **Next Fit**: the **next fit** algorithm keeps an extra pointer to the location within the list where one was looking last.
+
+### Other Approaches
+
+#### Segregated Lists
+
+If a particular application has one (or a few) popular-sized request that it makes, keep a separate list just to manage objects of that size; all other requests are forwarded to a more general memory allocator.
+
+By having a chunk of memory dedicated for one particular size of requests, fragmentation is much less of a concern; moreover, allocation and free requests can be served quite quickly when they are of the right size, as no complicated search of a list is required.
+
+#### Buddy Allocation
+
+Because coalescing is critical for an allocator, some approaches have been designed around making coalescing simple. One good example is found in the **binary buddy allocator**.
+
+In such a system, free memory is first conceptually thought of as one big space of size $2^N$ . When a request for memory is made, the search for free space recursively divides free space by two until a block that is big enough to accommodate the request is found (and a further split into two would result in a space that is too small).
+
+Here is an example of a 64KB free space getting divided in the search for a 7KB block (Figure 17.8).
+
+<img src="Asserts/image-20210320162241409.png" alt="image-20210320162241409" style="zoom:50%;" />
+
+> _**Note**_: This scheme can suffer from **internal fragmentation**, as you are only allowed to give out power-of-two-sized blocks.
+
+When returning the 8KB block to the free list, the allocator checks whether the “buddy” 8KB is free; if so, it coalesces the two blocks into a 16KB block. The allocator then checks if the buddy of the 16KB block is still free; if so, it coalesces those two blocks. This recursive coalescing process continues up the tree, either restoring the entire free space or stopping when a buddy is found to be in use.
+
+The address of each buddy pair only differs by a single bit; which bit is determined by the level in the buddy tree, which makes it easy to determine the buddy of a particular block.
+

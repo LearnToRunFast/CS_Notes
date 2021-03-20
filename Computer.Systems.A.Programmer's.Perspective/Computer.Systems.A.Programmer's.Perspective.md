@@ -2124,4 +2124,3 @@ Conversely, when the CPU performs a store operation such as where the contents o
 3. The main memory reads the data from the memory bus and stores the bits in the DRAM (Figure 6.8(c)).
 
 ![image-20210319215630452](Asserts/Computer.Systems.A.Programmer's.Perspective/image-20210319215630452.png)
-
