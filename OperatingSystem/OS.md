@@ -429,3 +429,42 @@ When returning the 8KB block to the free list, the allocator checks whether the 
 
 The address of each buddy pair only differs by a single bit; which bit is determined by the level in the buddy tree, which makes it easy to determine the buddy of a particular block.
 
+## Paging: Introduction
+
+Instead of splitting up a process’s address space into some number of variable-sized logical segments (e.g., code, heap, stack), we divide it into fixed-sized units, each of which we call a **page**. Correspondingly, we view physical memory as an array of fixed-sized slots called **page frames**; each of these frames can contain a single virtual memory page. 
+
+Paging has a number of advantages over segmentation approaches:
+
+- *flexibility*: with a fully-developed paging approach, the system will be able to support the abstraction of an address space effectively, regardless of how a process uses the address space.
+- the *simplicity* of free-space management that paging affords.
+
+To record where each virtual page of the address space is placed in physical memory, the operating system usually keeps a *per-process* data structure known as a **page table**. The major role of the page table is to store **address translations** for each of the virtual pages of the address space.
+
+If another process were to run in our example above, the OS would have to manage a different page table for it, as its virtual pages obviously map to *different* physical pages.
+
+To **translate** this virtual address that the process generated, we have to first split it into two components: the **virtual page number (VPN)**, and the **offset** within the page. For this example, because the virtual address space of the process is 64 bytes, we need 6 bits total for our virtual address ($2^6 = 64$). Thus, our virtual address can be conceptualized as follows:
+
+<img src="Asserts/image-20210322164726270.png" alt="image-20210322164726270" style="zoom:50%;" />
+
+Where Va5 is the highest-order bit of the virtual address, and Va0 the lowest-order bit. Assume page size is 16 bytes, we can further divide the virtual address as follows:
+
+<img src="Asserts/image-20210322164808013.png" alt="image-20210322164808013" style="zoom:50%;" />
+
+Use VPN to locate the virtual page number and index the page table to find which physical frame. Thus, we can translate the virtual address by replacing the VPN with the  **physical frame number**(PFN) (also sometimes called the **physical page number** or **PPN**) and then issue the load to physical memory (Figure 18.3).
+
+<img src="Asserts/image-20210322165519463.png" alt="image-20210322165519463" style="zoom:50%;" />
+
+The Page table will be huge if the VPN increased, it is impractical to store it inside the MMU. So it is normally store page table for each process in memory.c
+
+> _**Note**_: One of the most important data structures in the memory management subsystem of a modern OS is the **page table**. In general, a page table stores **virtual-to-physical address translations**, thus letting the system know where each page of an address space actually resides in physical memory. 
+
+The simplest form of page table is called a **linear page table**, which is just an array. The OS *indexes* the array by the virtual page number (VPN), and looks up the page-table entry (PTE) at that index in order to find the desired physical frame number (PFN).
+
+For contents of each PTE, there are some special purpose bits:
+
+- A **valid bit** is common to indicate whether the particular translation is valid. All the unused space will be marked **invalid**, and if the process tries to access such memory, it will generate a trap to the OS which will likely terminate the process. By simply marking all the unused pages in the address space invalid, we remove the need to allocate physical frames for those pages and thus save a great deal of memory.
+- A **protection bits**, indicating whether the page could be read from, written to, or executed from. Again, accessing a page in a way not allowed by these bits will generate a trap to the OS.
+- A **present bit** indicates whether this page is in physical memory or on disk (i.e., it has been **swapped out**).
+- A **dirty bit** is indicating whether the page has been modified since it was brought into memory.
+- A **reference bit** (a.k.a. **accessed bit**) is sometimes used to track whether a page has been accessed, and is useful in determining which pages are popular and thus should be kept in memory; such knowledge is critical during **page replacement**.
+
