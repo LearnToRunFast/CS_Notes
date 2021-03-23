@@ -428,3 +428,7 @@ Programs with good locality access most of their data from fast cache memories. 
 - Try to maximize the temporal locality in your programs by using a data object as often as possible once it has been read from memory.
 
 ## Linking
+
+Linking is the process of collecting and combining various pieces of code and data into a single file that can be *loaded* (copied) into memory and executed.
+
+Linking can be performed at *compile time*, when the source code is translated into machine code; at *load time*, when the program is loaded into memory and executed by the *loader*; and even at *run time*, by application programs. On modern systems, linking is performed automatically by programs called *linkers*.

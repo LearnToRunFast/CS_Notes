@@ -80,3 +80,9 @@ git checkout -b newBranch <hashcode of last commit>
 git rebase --onto master <first commit>^
 ```
 
+#### Push Local Branch to New Remote Branch
+
+```bash
+git push -u origin localBranch:newRemoteBranch
+```
+
