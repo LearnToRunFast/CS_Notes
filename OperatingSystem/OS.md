@@ -637,3 +637,28 @@ Finding the correct entry is now a matter of searching through this data structu
 
 **Swap space** refers to some reserved space on the disk for moving pages back and forth. The OS will need to remember the **disk address** of a given page.
 
+The **present bit** in each page-table entry indicates whether the page is present in physical memory in the event of TLB miss. If present bit is set to zero, the page is *not* in memory but rather on disk somewhere. Otherwise, it is in the physical memory. 
+
+The act of accessing a page that is not in physical memory is commonly referred to as a **page fault**. Upon a page fault, the OS is invoked to service the page fault. A particular piece of code, known as a **page-fault handler**, runs, and must service the page fault.
+
+
+
+### The Page Fault
+
+The OS could use the bits in the PTE normally used for data such as the PFN of the page for a disk address. When the OS receives a page fault for a page, it looks in the PTE to find the address, and issues the request to disk to fetch the page into memory.
+
+When the disk I/O completes, the OS will then update the page table to mark the page as present, update the PFN field of the page-table entry (PTE) to record the in-memory location of the newly-fetched page, and retry the instruction. This next attempt may generate a TLB miss, which would then be serviced and update the TLB with the translation (one could alternately update the TLB when servicing the page fault to avoid this step). Finally, a last restart would find the translation in the TLB and thus proceed to fetch the desired data or instruction from memory at the translated physical address.
+
+### Page Fault Control Flow
+
+Figures 21.2 shows what the hardware does during translation.
+
+![image-20210325233755513](Asserts/image-20210325233755513.png)
+
+Figures 21.3 shows what the OS does upon a page fault.
+
+![image-20210325233835750](Asserts/image-20210325233835750.png)
+
+### When Replacements Really Occur
+
+To keep a small amount of memory free, most operating systems thus have some kind of **high watermark** (HW) and **low watermark** (LW) to help decide when to start evicting pages from memory. When the OS notices that there are fewer than LW pages available, a background thread that is responsible for freeing memory runs. The thread evicts pages until there are HW pages available, then goes to sleep. The background thread, sometimes called the **swap daemon** or **page daemon**.
