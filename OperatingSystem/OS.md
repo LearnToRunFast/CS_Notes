@@ -571,3 +571,69 @@ The MIPS provides four such instructions:
 
 The OS uses these instructions to manage the TLB’s contents. It is of course critical that these instructions are **privileged**; imagine what a user process could do if it could modify the contents of the TLB.
 
+### Multi-level Page Tables
+
+The basic idea behind a multi-level page table is simple. First, chop up the page table into page-sized units; then, if an entire page of page-table entries (PTEs) is invalid, don’t allocate that page of the page table at all. To track whether a page of the page table is valid (and if valid, where it is in memory), use a new structure, called the **page directory**. The page directory thus either can be used to tell you where a page of the page table is, or that the entire page of the page table contains no valid pages.
+
+#### Two Level Page Table
+
+Figure 20.3 shows comparison between linear and multi-level page tables:
+
+![image-20210325103925453](Asserts/image-20210325103925453.png)
+
+The page directory, in a simple two-level table, contains one entry per page of the page table. It consists of a number of **page directory entries** (**PDE**). A PDE (minimally) has a **valid bit** and a **page frame number** (PFN), similar to a PTE. If the PDE is valid, it means that at least one of the pages of the page table that the entry points to (via the PFN) is valid.
+
+Multi-level page tables have some obvious advantages:
+
+1. The multi-level table only allocates page-table space in proportion to the amount of address space you are using.
+2. If carefully constructed, each portion of the page table fits neatly within a page, making it easier to manage memory; the OS can simply grab the next free page when it needs to allocate or grow a page table.
+
+Multi-level page tables have some drawbacks too:
+
+1. On a TLB miss, two loads from memory will be required to get the right translation information from the page table (one for the page directory, and one for the PTE itself). Thus, the multi-level table is a small example of a **time-space trade-off**. 
+2. *Complexity*. Whether it is the hardware or OS handling the page-table lookup (on a TLB miss), doing so is undoubtedly more involved than a simple linear page-table lookup.
+
+Assuming page directory entries contains 16 pages, we need to use top four bits of the VPN as page directory index:
+
+![image-20210325114321914](Asserts/image-20210325114321914.png)
+
+```c
+PDEAddr = PageDirBase + (PDIndex * sizeof(PDE))
+```
+
+To find the PTE, we have to index into the portion of the page table using the remaining bits of the VPN:
+
+![image-20210325114520271](Asserts/image-20210325114520271.png)
+
+Note that the page-frame number (PFN) obtained from the page-directory entry must be left-shifted into place before combining it with the page- table index to form the address of the PTE.
+
+```c
+PTEAddr = (PDE.PFN << SHIFT) + (PTIndex * sizeof(PTE))
+```
+
+#### More Than Two Levels
+
+Two Level will face the same issue with page directory entries become too big. To determine how many levels are needed in a multi-level table to make all pieces of the page table fit within a page, we start by determining how many page-table entries fit within a page. 
+
+Assume we have a 30-bit virtual address space, and our virtual address has a 21-bit virtual page number component and a 9-bit offset. Our page size of 512 bytes, and assuming a PTE size of 4 bytes, you should see that you can fit 128 PTEs on a single page. When we index into a page of the page table, we can thus conclude we’ll need the least significant 7 bits ($log_2128$) of the VPN as an index:
+
+![image-20210325123917979](Asserts/image-20210325123917979.png)
+
+The left page directory is 14 bits. If our page directory has $2^{14}$ entries, it spans not one page but 128, and thus our goal of making every piece of the multi-level page table fit into a page vanishes.
+
+By splitting the page directory itself into multiple pages, and then adding another page directory on top of that, to point to the pages of the page directory. We can thus split up our virtual address as follows:
+
+![image-20210325124958905](Asserts/image-20210325124958905.png)
+
+When indexing the upper-level page directory, we use the very top bits of the virtual address (PD Index 0 in the diagram); this index can be used to fetch the page-directory entry from the top-level page directory. If valid, the second level of the page directory is consulted by combining the physical frame number from the top-level PDE and the next part of the VPN (PD Index 1). Finally, if valid, the PTE address can be formed by using the page-table index combined with the address from the second-level PDE. 
+
+### Inverted Page Tables
+
+An even more extreme space savings in the world of page tables is found with **inverted page tables**. Instead of having many page tables (one per process of the system), we keep a single page table that has an entry for each *physical page* of the system. The entry tells us which process is using this page, and which virtual page of that process maps to this physical page.
+
+Finding the correct entry is now a matter of searching through this data structure. A hash table is often built over the base structure to speed up lookups.
+
+## Swapping: Mechanisms
+
+**Swap space** refers to some reserved space on the disk for moving pages back and forth. The OS will need to remember the **disk address** of a given page.
+

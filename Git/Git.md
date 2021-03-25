@@ -86,3 +86,37 @@ git rebase --onto master <first commit>^
 git push -u origin localBranch:newRemoteBranch
 ```
 
+#### Get the Remote Branch to Local
+
+```bash
+git fetch
+git checkout remotebranchName
+```
+
+#### Merge Two Local Branches
+
+```bash
+git checkout branchOfMergeTo
+git merge branchOfMergeFrom
+```
+
+#### Merge Current Stage Files With Last Commit
+
+`--no-edit` Automatically commit with previous commit message.
+
+```bash
+git commit --amend --no-edit
+```
+
+#### Create a Copy of Remote Branch
+
+```c
+git branch --track <new-branch> origin/<base-branch>
+```
+
+#### Create a Branch From Commit
+
+```c
+git branch <new-branch> hashValue
+```
+
