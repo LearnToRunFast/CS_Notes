@@ -633,7 +633,9 @@ An even more extreme space savings in the world of page tables is found with **i
 
 Finding the correct entry is now a matter of searching through this data structure. A hash table is often built over the base structure to speed up lookups.
 
-## Swapping: Mechanisms
+## Swapping
+
+### Mechanisms
 
 **Swap space** refers to some reserved space on the disk for moving pages back and forth. The OS will need to remember the **disk address** of a given page.
 
@@ -641,15 +643,21 @@ The **present bit** in each page-table entry indicates whether the page is prese
 
 The act of accessing a page that is not in physical memory is commonly referred to as a **page fault**. Upon a page fault, the OS is invoked to service the page fault. A particular piece of code, known as a **page-fault handler**, runs, and must service the page fault.
 
+> <center><strong>TYPES OF CACHE MISSES</strong></center>
+>
+> A **compulsory miss** (or **cold-start miss**) occurs because the cache is empty to begin with and this is the first reference to the item.
+>
+> A **capacity miss** occurs because the cache ran out of space and had to evict an item to bring a new item into the cache.
+>
+> A **conflict miss** arises in hardware because of limits on where an item can be placed in a hardware cache, due to something known as **set-associativity**; it does not arise in the OS page cache because such caches are always **fully-associative**.
 
-
-### The Page Fault
+#### The Page Fault
 
 The OS could use the bits in the PTE normally used for data such as the PFN of the page for a disk address. When the OS receives a page fault for a page, it looks in the PTE to find the address, and issues the request to disk to fetch the page into memory.
 
 When the disk I/O completes, the OS will then update the page table to mark the page as present, update the PFN field of the page-table entry (PTE) to record the in-memory location of the newly-fetched page, and retry the instruction. This next attempt may generate a TLB miss, which would then be serviced and update the TLB with the translation (one could alternately update the TLB when servicing the page fault to avoid this step). Finally, a last restart would find the translation in the TLB and thus proceed to fetch the desired data or instruction from memory at the translated physical address.
 
-### Page Fault Control Flow
+#### Page Fault Control Flow
 
 Figures 21.2 shows what the hardware does during translation.
 
@@ -659,6 +667,38 @@ Figures 21.3 shows what the OS does upon a page fault.
 
 ![image-20210325233835750](Asserts/image-20210325233835750.png)
 
-### When Replacements Really Occur
+#### When Replacements Really Occur
 
 To keep a small amount of memory free, most operating systems thus have some kind of **high watermark** (HW) and **low watermark** (LW) to help decide when to start evicting pages from memory. When the OS notices that there are fewer than LW pages available, a background thread that is responsible for freeing memory runs. The thread evicts pages until there are HW pages available, then goes to sleep. The background thread, sometimes called the **swap daemon** or **page daemon**.
+
+### Swapping Policies
+
+The optimal solution is to replaces the page that will be accessed *furthest in the future* is the optimal policy, resulting in the fewest-possible cache misses. But the future is not generally known; you can’t build the optimal policy for a general-purpose operating system. Thus, the optimal policy will serve only as a comparison point, to know how close we are to “perfect”.
+
+1. **First-in First-out (FIFO)**: The pages were simply placed in a queue when they enter the system; when a replacement occurs, the page on the tail of the queue (the “first-in” page) is evicted. FIFO has one great strength: it is quite simple to implement.
+2. **Random**: Which simply picks a random page to replace under memory pressure.
+3. **Least-Frequently-Used** (**LFU**): replaces the least-frequently-used page when an eviction must take place.
+4. **Least-Recently- Used** (**LRU**): policy replaces the least-recently-used page.
+   - Use bit per page of the system, and the use bits live in memory somewhere (they could be in the per-process page tables, for example, or just in an array somewhere). Whenever a page is referenced (i.e., read or written), the use bit is set by hardware to 1. Imagine all the pages of the system arranged in a circular list. A **clock hand** points to some particular page to begin with. When a replacement must occur, the OS checks if the currently-pointed to page P has a use bit of 1 or 0.
+     - If 1, this implies that page P was recently used and thus is *not* a good candidate for replacement. Thus, the use bit for P is set to 0 (cleared), and the clock hand is incremented to the next page (P + 1). 
+     - The algorithm continues until it finds a use bit that is set to 0, implying this page has not been recently used.
+   - One small modification to the clock algorithm is to additional consideration of whether a page has been modified or not while in memory. The reason for this: if a page has been **modified** and is thus **dirty**, it must be written back to disk to evict it, which is expensive. If it has not been modified (and is thus **clean**), the eviction is free; the physical frame can simply be reused for other purposes without additional I/O. Thus, some VM systems prefer to evict clean pages over dirty pages.
+
+### Other VM Policies
+
+#### Page Selection Policy
+
+For most pages, the OS simply uses **demand paging**, which means the OS brings the page into memory when it is accessed. The OS could guess that a page is about to be used, and thus bring it in ahead of time; this behavior is known as **prefetching** and should only be done when there is reasonable chance of success. For example, some systems will assume that if a code page P is brought into memory, that code page P +1 will likely soon be accessed and thus should be brought into memory too.
+
+#### Clustering Write
+
+This policy determines how the OS writes pages out to disk. Many systems collect a number of pending writes together in memory and write them to disk in one (more efficient) write. This behavior is usually called **clustering** or simply **grouping** of writes, and is effective because of the nature of disk drives, which perform a single large write more efficiently than many small ones.
+
+### Thrashing
+
+When the system will constantly be paging, it referred to as **thrashing**. An **admission control** states that it is sometimes better to do less work well than to try to do everything at once poorly.  For example, given a set of processes, a system could decide not to run a sub- set of processes, with the hope that the reduced set of processes’ **working sets** (the pages that they are using actively) fit in memory and thus can make progress.
+
+Some current systems take more a draconian approach to memory overload. For example, some versions of Linux run an **out-of-memory killer** when memory is oversubscribed; this daemon chooses a memory-intensive process and kills it, thus reducing memory in a none-too-subtle manner.
+
+## Complete VM Systems
+
