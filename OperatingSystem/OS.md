@@ -231,7 +231,7 @@ With address translation, the OS can control each and every memory access from a
 
 - **Internal fragmentation**: The space between two process maybe wasted(if it is too small to fit one process)
 
-## Segmentation
+### Segmentation
 
 With the base and bounds registers, the OS can easily relocate processes to different parts of physical memory. However, as you can imagine from Figure 16.1, although the space between the stack and heap is not being used by the process, it is still taking up physical memory when we relocate the entire address space somewhere in physical memory; thus, the simple approach of using a base and bounds register pair to virtualise memory is wasteful.
 
@@ -249,9 +249,9 @@ The hardware structure in our MMU required to support segmentation by providing 
 
 > _**Note:**_ **Segmentation fault** arises from a memory access on a segmented machine to an illegal address.
 
-### Segmentation Referring
+#### Segmentation Referring
 
-#### Explicit Approach
+##### Explicit Approach
 
 In our example above, we have three segments; thus we need two bits to accomplish our task. If we use the top two bits of our 14-bit virtual address to select the segment. If the top two bits are 01, the hardware knows the address is in the heap, and thus uses the heap base and bounds.
 
@@ -264,7 +264,7 @@ In our example above, we have three segments; thus we need two bits to accomplis
 2. It limits use of the virtual address space.
    - 16KB address space gets chopped into four pieces.
 
-#### Implicit Approach
+##### Implicit Approach
 
 The hardware determines the segment by noticing how the address was formed. 
 
@@ -272,7 +272,7 @@ The hardware determines the segment by noticing how the address was formed.
 - if the address is based off of the stack or base pointer, it must be in the stack segment
 - any other address must be in the heap.
 
-### Backward Growing Stack
+#### Backward Growing Stack
 
 The stack is grows backwards, it must be handle differently. We meed hardware support to know the segment grow direction which is another bit to indicate the direction.
 
@@ -287,7 +287,7 @@ Assume we wish to access virtual address 15KB, which should map to physical addr
 - Add -1KB to 28KB, we get physical address of 27KB
 - bound check: abs(negative offset) <= Segement Size
 
-### Support For Sharing
+#### Support For Sharing
 
 To save memory, It is useful to share certain memory segments between address spaces. In particular, *code sharing* is common.
 
@@ -297,13 +297,13 @@ Basic support adds a few bits(`Protection bits`) per segment, indicating whether
 
 By setting a code segment to read-only, the same code can be shared across multiple processes, without worry of harming isolation.
 
-### Fine-grained vs. Coarse-grained Segmentation
+#### Fine-grained vs. Coarse-grained Segmentation
 
 Systems with just a few segments (i.e., code, stack, heap); we can think of this segmentation as **coarse-grained**.
 
 The address spaces to consist of a large number of smaller segments, referred to as **fine-grained** segmentation. Supporting many segments requires a **segment table** of some kind stored in memory.
 
-### OS Support
+#### OS Support
 
 Segmentation raises a number of new issues for the operating system. 
 
@@ -320,7 +320,7 @@ One solution to this problem would be to **compact** physical memory by rearrang
 
 A simpler approach might instead be to use a free-list management algorithm that tries to keep large extents of memory available for allocation.  Such as the `best-fit`(the closest free spaces in size that satisfies the desired allocation) free spaces, `worst-fit`, `first-fit` or more complex schemes like `buddy algorithm`.Unfortunately, though, no matter how smart the algorithm, external fragmentation will still exist; thus, a good algorithm simply attempts to minimize it.
 
-## Free-Space Management
+### Free-Space Management
 
 Free-space management becomes more difficult when it consists of variable-sized units; this arises in a user-level memory-allocation library (as in malloc() and free()) and in an OS managing physical memory when using **segmentation** to implement virtual memory. In either case, the problem that exists is known as **external fragmentation**: the free space gets chopped into little pieces of different sizes and is thus fragmented; subsequent requests may fail because there is no single contiguous space that can satisfy the request, even though the total amount of free space exceeds the size of the request.
 
@@ -330,7 +330,7 @@ The space that this library manages is known historically as the heap, and the g
 
 > _**Note**_: There is **internal fragmentation** when user requests memories that is more than what they need. we’ll mostly focus on **external fragmentation** only.
 
-### Splitting and Coalescing
+#### Splitting and Coalescing
 
 A free list contains a set of elements that describe the free space still remaining in the heap. Thus, assume the following 30-byte heap:
 
@@ -395,7 +395,7 @@ Assume a chunk of memory of 100 bytes is requested. The library will first find 
 
 When the memory is been freed, go through the list and **merge** neighboring chunks.
 
-### Basic Strategies
+#### Basic Strategies
 
 There are many strategies to minimize the external fragmentation:
 
@@ -405,15 +405,15 @@ There are many strategies to minimize the external fragmentation:
   - First fit has the advantage of speed.
 - **Next Fit**: the **next fit** algorithm keeps an extra pointer to the location within the list where one was looking last.
 
-### Other Approaches
+#### Other Approaches
 
-#### Segregated Lists
+##### Segregated Lists
 
 If a particular application has one (or a few) popular-sized request that it makes, keep a separate list just to manage objects of that size; all other requests are forwarded to a more general memory allocator.
 
 By having a chunk of memory dedicated for one particular size of requests, fragmentation is much less of a concern; moreover, allocation and free requests can be served quite quickly when they are of the right size, as no complicated search of a list is required.
 
-#### Buddy Allocation
+##### Buddy Allocation
 
 Because coalescing is critical for an allocator, some approaches have been designed around making coalescing simple. One good example is found in the **binary buddy allocator**.
 
@@ -429,9 +429,9 @@ When returning the 8KB block to the free list, the allocator checks whether the 
 
 The address of each buddy pair only differs by a single bit; which bit is determined by the level in the buddy tree, which makes it easy to determine the buddy of a particular block.
 
-## Paging
+### Paging
 
-### Introduction
+#### Introduction
 
 Instead of splitting up a process’s address space into some number of variable-sized logical segments (e.g., code, heap, stack), we divide it into fixed-sized units, each of which we call a **page**. Correspondingly, we view physical memory as an array of fixed-sized slots called **page frames**; each of these frames can contain a single virtual memory page. 
 
@@ -470,13 +470,13 @@ For contents of each PTE, there are some special purpose bits:
 - A **dirty bit** is indicating whether the page has been modified since it was brought into memory.
 - A **reference bit** (a.k.a. **accessed bit**) is sometimes used to track whether a page has been accessed, and is useful in determining which pages are popular and thus should be kept in memory; such knowledge is critical during **page replacement**.
 
-### Faster Translations (TLBs)
+#### Faster Translations (TLBs)
 
 To speed address translation, we are going to add what is called a **translation-lookaside buffer** (**TLB**). A TLB is part of the chip’s **memory-management unit** (**MMU**), and is simply a hardware **cache** of popular virtual-to-physical address translations; thus, a better name would be an **address-translation cache**. 
 
 Upon each virtual memory reference, the hardware first checks the TLB to see if the desired translation is held therein; if so, the translation is performed (quickly) *without* having to consult the page table (which has all translations).
 
-#### TLB Basic Algorithm
+##### TLB Basic Algorithm
 
 The algorithm the hardware follows works like this: 
 
@@ -485,7 +485,7 @@ The algorithm the hardware follows works like this:
    1. If it does, we have a **TLB hit**, which means the TLB holds the translation. We can now extract the page frame number (PFN) from the relevant TLB entry, concatenate that onto the offset from the original virtual address, and form the desired physical address (PA), and access memory, assuming protection checks do not fail.
    2. If the CPU does not find the translation in the TLB (a **TLB miss**), the hardware accesses the page table to find the translation. Assuming that the virtual memory reference generated by the process is valid and accessible, updates the TLB with the translation. These set of actions are costly, primarily because of the extra memory reference needed to access the page table.
 
-#### Handles The TLB Miss
+##### Handles The TLB Miss
 
 Either the hardware, or the software (OS) can handles the TLB miss:
 
@@ -511,7 +511,7 @@ When running the TLB miss-handling code, the OS needs to be extra careful not to
 >
 > By setting all TLB entries to invalid, the system can ensure that the about-to-be-run process does not accidentally use a virtual-to-physical translation from a previous process.
 
-#### TLB Contents
+##### TLB Contents
 
 A TLB entry might look like this:
 
@@ -524,7 +524,7 @@ Other bits:
 3. A **address-space identifier**.
 4. A **dirty bit**.
 
-#### Context Switches
+##### Context Switches
 
 The TLB contains virtual-to-physical translations that are only valid for the currently running process; these translations are not meaningful for other processes.
 
@@ -538,13 +538,13 @@ There are a number of possible solutions to this problem:
    - Provide an **address space identifier** (**ASID**) field in the TLB. ASID is similar to a **process identifier** (**PID**), but it has fewer bits.
    - During a context switch, set some privileged register to the ASID of the current process in order to know which process is currently running.
 
-#### Replacement Policy
+##### Replacement Policy
 
 **Least-recently-used** or **LRU** tries to take advantage of locality in the memory-reference stream, assuming it is likely that an entry that has not recently been used is a good candidate for eviction.
 
 **Random** policy, which evicts a TLB mapping at random.
 
-#### A Real TLB Entry
+##### A Real TLB Entry
 
 ![image-20210323223258121](Asserts/image-20210323223258121.png)
 
@@ -571,11 +571,11 @@ The MIPS provides four such instructions:
 
 The OS uses these instructions to manage the TLB’s contents. It is of course critical that these instructions are **privileged**; imagine what a user process could do if it could modify the contents of the TLB.
 
-### Multi-level Page Tables
+#### Multi-level Page Tables
 
 The basic idea behind a multi-level page table is simple. First, chop up the page table into page-sized units; then, if an entire page of page-table entries (PTEs) is invalid, don’t allocate that page of the page table at all. To track whether a page of the page table is valid (and if valid, where it is in memory), use a new structure, called the **page directory**. The page directory thus either can be used to tell you where a page of the page table is, or that the entire page of the page table contains no valid pages.
 
-#### Two Level Page Table
+##### Two Level Page Table
 
 Figure 20.3 shows comparison between linear and multi-level page tables:
 
@@ -611,7 +611,7 @@ Note that the page-frame number (PFN) obtained from the page-directory entry mus
 PTEAddr = (PDE.PFN << SHIFT) + (PTIndex * sizeof(PTE))
 ```
 
-#### More Than Two Levels
+##### More Than Two Levels
 
 Two Level will face the same issue with page directory entries become too big. To determine how many levels are needed in a multi-level table to make all pieces of the page table fit within a page, we start by determining how many page-table entries fit within a page. 
 
@@ -627,15 +627,13 @@ By splitting the page directory itself into multiple pages, and then adding anot
 
 When indexing the upper-level page directory, we use the very top bits of the virtual address (PD Index 0 in the diagram); this index can be used to fetch the page-directory entry from the top-level page directory. If valid, the second level of the page directory is consulted by combining the physical frame number from the top-level PDE and the next part of the VPN (PD Index 1). Finally, if valid, the PTE address can be formed by using the page-table index combined with the address from the second-level PDE. 
 
-### Inverted Page Tables
+#### Inverted Page Tables
 
 An even more extreme space savings in the world of page tables is found with **inverted page tables**. Instead of having many page tables (one per process of the system), we keep a single page table that has an entry for each *physical page* of the system. The entry tells us which process is using this page, and which virtual page of that process maps to this physical page.
 
 Finding the correct entry is now a matter of searching through this data structure. A hash table is often built over the base structure to speed up lookups.
 
-## Swapping
-
-### Mechanisms
+### Swapping
 
 **Swap space** refers to some reserved space on the disk for moving pages back and forth. The OS will need to remember the **disk address** of a given page.
 
@@ -671,7 +669,7 @@ Figures 21.3 shows what the OS does upon a page fault.
 
 To keep a small amount of memory free, most operating systems thus have some kind of **high watermark** (HW) and **low watermark** (LW) to help decide when to start evicting pages from memory. When the OS notices that there are fewer than LW pages available, a background thread that is responsible for freeing memory runs. The thread evicts pages until there are HW pages available, then goes to sleep. The background thread, sometimes called the **swap daemon** or **page daemon**.
 
-### Swapping Policies
+#### Swapping Policies
 
 The optimal solution is to replaces the page that will be accessed *furthest in the future* is the optimal policy, resulting in the fewest-possible cache misses. But the future is not generally known; you can’t build the optimal policy for a general-purpose operating system. Thus, the optimal policy will serve only as a comparison point, to know how close we are to “perfect”.
 
@@ -684,21 +682,102 @@ The optimal solution is to replaces the page that will be accessed *furthest in 
      - The algorithm continues until it finds a use bit that is set to 0, implying this page has not been recently used.
    - One small modification to the clock algorithm is to additional consideration of whether a page has been modified or not while in memory. The reason for this: if a page has been **modified** and is thus **dirty**, it must be written back to disk to evict it, which is expensive. If it has not been modified (and is thus **clean**), the eviction is free; the physical frame can simply be reused for other purposes without additional I/O. Thus, some VM systems prefer to evict clean pages over dirty pages.
 
-### Other VM Policies
+#### Other VM Policies
 
-#### Page Selection Policy
+##### Page Selection Policy
 
 For most pages, the OS simply uses **demand paging**, which means the OS brings the page into memory when it is accessed. The OS could guess that a page is about to be used, and thus bring it in ahead of time; this behavior is known as **prefetching** and should only be done when there is reasonable chance of success. For example, some systems will assume that if a code page P is brought into memory, that code page P +1 will likely soon be accessed and thus should be brought into memory too.
 
-#### Clustering Write
+##### Clustering Write
 
 This policy determines how the OS writes pages out to disk. Many systems collect a number of pending writes together in memory and write them to disk in one (more efficient) write. This behavior is usually called **clustering** or simply **grouping** of writes, and is effective because of the nature of disk drives, which perform a single large write more efficiently than many small ones.
 
-### Thrashing
+### Other Optimizations
+
+#### Thrashing
 
 When the system will constantly be paging, it referred to as **thrashing**. An **admission control** states that it is sometimes better to do less work well than to try to do everything at once poorly.  For example, given a set of processes, a system could decide not to run a sub- set of processes, with the hope that the reduced set of processes’ **working sets** (the pages that they are using actively) fit in memory and thus can make progress.
 
 Some current systems take more a draconian approach to memory overload. For example, some versions of Linux run an **out-of-memory killer** when memory is oversubscribed; this daemon chooses a memory-intensive process and kills it, thus reducing memory in a none-too-subtle manner.
 
-## Complete VM Systems
+#### Memory Hogs
+
+Programs that use a lot of memory and make it hard for other programs to run called **Memory hogs**. The **segmented FIFO** replacement policy introduces to resolve it, each process has a maximum number of pages it can keep in memory, known as its **resident set size** (**RSS**). Each of these pages is kept on a FIFO list; when a process exceeds its RSS, the “first-in” page is evicted. **Second-chance lists** can improve FIFO's performance, the pages are placed inside the before getting evicted from memory.
+
+#### Demand Zeroing
+
+In a naive implementation, the OS responds to a request to add a page to your heap by finding a page in physical memory, zeroing it (required for security; otherwise you’d be able to see what was on the page from when some other process used it!), and then mapping it into your address space (i.e., setting up the page table to refer to that physical page as desired). But the naive implementation can be costly, particularly if the page does not get used by the process.
+
+With **demand zeroing**, the OS instead does very little work when the page is added to your address space; it puts an entry in the page table that marks the page inaccessible. If the process then reads or writes the page, a trap into the OS takes place. When handling the trap, the OS notices (usually through some bits marked in the “reserved for OS” portion of the page table entry) that this is actually a demand-zero page; at this point, the OS does the needed work of finding a physical page, zeroing it, and mapping it into the process’s address space. If the process never accesses the page, all such work is avoided, and thus the virtue of demand zeroing.
+
+#### Copy-on-Write
+
+When the OS needs to copy a page from one address space to another, instead of copying it, it can map it into the target address space and mark it read-only in both address spaces. If both address spaces only read the page, no further action is taken, and thus the OS has realized a fast copy without actually moving any data.
+
+However, one of the address spaces does indeed try to write to the page, it will trap into the OS. The OS will then notice that the page is a COW page, and thus (lazily) allocate a new page, fill it with the data, and map this new page into the address space of the faulting process. The process then continues and now has its own private copy of the page.
+
+### The Linux Address Space
+
+Linux virtual address space consists of a user portion(where user program code, stack, heap, and other parts reside) and a kernel portion (where kernel code, stacks, heap, and other parts reside). Upon a context switch, the user portion of the currently-running address space changes; the kernel portion is the same across processes. A program running in user mode cannot access kernel virtual pages; only by trapping into the kernel and transitioning to privileged mode can such memory be accessed.
+
+Figure 23.2 shows a depiction of a typical (simplified) address space.
+
+<img src="Asserts/image-20210327145912487.png" alt="image-20210327145912487" style="zoom:50%;" />
+
+One slightly interesting aspect of Linux is that it contains two types of kernel virtual addresses. 
+
+1. The first are known as **kernel logical addresses**. This is what you would consider the normal virtual address space of the kernel
+   - to get more memory of this type, kernel code merely needs to call **kmalloc**.
+   - Most kernel data structures live here, such as page tables, per-process kernel stacks, and so forth. 
+   - Unlike most other memory in the system, kernel logical memory *cannot* be swapped to disk.
+   - there is a direct mapping between kernel logical addresses and the first portion of physical memory. Thus, kernel logical address 0xC0000000 translates to physical address 0x00000000, 0xC0000FFF to 0x00000FFF, and so forth. This direct mapping has two implications.
+     - it is simple to translate back and forth between kernel logical addresses and physical addresses, as a result, these addresses are often treated as if they are indeed physical.
+     - If a chunk of memory is contiguous in kernel logical address space, it is also contiguous in physical memory. This makes memory allocated in this part of the kernel’s address space suitable for operations which need contiguous physical memory to work correctly, such as I/O transfers to and from devices via **directory memory access** (**DMA**).
+2. The other type of kernel address is a **kernel virtual address**.
+   - Kernel code calls **vmalloc** to get memory of this type, which returns a pointer to a virtually contiguous region of the desired size.
+   - kernel virtual memory is usually not contiguous; each kernel virtual page may map to non-contiguous physical pages (and is thus not suitable for DMA).
+
+#### Page Table Structure
+
+The x86 provides a hardware-managed, multi-level page table structure, with one page table per process; the OS simply sets up mappings in its memory, points a privileged register at the start of the page directory, and the hardware handles the rest. The OS gets involved, as expected, at process creation, deletion, and upon context switches, making sure in each case that the correct page table is being used by the hardware MMU to perform translations.
+
+The full 64-bit nature of the virtual address space is not yet in use, however, rather only the bottom 48 bits. Thus, a virtual address can be viewed as follows:
+
+<img src="Asserts/image-20210327151751430.png" alt="image-20210327151751430" style="zoom:50%;" />
+
+The bottom 12 bits (due to the 4-KB page size) are used as the offset, leaving the middle 36 bits of virtual address to take part in the translation. The P1 portion of the address is used to index into the topmost page directory, and the translation proceeds from there, one level at a time, until the actual page of the page table is indexed by P4, yielding the desired page table entry.
+
+#### Large Page Support
+
+Intel x86 allows for the use of multiple page sizes, not just the standard 4-KB page. Specifically, recent designs support 2-MB and even 1-GB pages in hardware. Thus, over time, Linux has evolved to allow applications to utilize these **huge pages** (as they are called in the world of Linux).
+
+Huge pages bring benefits:
+
+- Reduces the number of mappings that are needed in the page table.
+- Reduces page-table entries.
+- Lead to better TLB behavior and related performance gains.
+  - Huge pages allow a process to access a large tract of memory without TLB misses, by using fewer slots in the TLB.
+  - There are other benefits to huge pages: there is a shorter TLB-miss path; can serve TLB miss more quickly.
+
+#### The Page Cache
+
+To reduce costs of accessing persistent storage (the focus of the third part of this book), most systems use aggressive **caching** subsystems to keep popular data items in memory(inclued Linux).
+
+The Linux **page cache** is unified, keeping pages in memory from three primary sources: 
+
+1. **memory-mapped files**, file data.
+2. metadata from devices (usually accessed by directing read() and write() calls to the file system).
+3. heap and stack pages that comprise each process (sometimes called **anonymous memory**, because there is no named file underneath of it, but rather swap space). 
+
+These entities are kept in a **page cache hash table**, allowing for quick lookup when data is needed.
+
+The page cache tracks if entries are **clean** (read but not updated) or **dirty** (a.k.a., **modified**). Dirty data is periodically written to the backing store by background threads (called `pdflush`), thus ensuring that modified data eventually is written back to persistent storage. This background activity either takes place after a certain time period or if too many pages are considered dirty (both configurable parameters).
+
+##### 2Q Replacement
+
+A standard LRU replacement is effective, but can be subverted by certain common access patterns. For example, if a process repeatedly accesses a large file (especially one that is nearly the size of memory, or larger), LRU will kick every other file out of memory. Even worse: retaining portions of this file in memory isn’t useful, as they are never re-referenced before getting kicked out of memory.
+
+The Linux version of the 2Q replacement algorithm solves this problem by keeping two lists, and dividing memory between them. When accessed for the first time, a page is placed on one queue (called **inactive list**); when it is re-referenced, the page is promoted to the other queue (called **active list** ). When replacement needs to take place, the candidate for replacement is taken from the inactive list. Linux also periodically moves pages from the bottom of the active list to the inactive list, keeping the active list to about two-thirds of the total page cache size.
+
+## Concurrency
 
