@@ -4180,17 +4180,144 @@ func formatOneValue(x interface{}) string {
 
 ### Type Switches
 
+Interfaces are used in two distinct styles. In the first style, exemplified by io.Reader, io.Writer, fmt.Stringer, sort.Interface, http.Handler, and error, an interface’s methods express the similarities of the concrete types that satisfy the interface but hide the representation details and intrinsic operations of those concrete types. The emphasis is on the methods, not on the concrete types.
 
+The second style exploits the ability of an interface value to hold values of a variety of concrete types and considers the interface to be the *union* of those types. Type assertions are used to discriminate among these types dynamically and treat each case differently. In this style, the emphasis is on the concrete types that satisfy the interface, not on the interface’s methods (if indeed it has any), and there is no hiding of information.
 
+Go’s API for querying an SQL database, like those of other languages, lets us cleanly separate the fixed part of a query from the variable parts. An example client might look like this:
 
+```go
 
+import "database/sql"
+func listTracks(db sql.DB, artist string, minYear, maxYear int) {
+  result, err := db.Exec(
+    "SELECT * FROM tracks WHERE artist = ? AND ? <= year AND year <= ?",
+    artist, minYear, maxYear)
+  // ...
+}
+```
 
+Within Exec, we might find a function like the one below, which converts each argument value to its literal SQL notation.
 
+```go
+func sqlQuote(x interface{}) string {
+  if x == nil {
+    return "NULL"
+  } else if _, ok := x.(int); ok {
+    return fmt.Sprintf("%d", x)
+  } else if _, ok := x.(uint); ok {
+    return fmt.Sprintf("%d", x)
+  } else if b, ok := x.(bool); ok {
+    if b {
+      return "TRUE"
+    }
+    return "FALSE"
+  } else if s, ok := x.(string); ok {
+    return sqlQuoteString(s) // (not shown)
+  } else {
+    panic(fmt.Sprintf("unexpected type %T: %v", x, x))
+  } 
+}
+// which can convert to better version
+func sqlQuote(x interface{}) string {
+  switch x := x.(type) {
+    case nil:      
+    return "NULL"
+    case int, uint:
+    return fmt.Sprintf("%d", x) // x has type interface{} here.
+    case bool:
+    if x {
+      return "TRUE"
+    }
+    return "FALSE"
+    case string:
+    return sqlQuoteString(x) // (not shown)
+    default:
+    panic(fmt.Sprintf("unexpected type %T: %v", x, x))
+  }
+}
+```
 
+Although the type of x is interface{}, we consider it a *discriminated union* of int, uint, bool, string, and nil.
 
+### Example: Token-Based XML Decoding
 
+The `encoding/xml` package also provides a lower-level *token-based* API for decoding XML. In the token-based style, the parser consumes the input and produces a stream of tokens, primarily of four kinds—StartElement, EndElement, CharData, and Comment—each being a concrete type in the encoding/xml package. Each call to(*xml.Decoder). Token returns a token. The Token interface, which has no methods, is also an example of a discriminated union.
 
+The relevant parts of the API are shown here:
 
+```go
+package xml
+type Name struct {
+  Local string // e.g., "Title" or "id"
+}
+type Attr struct { // e.g., name="value"
+  Name  Name
+  Value string
+}
+// A Token includes StartElement, EndElement, CharData,
+// and Comment, plus a few esoteric types (not shown).
+type Token interface{}
+type StartElement struct { // e.g., <name>
+  Name Name
+  Attr []Attr
+}
+type EndElement struct { Name Name } // e.g., </name>
+type CharData []byte                 // e.g., <p>CharData</p>
+type Comment []byte                  // e.g., <!-- Comment -->
+type Decoder struct{ /* ... */ }
+func NewDecoder(io.Reader) *Decoder
+func (*Decoder) Token() (Token, error) // returns next Token in sequence
+```
+
+The xmlselect program below extracts and prints the text found beneath certain elements in an XML document tree. Using the API above, it can do its job in a single pass over the input without ever materializing the tree.
+
+```go
+package main
+import (
+  "encoding/xml"
+  "fmt"
+  "io"
+  "os"
+  "strings"
+)
+func main() {
+  dec := xml.NewDecoder(os.Stdin)
+  var stack []string // stack of element names
+  for {
+    tok, err := dec.Token()
+    if err == io.EOF {
+      break
+    } else if err != nil {
+      fmt.Fprintf(os.Stderr, "xmlselect: %v\n", err)
+      os.Exit(1)
+    }
+    switch tok := tok.(type) {
+      case xml.StartElement:
+      stack = append(stack, tok.Name.Local) // push
+      case xml.EndElement:
+      stack = stack[:len(stack)-1] // pop
+      case xml.CharData:
+      if containsAll(stack, os.Args[1:]) {
+        fmt.Printf("%s: %s\n", strings.Join(stack, " "), tok)
+      } 
+    }
+  }
+}
+// containsAll reports whether x contains the elements of y, in order.
+func containsAll(x, y []string) bool {
+  for len(y) <= len(x) {
+    if len(y) == 0 {
+      return true
+    }
+    if x[0] == y[0] {
+      y = y[1:]
+    }
+    x = x[1:]
+  }
+  return false
+}
+```
 
 ## Concurrency
 
@@ -4200,13 +4327,13 @@ Making progress run more than one task simultaneously is known as concurrency. G
 
 ### Go Routine
 
-**GO Scheduler** monitors the activities carried out by **Go Routines**. By default Go tries to use one core.
+**GO Scheduler** monitors the activities carried out by **Go Routines**. By default Go tries to use one core. Place a `go` command in front of a function and main routine communicate with child routine  use **Channel**. One **channel** only pass one type of value.
 
-Place a `go` command in front of a function and main routine communicate with child routine  use **Channel**.One **channel** only pass one type of value.
-
-**Note**: Never access same variable from different routines, make a copy and pass it through as parameter.
+> **Note**: Never access same variable from different routines, make a copy and pass it through as parameter.
 
 ### Channel
+
+Each channel is a conduit for values of a particular type, called the channel’s *element type*. The type of a channel whose elements have type int is written chan int. As with maps, a channel is a *reference* to the data structure created by make. 
 
 ```go
 c := make(chan string) // communicate use channel with string type
@@ -4218,60 +4345,352 @@ myNumber <- c // wait for a value to be sent into the channel. when we get one ,
 
 #### Channel Direction
 
-We can specify a direction on a channel type thus restricting it to either sending or receiving. For example pinger's function signature can be changed to this:
+We can specify a direction on a channel type thus restricting it to either sending or receiving. For example:
 
 ```go
-func pinger(c chan<- string)
+ch <- x  // a send statement
+x = <-ch // a receive expression in an assignment statement
+<-ch     // a receive statement; result is discarded
 ```
 
-Now `c` can only be sent to. Attempting to receive from c will result in a compiler error. Similarly we can change printer to this:
+#### Unbuffered Channels
+
+A send operation on an unbuffered channel blocks the sending goroutine until another goroutine executes a corresponding receive on the same channel, at which point the value is transmitted and both goroutines may continue. Conversely, if the receive operation was attempted first, the receiving goroutine is blocked until another goroutine performs a send on the same channel.
+
+Communication over an unbuffered channel causes the sending and receiving goroutines to *synchronize*. Because of this, unbuffered channels are sometimes called *synchronous* channels.
 
 ```go
-func printer(c <-chan string)
+func mustCopy(dst io.Writer, src io.Reader) {
+  if _, err := io.Copy(dst, src); err != nil {
+    log.Fatal(err)
+  } 
+}
+func main() {
+  conn, err := net.Dial("tcp", "localhost:8000")
+  if err != nil {
+    log.Fatal(err)
+  }
+  done := make(chan struct{})
+  go func() {
+    io.Copy(os.Stdout, conn) // NOTE: ignoring errors
+    log.Println("done")
+    done <- struct{}{} // signal the main goroutine
+  }()
+  mustCopy(conn, os.Stdin)
+  conn.Close()
+  <-done // wait for background goroutine to finish
+}
 ```
 
-A channel that doesn't have these restrictions is known as bi-directional. A bi-directional channel can be passed to a function that takes send-only or receive-only channels, but the reverse is not true.
+When the user closes the standard input stream, mustCopy returns and the main goroutine calls conn.Close(), closing both halves of the network connection. Closing the write half of the connection causes the server to see an end-of-file condition. Closing the read half causes the background goroutine’s call to io.Copy to return a ‘‘read from closed connection’’ error, which is why we’ve removed the error logging.
 
-### Select
+#### Pipelines
+
+Channels can be used to connect goroutines together so that the output of one is the input to another. This is called a *pipeline*. The program below consists of three goroutines connected by two channels, as shown schematically in Figure 8.1.
+
+<img src="Asserts/image-20210328111428762.png" alt="image-20210328111428762" style="zoom:50%;" />
+
+```go
+func main() {
+  naturals := make(chan int)
+  squares := make(chan int)
+  // Counter
+  go func() {
+    defer close(naturals)
+    for x := 0; ; x++ {
+      naturals <- x
+    }
+  }()
+  // Squarer
+  go func() {
+    defer     close(squares)
+    for {
+      x, ok := <-naturals
+      if !ok {
+        break // channel was closed and drained
+      }
+      squares <- x * x
+    } 
+
+  }()
+
+  // Better version of Squarer
+  go func() {    
+    defer     close(squares)
+    for x := range naturals {
+      squares <- x * x
+    }
+  }()
+  // Printer (in main goroutine)
+  for {
+    fmt.Println(<-squares)
+  } 
+}
+```
+
+If the sender knows that no further values will ever be sent on a channel, it is useful to com- municate this fact to the receiver goroutines so that they can stop waiting. This is accomplished by *closing* the channel using the built-in close function:
+
+```go
+close(naturals)
+```
+
+You needn’t close every channel when you’ve finished with it. It’s only necessary to close a channel when it is important to tell the receiving goroutines that all data have been sent. A channel that the garbage collector determines to be unreachable will have its resources reclaimed whether or not it is closed.
+
+#### Unidirectional Channel Types
+
+To document this intent and prevent misuse, the Go type system provides *unidirectional* channel types that expose only one or the other of the send and receive operations.
+
+```go
+//send only
+chan<- int
+// receive-only
+<-chan int
+```
+
+Since the close operation asserts that no more sends will occur on a channel, only the send- ing goroutine is in a position to call it, and for this reason it is a compile-time error to attempt to close a receive-only channel.
+
+Here’s the squaring pipeline once more, this time with unidirectional channel types:
+
+```go
+func counter(out chan<- int) {
+  for x := 0; x < 100; x++ {
+    out <- x
+  }
+  close(out)
+}
+func squarer(out chan<- int, in <-chan int) {
+  for v := range in {
+    out <- v * v
+  } 
+  close(out)
+}
+func printer(in <-chan int) {
+  for v := range in {
+    fmt.Println(v)
+  } 
+}
+func main() {
+  naturals := make(chan int)
+  squares := make(chan int)
+  go counter(naturals)
+  go squarer(squares, naturals)
+  printer(squares)
+}
+```
+
+### Buffered Channels
+
+A buffered channel has a queue of elements. The queue’s maximum size is determined when it is created, by the capacity argument to make. The statement below creates a buffered channel capable of holding three string values. Figure 8.2 is a graphical representation of ch and the channel to which it refers.
+
+![image-20210328113051025](Asserts/image-20210328113051025.png)
+
+A send operation on a buffered channel inserts an element at the back of the queue, and a receive operation removes an element from the front. If the channel is full, the send operation blocks its goroutine until space is made available by another goroutine’s receive. Conversely, if the channel is empty, a receive operation blocks until a value is sent by another goroutine.
+
+We can send up to three values on this channel without the goroutine blocking:
+
+```go
+ch <- "A"
+ch <- "B"
+ch <- "C"
+```
+
+At this point, the channel is full (Figure 8.3), and a fourth send statement would block.
+
+<img src="Asserts/image-20210328114718943.png" alt="image-20210328114718943" style="zoom:50%;" />
+
+If we receive one value,
+
+```go
+fmt.Println(<-ch) // "A"
+```
+
+the channel is neither full nor empty (Figure 8.4), so either a send operation or a receive operation could proceed without blocking. In this way, the channel’s buffer decouples the sending and receiving goroutines.
+
+![image-20210328115306668](Asserts/image-20210328115306668.png)
+
+In the unlikely event that a program needs to know the channel’s buffer capacity or leng, it can be obtained by calling the built-in function:
+
+```go
+fmt.Println(cap(ch)) // "3"
+fmt.Println(len(ch)) // "2"
+```
+
+Consider example below,  It sends their responses over a buffered channel, then receives and returns only the first response, which is the quickest one to arrive. Thus mirroredQuery returns a result even before the two slower servers have responded. 
+
+```go
+func mirroredQuery() string {
+  responses := make(chan string, 3)
+  go func() { responses <- request("asia.gopl.io") }()
+  go func() { responses <- request("europe.gopl.io") }()
+  go func() { responses <- request("americas.gopl.io") }()
+  return <-responses // return the quickest response
+}
+func request(hostname string) (response string) { /* ... */ }
+```
+
+If we used an unbuffered channel, the two slower goroutines would have gotten stuck trying to send their responses on a channel from which no goroutine will ever receive. This situation, called a *goroutine leak*, would be a bug. Unlike garbage variables, leaked goroutines are not automatically collected, so it is important to make sure that goroutines terminate themselves when no longer needed.
+
+#### Buffered Channels Vs Unbuffered Channels
+
+The choice between unbuffered and buffered channels, and the choice of a buffered channel’s capacity, may both affect the correctness of a program. Unbuffered channels give stronger synchronization guarantees because every send operation is synchronized with its corresponding receive; with buffered channels, these operations are decoupled. Also, when we know an upper bound on the number of values that will be sent on a channel, it’s not unusual to create a buffered channel of that size and perform all the sends before the first value is received. Failure to allocate sufficient buffer capacity would cause the program to deadlock.
+
+Channel buffering may also affect program performance. Imagine three cooks in a cake shop, one baking, one icing, and one inscribing each cake before passing it on to the next cook in the assembly line. In a kitchen with little space, each cook that has finished a cake must wait for the next cook to become ready to accept it; this rendezvous is analogous to communication over an unbuffered channel.
+
+If there is space for one cake between each cook, a cook may place a finished cake there and immediately start work on the next; this is analogous to a buffered channel with capacity 1. So long as the cooks work at about the same rate on average, most of these handovers proceed quickly, smoothing out transient differences in their respective rates. More space between cooks—larger buffers—can smooth out bigger transient variations in their rates without stalling the assembly line, such as happens when one cook takes a short break, then later rushes to catch up.
+
+On the other hand, if an earlier stage of the assembly line is consistently faster than the following stage, the buffer between them will spend most of its time full. Conversely, if the later stage is faster, the buffer will usually be empty. A buffer provides no benefit in this case.
+
+The assembly line metaphor is a useful one for channels and goroutines. For example, if the second stage is more elaborate, a single cook may not be able to keep up with the supply from the first cook or meet the demand from the third. To solve the problem, we could hire another cook to help the second, performing the same task but working independently. This is analogous to creating another goroutine communicating over the same channels.
+
+### Looping in Parallel
+
+```go
+// makeThumbnails3 makes thumbnails of the specified files in parallel.
+func makeThumbnails3(filenames []string) {
+  ch := make(chan struct{})
+  for _, f := range filenames {
+    go func(f string) {
+      thumbnail.ImageFile(f) // NOTE: ignoring errors
+      ch <- struct{}{}
+    }(f) // must pass f as argument!
+  }
+  // Wait for goroutines to complete.
+  for range filenames {
+    <-ch
+  } 
+}
+```
+
+The next version of makeThumbnails uses a buffered channel to return the names of the generated image files along with any errors.
+
+```go
+// makeThumbnails5 makes thumbnails for the specified files in parallel.
+// It returns the generated file names in an arbitrary order,
+// or an error if any step failed.
+func makeThumbnails5(filenames []string) (thumbfiles []string, err error) {
+  type item struct {
+    thumbfile string
+    err       error
+  }
+  ch := make(chan item, len(filenames))
+  for _, f := range filenames {
+    go func(f string) {
+      var it item
+      it.thumbfile, it.err = thumbnail.ImageFile(f)
+      ch <- it 
+    }(f)
+  }
+  for range filenames {
+    it := <-ch
+    if it.err != nil {
+      return nil, it.err
+    }
+    thumbfiles = append(thumbfiles, it.thumbfile)
+  }
+  return thumbfiles, nil
+}
+```
+
+Our final version of makeThumbnails returns the total number of bytes occupied by the new files. Unlike the previous versions, however, it receives the file names not as a slice but over a channel of strings, so we cannot predict the number of loop iterations.
+
+We need to increment a counter before each goroutine starts and decrement it as each goroutine finishes. This demands a special kind of counter, one that can be safely manipulated from multiple goroutines and that provides a way to wait until it becomes zero. This counter type is known as `sync.WaitGroup`, and the code below shows how to use it:
+
+```go
+// makeThumbnails6 makes thumbnails for each file received from the channel.
+// It returns the number of bytes occupied by the files it creates.
+func makeThumbnails6(filenames <-chan string) int64 {
+  sizes := make(chan int64)
+  var wg sync.WaitGroup // number of working goroutines
+  for f := range filenames {
+    wg.Add(1)
+    // worker
+    go func(f string) {
+      defer wg.Done()
+      thumb, err := thumbnail.ImageFile(f)
+      if err != nil {
+        log.Println(err)
+        return
+      }
+      info, _ := os.Stat(thumb) // OK to ignore error
+      sizes <- info.Size()
+    }(f)
+  }
+  // closer
+  go func() {
+    wg.Wait()
+    close(sizes)
+  }()
+  var total int64
+  for size := range sizes {
+    total += size
+  }
+  return total
+}
+```
+
+Figure 8.5 illustrates the sequence of events in the makeThumbnails6 function. The vertical lines represent goroutines. The thin segments indicate sleep, the thick segments activity. The diagonal arrows indicate events that synchronize one goroutine with another. Time flows down. Notice how the main goroutine spends most of its time in the range loop asleep, waiting for a worker to send a value or the closer to close the channel.
+
+![image-20210328122934514](Asserts/image-20210328122934514.png)
+
+#### Limit Parallelism
+
+We can limit parallelism using a buffered channel of capacity *n* to model a concurrency primitive called a *counting semaphore*.
+
+```go
+// tokens is a counting semaphore used to
+// enforce a limit of 20 concurrent requests.
+var tokens = make(chan struct{}, 20)
+func crawl(url string) []string {
+  fmt.Println(url)
+  tokens <- struct{}{} // acquire a token
+  list, err := links.Extract(url)
+  <-tokens // release the token
+  if err != nil {
+    log.Print(err)
+  }
+  return list
+}
+
+func main() {
+  worklist := make(chan []string)
+  var n int // number of pending sends to worklist
+  // Start with the command-line arguments.
+  n++
+  go func() { worklist <- os.Args[1:] }()
+  // Crawl the web concurrently.
+  seen := make(map[string]bool)
+  for ; n > 0; n-- {
+    list := <-worklist
+    for _, link := range list {
+      if !seen[link] {
+        seen[link] = true
+        n++ss
+        go func(link string) {
+          worklist <- crawl(link)
+        }(link)
+      }
+    }
+  }
+}
+```
+
+### Multiplexing with Select
 
 Go has a special statement called `select` which works like a `switch` but for channels:
 
 ```go
-func main() {
-  c1 := make(chan string)
-  c2 := make(chan string)
-
-  go func() {
-    for {
-      c1 <- "from 1"
-      time.Sleep(time.Second * 2)
-    }
-  }()
-
-  go func() {
-    for {
-      c2 <- "from 2"
-      time.Sleep(time.Second * 3)
-    }
-  }()
-
-  go func() {
-    for {
-      select {
-      case msg1 := <- c1:
-        fmt.Println(msg1)
-      case msg2 := <- c2:
-        fmt.Println(msg2)
-      }
-    }
-  }()
-
-  var input string
-  fmt.Scanln(&input)
-}
+select {
+  case <-ch1:
+  // ...
+  case x := <-ch2:
+  // ...use x...
+  case ch3 <- y:
+  // ...
+  default:
+  }
+// ...
+select{} // waits forever.
 ```
-
-This program prints “from 1” every 2 seconds and “from 2” every 3 seconds. `select` picks the first channel that is ready and receives from it (or sends to it). If more than one of the channels are ready then it randomly picks which one to receive from. If none of the channels are ready, the statement blocks until one becomes available.
 
 The `select` statement is often used to implement a timeout:
 
@@ -4303,15 +4722,261 @@ default:
 
 The default case happens immediately if none of the channels are ready.
 
-### Buffered Channels
-
-It's also possible to pass a second parameter to the make function when creating a channel:
+#### Example: Concurrent Directory Traversal
 
 ```go
-c := make(chan int, 1)
+// du
+package main
+import (
+  "flag"
+  "fmt"
+  "io/ioutil"
+  "os"
+  "path/filepath"
+)
+var verbose = flag.Bool("v", false, "show verbose progress messages")
+
+func main() {
+  // Determine the initial directories.
+  flag.Parse()
+  roots := flag.Args()
+  if len(roots) == 0 {
+    roots = []string{"."}
+  }
+
+  // Traverse each root of the file tree in parallel.
+  fileSizes := make(chan int64)
+  var n sync.WaitGroup
+  for _, root := range roots {
+    n.Add(1)
+    go walkDir(root, &n, fileSizes)
+  }
+  go func() {
+    n.Wait()
+    close(fileSizes)
+  }()
+
+  // Print the results periodically.
+  var tick <-chan time.Time
+  if *verbose {
+    tick = time.Tick(500 * time.Millisecond)
+  }
+  var nfiles, nbytes int64
+loop:
+  for { 
+    select {
+      case size, ok := <-fileSizes:
+        if !ok {
+          break loop // fileSizes was closed
+        }
+        nfiles++
+        nbytes += size
+      case <-tick:
+      	printDiskUsage(nfiles, nbytes)
+    } 
+  }
+  printDiskUsage(nfiles, nbytes) // final totals
+}
+
+func walkDir(dir string, n *sync.WaitGroup, fileSizes chan<- int64) {
+  defer n.Done()
+  for _, entry := range dirents(dir) {
+    if entry.IsDir() {
+      n.Add(1)
+      subdir := filepath.Join(dir, entry.Name())
+      go walkDir(subdir, n, fileSizes)
+    } else {
+      fileSizes <- entry.Size()
+    } 
+  }
+}
+
+
+// sema is a counting semaphore for limiting concurrency in dirents.
+var sema = make(chan struct{}, 20)
+
+// dirents returns the entries of directory dir.
+func dirents(dir string) []os.FileInfo {
+  // to limit the concurrency up to 20
+  sema <- struct{}{}        // acquire token
+  defer func() { <-sema }() // release token
+
+  entries, err := ioutil.ReadDir(dir)
+  if err != nil {
+    fmt.Fprintf(os.Stderr, "du1: %v\n", err)
+    return nil
+  }
+  return entries
+}
+
+func printDiskUsage(nfiles, nbytes int64) {
+  fmt.Printf("%d files  %.1f GB\n", nfiles, float64(nbytes)/1e9)
+}
+
 ```
 
-This creates a buffered channel with a capacity of 1. Normally channels are synchronous; both sides of the channel will wait until the other side is ready. A buffered channel is asynchronous; sending or receiving a message will not wait unless the channel is already full.
+### Cancellation
+
+For cancellation, what we need is a reliable mechanism to *broadcast* an event over a channel so that many goroutines can see it *as* it occurs and can later see that it *has* occurred.
+
+After a channel has been closed and drained of all sent values, subsequent receive operations proceed immediately, yielding zero values. We can exploit this to create a broad- cast mechanism: don’t send a value on the channel, *close* it.
+
+We can add cancellation to the du program from the previous section with a few simple changes. First, we create a cancellation channel on which no values are ever sent, but whose closure indicates that it is time for the program to stop what it is doing. We also define a utility function, cancelled, that checks or *polls* the cancellation state at the instant it is called.
+
+```go
+var done = make(chan struct{})
+func cancelled() bool {
+  select {
+    case <-done:
+    	return true
+    default:
+    	return false
+  } 
+}
+```
+
+Next, we create a goroutine that will read from the standard input, which is typically connected to the terminal. As soon as any input is read (for instance, the user presses the return key), this goroutine broadcasts the cancellation by closing the done channel.
+
+```go
+// Cancel traversal when input is detected.
+go func() {
+  os.Stdin.Read(make([]byte, 1)) // read a single byte
+  close(done)
+}()
+```
+
+In the main goroutine, we add a third case to the select statement that tries to receive from the done channel. The function returns if this case is ever selected, but before it returns it must first drain the fileSizes channel, discarding all values until the channel is closed. It does this to ensure that any active calls to walkDir can run to completion without getting stuck sending to fileSizes.
+
+```go
+for { 
+  select {
+    case <-done:
+      // Drain fileSizes to allow existing goroutines to finish.
+      for range fileSizes {
+        // Do nothing.
+      }
+      return
+    case size, ok := <-fileSizes:
+    	// ...
+  } 
+}
+```
+
+The walkDir goroutine polls the cancellation status when it begins, and returns without doing anything if the status is set. This turns all goroutines created after cancellation into no-ops:
+
+```go
+func walkDir(dir string, n *sync.WaitGroup, fileSizes chan<- int64) {
+  defer n.Done()
+  if cancelled() {
+    return
+  }
+  for _, entry := range dirents(dir) {
+    // ...
+  } 
+}
+```
+
+The select below makes this operation cancellable and reduces the typical cancellation latency of the program from hundreds of milliseconds to tens:
+
+```go
+func dirents(dir string) []os.FileInfo {
+  select {
+    case sema <- struct{}{}: // acquire token
+  	case <-done:
+    	return nil // cancelled
+  }
+  defer func() { <-sema }() // release token
+  // ...read directory...
+}
+```
+
+There’s a handy trick we can use during testing: if instead of returning from main in the event of cancellation, we execute a call to panic, then the runtime will dump the stack of every goroutine in the program. If the main goroutine is the only one left, then it has cleaned up after itself. But if other goroutines remain, they may not have been properly cancelled, or perhaps they have been cancelled but the cancellation takes time; a little investigation may be worthwhile. The panic dump often contains sufficient information to distinguish these cases.
+
+### Example: Chat Server
+
+There are four kinds of goroutine in this program. There is one instance apiece of the main and broadcaster goroutines, and for each client connection there is one handleConn and one clientWriter goroutine. The broadcaster is a good illustration of how select is used, since it has to respond to three different kinds of messages.
+
+The job of the main goroutine, shown below, is to listen for and accept incoming network connections from clients. For each one, it creates a new handleConn goroutine.
+
+```go
+func main() {
+  listener, err := net.Listen("tcp", "localhost:8000")
+  if err != nil {
+    log.Fatal(err)
+  }
+  go broadcaster()
+  for {
+    conn, err := listener.Accept()
+    if err != nil {
+      log.Print(err)
+      continue
+    }
+    go handleConn(conn)
+  }
+}
+```
+
+Next is the broadcaster. Its local variable clients records the current set of connected clients. The only information recorded about each client is the identity of its outgoing message channel, about which more later.
+
+```go
+type client chan<- string // an outgoing message channel
+var (
+  entering = make(chan client)
+  leaving  = make(chan client)
+  messages = make(chan string) // all incoming client messages
+)
+func broadcaster() {
+  clients := make(map[client]bool) // all connected clients
+  for {
+    select {
+      case msg := <-messages:
+        // Broadcast incoming message to all
+        // clients' outgoing message channels.
+        for cli := range clients {
+          cli <- msg
+        }
+      case cli := <-entering:
+      	clients[cli] = true
+      case cli := <-leaving:
+      	delete(clients, cli)
+      	close(cli)
+    } 
+  }
+}
+```
+
+The handleConn function creates a new outgoing message channel for its client and announces the arrival of this client to the broadcaster over the entering channel. Then it reads every line of text from the client, sending each line to the broadcaster over the global incoming message channel, prefixing each message with the identity of its sender. Once there is nothing more to read from the client, handleConn announces the departure of the client over the leaving channel and closes the connection.
+
+```go
+func handleConn(conn net.Conn) {
+  ch := make(chan string) // outgoing client messages
+  go clientWriter(conn, ch)
+  
+  who := conn.RemoteAddr().String()
+  ch <- "You are " + who
+  messages <- who + " has arrived"
+  entering <- ch
+  input := bufio.NewScanner(conn)
+  for input.Scan() {
+    messages <- who + ": " + input.Text()
+  }
+  // NOTE: ignoring potential errors from input.Err()
+  leaving <- ch
+  messages <- who + " has left"
+  conn.Close()
+}
+func clientWriter(conn net.Conn, ch <-chan string) {
+  for msg := range ch {
+    fmt.Fprintln(conn, msg) // NOTE: ignoring network errors
+  } 
+}
+```
+
+In addition, handleConn creates a clientWriter goroutine for each client that receives messages broadcast to the client’s outgoing message channel and writes them to the client’s network connection. The client writer’s loop terminates when the broadcaster closes the channel after receiving a leaving notification.
+
+## Concurrency with Shared Variables
+
+
 
 ## Testing
 
