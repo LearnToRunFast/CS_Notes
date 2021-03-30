@@ -803,3 +803,144 @@ A **race condition** arises if multiple threads of execution enter the critical 
 An **indeterminate** program consists of one or more race conditions; the output of the program varies from run to run, depending on which threads ran when. The outcome is thus not **deterministic**, something we usually expect from computer systems.
 
 To avoid these problems, threads should use some kind of **mutual exclusion** primitives; doing so guarantees that only a single thread ever enters a critical section, thus avoiding races, and resulting in deterministic program outputs.
+
+### Locks
+
+A lock is just a variable, which can be used to protect the critical section. If one thread acquire the lock by calling `lock()` and another thread then calls lock() on that same lock variable, it will not return while the lock is held by another thread but wait for the lock to be released.
+
+Once the owner of the lock calls `unlock()`, the lock is now available (free) again. If no other threads are waiting for the lock, the state of the lock is simply changed to free. If there are waiting threads (stuck in lock()), one of them will (eventually) notice (or be informed of) this change of the lock’s state, acquire the lock, and enter the critical section.
+
+#### Pthread Locks
+
+The name that the POSIX library uses for a lock is a **mutex**, as it is used to provide **mutual exclusion** between threads, i.e., if one thread is in the critical section, it excludes the others from entering until it has completed the section. 
+
+```c
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER; 
+Pthread_mutex_lock(&lock); // wrapper; exits on failure
+balance = balance + 1;
+Pthread_mutex_unlock(&lock);
+```
+
+You might also notice here that the POSIX version passes a variable to lock and unlock, as we may be using *different* locks to protect different variables. Doing so can increase concurrency: instead of one big lock that is used any time any critical section is accessed (a **coarse-grained** locking strategy), one will often protect different data and data structures with different locks, thus allowing more threads to be in locked code at once (a more **fine-grained** approach).
+
+#### Evaluating Locks
+
+To evaluate whether a lock works (and works well), we should establish some basic criteria. 
+
+1. The first is whether the lock does its basic task, which is to provide **mutual exclusion**.
+2. The second is **fairness**. Does each thread contending for the lock get a fair shot at acquiring it once it is free?
+3. The final criterion is **performance**, specifically the time overheads added by using the lock. There are a few different cases that are worth considering here. 
+   1. One is the case of no contention; when a single thread is running and grabs and releases the lock. 
+   2. Another is the case where multiple threads are contending for the lock on a single CPU.
+   3. How does the lock perform when there are multiple CPUs involved, and threads on each contending for the lock.
+
+By comparing these different scenarios, we can better understand the performance impact of using various locking techniques, as described below.
+
+#### Building Working Spin Locks with Test-And-Set
+
+```c
+int TestAndSet(int *old_ptr, int new) {
+  int old = *old_ptr; // fetch old value at old_ptr
+  *old_ptr = new;     // store ’new’ into old_ptr
+  return old;         // return the old value
+}
+typedef struct __lock_t {
+  int flag;
+} lock_t;
+
+void init(lock_t *lock) {
+  // 0: lock is available, 1: lock is held
+  lock->flag = 0;
+}
+void lock(lock_t *lock) {
+  while (TestAndSet(&lock->flag, 1) == 1)
+    ; // spin-wait (do nothing)
+}
+void unlock(lock_t *lock) {
+    lock->flag = 0;
+}
+
+```
+
+#### Compare-And-Swap
+
+```c
+int CompareAndSwap(int *ptr, int expected, int new) {
+  int original = *ptr;
+  if (original == expected)
+    *ptr = new;
+  return original;
+}
+
+void lock(lock_t *lock) {
+  while (CompareAndSwap(&lock->flag, 0, 1) == 1)
+    ; // spin
+}
+```
+
+#### Load-Linked and Store-Conditional
+
+```c
+int LoadLinked(int *ptr) {
+  return *ptr;
+}
+int StoreConditional(int *ptr, int value) {
+  if (no update to *ptr since LoadLinked to this address) {
+    *ptr = value;
+    return 1; // success!
+  }else{
+    return 0; // failed to update
+  }
+}
+void lock(lock_t *lock) {
+  while (LoadLinked(&lock->flag) ||
+         !StoreConditional(&lock->flag, 1))
+    ; // spin
+}
+
+void unlock(lock_t *lock) {
+  lock->flag = 0;
+}
+```
+
+####  Ticket Locks
+
+```c
+int FetchAndAdd(int *ptr) {
+  int old = *ptr;
+  *ptr = old + 1;
+  return old;
+}
+typedef struct __lock_t {
+    int ticket;
+    int turn;
+} lock_t;
+void lock_init(lock_t *lock) {
+  lock->ticket = 0;
+  lock->turn = 0;
+}
+void lock(lock_t *lock) {
+  int myturn = FetchAndAdd(&lock->ticket)
+  while (lock->turn != myturn)
+    ; // spin
+}
+void unlock(lock_t *lock) {
+  lock->turn = lock->turn + 1;
+}
+```
+
+#### Using Queues: Sleeping Instead Of Spinning
+
+Linux provides a **futex** which each futex has associated with it a specific physical memory location, as well as a per-futex in-kernel queue. Callers can use futex calls (described below) to sleep and wake as need be.
+
+The call to futex wait(address, expected) puts the calling thread to sleep, assuming the value at address is equal to expected. If it is *not* equal, the call returns immediately. The call to the routine futex wake(address) wakes one thread that is waiting on the queue. The usage of these calls in a Linux mutex is shown in Figure 28.10.
+
+![image-20210330231941197](Asserts/image-20210330231941197.png)
+
+This code snippet from `lowlevellock.h` in the `nptl` library (part of the gnu libc library) is interesting for a few reasons. First, it uses a single integer to track both whether the lock is held or not (the high bit of the integer) and the number of waiters on the lock (all the other bits). Thus, if the lock is negative, it is held (because the high bit is set and that bit determines the sign of the integer). Second, the code snippet shows how to optimize for the common case, specifically when there is no contention for the lock; with only one thread acquiring and releasing a lock, very little work is done
+
+#### Two-Phase Locks
+
+A two-phase lock realizes that spinning can be useful, particularly if the lock is about to be released. So in the first phase, the lock spins for a while, hoping that it can acquire the lock.
+
+However, if the lock is not acquired during the first spin phase, a second phase is entered, where the caller is put to sleep, and only woken up when the lock becomes free later. The Linux lock above is a form of such a lock, but it only spins once; a generalization of this could spin in a loop for a fixed amount of time before using **futex** support to sleep.

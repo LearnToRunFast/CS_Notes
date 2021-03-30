@@ -36,6 +36,8 @@ With `commit history`, we can execute `git push <upstream>` to push the changes 
 
 `git reset <filename>` move file from stage area to working directory, it can be apply to commit hash to. Eg. `git reset <hash value>` will bring all the changes from hash value to HEAD to working directory, if there are changes on working directory, they will merge.
 
+`git reset --soft HEAD^` move latest commit to stage area.
+
 `git reflog` will show all the `reset`, `checkout` logs.
 
 `git pull <remote branch>` merge upstream with current branch.

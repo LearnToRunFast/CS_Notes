@@ -8,13 +8,15 @@ Go does not require semicolons at the ends of statements or declarations, except
 
 It is implicitly initialized to the *zero value* for its type, which is 0 for numeric types and the empty string "" for strings.
 
-## Go Tools
+## Packages and the Go Tool
+
+### Go Tools
 
 `goimports`: manages the insertion and removal of import declarations as needed.
 
 `gofmt`: Format the code automatically.
 
-## GO CLI
+### GO CLI
 
 1. `go build` Compiles a bunch of go source code files.
 2. `go run` Compiles and executes one or two files.
@@ -23,7 +25,7 @@ It is implicitly initialized to the *zero value* for its type, which is 0 for nu
 5. `go get` Downloads the raw source code of other's package.
 6. `go test` Runs any tests associated with the current project.
 
-## Package
+### Package
 
 Packages in Go serve the same purposes as libraries or modules in other languages, supporting modularity, encapsulation, separate compilation, and reuse.
 
@@ -31,11 +33,11 @@ Package-level names like the types and constants declared in one file of a packa
 
 The *doc comment*  immediately preceding the package declaration documents the package as a whole. Conventionally, it should start with a summary sentence in the style illustrated. Only one file in each package should have a package doc comment. Extensive doc comments are often placed in a file of their own, conventionally called doc.go.
 
-### Public & private
+#### Public & private
 
 Every function in the packages we've seen start with a capital letter. In Go if something starts with a capital letter that means other packages (and programs) are able to see it. If we had named the function `average` instead of `Average` our `main` program would not have been able to see it.
 
-### Alias
+#### Alias
 
 we  use an alias for an imported math: `m` is the alias.
 
@@ -49,7 +51,7 @@ func main() {
 }
 ```
 
-### Type of Package
+#### Type of Package
 
 There are two types of packages.
 
@@ -70,7 +72,7 @@ func main() {
 }
 ```
 
-### Import Packages
+#### Import Packages
 
 ```go
 import "fmt"
@@ -83,7 +85,7 @@ import (
 )
 ```
 
-### Creating Packages
+#### Creating Packages
 
 Let's create an application that will use a package we will write. Create a folder in `~/src/golang-book` called `chapter11`. Inside that folder create a file called `main.go` which contains this:
 
@@ -116,7 +118,7 @@ func Average(xs []float64) float64 {
 
 Using a terminal in the `math` folder you just created run `go install`. This will compile the `math.go` program and create a linkable object file: `~/pkg/os_arch/golang-book/chapter11/math.a`.Now go back to the `chapter11` folder and run `go run main.go`. You should see `2.5`. 
 
-### Package Initialization
+#### Package Initialization
 
 Package initialization begins by initializing package-level variables in the order in which they are declared, except that dependencies are resolved first:
 
@@ -128,7 +130,7 @@ var c = 1 // c initialized first, to 1
 func f() int { return c + 1 }
 ```
 
-#### Init Function
+##### Init Function
 
 ```go
    func init() { /* ... */ }
@@ -4976,7 +4978,238 @@ In addition, handleConn creates a clientWriter goroutine for each client that re
 
 ## Concurrency with Shared Variables
 
+### Serial Confinement
 
+It’s common to share a variable between goroutines in a pipeline by passing its address from one stage to the next over a channel. If each stage of the pipeline refrains from accessing the variable after sending it to the next stage, then all accesses to the variable are sequential. This discipline is sometimes called *serial confinement*.
+
+In the example below, Cakes are serially confined, first to the baker goroutine, then to the icer goroutine:
+
+```go
+type Cake struct{ state string }
+func baker(cooked chan<- *Cake) {
+  for {
+    cake := new(Cake)
+    cake.state = "cooked"
+    cooked <- cake // baker never touches this cake again
+  } }
+func icer(iced chan<- *Cake, cooked <-chan *Cake) {
+  for cake := range cooked {
+    cake.state = "iced"
+    iced <- cake // icer never touches this cake again
+  } 
+}
+```
+
+### Mutual Exclusion
+
+We can use a channel of capacity 1 to ensure that at most one goroutine accesses a shared variable at a time. A semaphore that counts only to 1 is called a *binary semaphore*.
+
+```go
+var (
+  sema    = make(chan struct{}, 1) // a binary semaphore guarding balance
+  balance int
+)
+
+func Deposit(amount int) {
+  sema <- struct{}{} // acquire token
+  balance = balance + amount
+  <-sema // release token
+}
+
+func Balance() int {
+  sema <- struct{}{} // acquire token
+  b := balance
+  <-sema // release token
+  return b
+}
+
+// This pattern of mutual exclusion is so useful that it is supported directly by the Mutex type from the sync package.
+import "sync"
+var (
+  mu      sync.Mutex // guards balance
+  balance int
+)
+func Deposit(amount int) {
+  mu.Lock()
+  balance = balance + amount
+  mu.Unlock()
+}
+func Balance() int {
+  mu.Lock()
+  b := balance
+  mu.Unlock()
+  return b
+}
+```
+
+###  Lazy Initialization: sync.Once
+
+The sync package provides a specialized solution to the problem of one-time ini- tialization: `sync.Once`. Conceptually, a Once consists of a mutex and a boolean variable that records whether initialization has taken place; the mutex guards both the boolean and the client’s data structures. Using `sync.Once` in this way, we can avoid sharing variables with other goroutines until they have been properly constructed.
+
+```go
+func loadIcons() {
+  icons = make(map[string]image.Image)
+  icons["spades.png"] = loadIcon("spades.png")
+  icons["hearts.png"] = loadIcon("hearts.png")
+  icons["diamonds.png"] = loadIcon("diamonds.png")
+  icons["clubs.png"] = loadIcon("clubs.png")
+}
+
+var loadIconsOnce sync.Once
+var icons map[string]image.Image
+// Concurrency-safe.
+func Icon(name string) image.Image {
+  loadIconsOnce.Do(loadIcons)
+  return icons[name]
+}
+```
+
+### The Race Detector
+
+Add the `-race` flag to your go build, go run, or go test command. This causes the compiler to build a modified version of your application or test with additional instrumentation that effectively records all accesses to shared variables that occurred during execution, along with the identity of the goroutine that read or wrote the variable. The race detector reports all data races that were actually executed. However, it can only detect race conditions that occur during a run.
+
+### Example: Concurrent Non-Blocking Cache
+
+#### Shared Variables and Locks
+
+```go
+package memo
+
+type entry struct {
+  res   result
+  ready chan struct{} // closed when res is ready
+}
+func New(f Func) *Memo {
+  return &Memo{f: f, cache: make(map[string]*entry)}
+}
+type Memo struct {
+  f     Func
+  mu    sync.Mutex // guards cache
+  cache map[string]*entry
+}
+
+// Func is the type of the function to memoize.
+type Func func(key string) (interface{}, error)
+
+type result struct {
+  value interface{}
+  err   error
+}
+
+// NOTE: not concurrency-safe!
+func (memo *Memo) Get(key string) (value interface{}, err error) {
+  memo.mu.Lock()
+  e := memo.cache[key]
+  if e == nil {
+    // This is the first request for this key.
+    // This goroutine becomes responsible for computing
+    // the value and broadcasting the ready condition.
+    e = &entry{ready: make(chan struct{})}
+    memo.cache[key] = e
+    memo.mu.Unlock()
+    e.res.value, e.res.err = memo.f(key)
+    close(e.ready) // broadcast ready condition
+  } else {
+    // This is a repeat request for this key.
+    memo.mu.Unlock()
+    <-e.ready // wait for ready condition
+  }
+  return e.res.value, e.res.err
+}
+func main() {
+  m := memo.New(httpGetBody)
+  var n sync.WaitGroup
+  for url := range incomingURLs() {
+    n.Add(1)
+    go func(url string) {
+      start := time.Now()
+      value, err := m.Get(url)
+      if err != nil {
+        log.Print(err)
+      }
+      fmt.Printf("%s, %s, %d bytes\n",
+                 url, time.Since(start), len(value.([]byte)))
+      n.Done()
+    }(url)
+  } 
+  n.Wait()
+}
+
+
+```
+
+#### Communicating Sequential Processes
+
+```go
+// A request is a message requesting that the Func be applied to key.
+type request struct {
+  key      string
+  response chan<- result // the client wants a single result
+}
+type Memo struct{ requests chan request }
+// New returns a memoization of f.  Clients must subsequently call Close.
+func New(f Func) *Memo {
+  memo := &Memo{requests: make(chan request)}
+  go memo.server(f)
+  return memo
+}
+func (memo *Memo) Get(key string) (interface{}, error) {
+  response := make(chan result)
+  memo.requests <- request{key, response}
+  res := <-response
+  return res.value, res.err
+}
+func (memo *Memo) Close() { close(memo.requests) }
+
+func (memo *Memo) server(f Func) {
+  cache := make(map[string]*entry)
+  for req := range memo.requests {
+    e := cache[req.key]
+    if e == nil {
+      // This is the first request for this key.
+      e = &entry{ready: make(chan struct{})}
+      cache[req.key] = e
+      go e.call(f, req.key) // call f(key)
+    }
+    go e.deliver(req.response)
+  }
+}
+func (e *entry) call(f Func, key string) {
+  // Evaluate the function.
+  e.res.value, e.res.err = f(key)
+  // Broadcast the ready condition.
+  close(e.ready)
+}
+func (e *entry) deliver(response chan<- result) {
+  // Wait for the ready condition.
+  <-e.ready
+  // Send the result to the client.
+  response <- e.res
+}
+
+```
+
+### Goroutines and Threads
+
+#### Growable Stacks
+
+Each OS thread has a fixed-size block of memory (often as large as 2MB) for its *stack*, the work area where it saves the local variables of function calls that are in progress or temporarily suspended while another function is called.
+
+In contrast, a goroutine starts life with a small stack, typically 2KB. A goroutine’s stack, like the stack of an OS thread, holds the local variables of active and suspended function calls, but unlike an OS thread, a goroutine’s stack is not fixed; it grows and shrinks as needed. The size limit for a goroutine stack may be as much as 1GB, orders of magnitude larger than a typical fixed-size thread stack, though of course few goroutines use that much.
+
+#### Goroutine Scheduling
+
+OS threads are scheduled by the OS kernel. Every few milliseconds, a hardware timer interrupts the processor, which causes a kernel function called the *scheduler* to be invoked. This function suspends the currently executing thread and saves its registers in memory, looks over the list of threads and decides which one should run next, restores that thread’s registers from memory, then resumes the execution of that thread. This operation is slow, due to its poor locality and the number of memory accesses required, and has historically only gotten worse as the number of CPU cycles required to access memory has increased.
+
+The Go runtime contains its own scheduler that uses a technique known as *m:n scheduling*, because it multiplexes (or schedules) *m* goroutines on *n* OS threads. The job of the Go scheduler is analogous to that of the kernel scheduler, but it is concerned only with the goroutines of a single Go program.
+
+The Go scheduler is not invoked periodically by a hardware timer, but implicitly by certain Go language constructs. For example, when a goroutine calls time.Sleep or blocks in a channel or mutex operation, the scheduler puts it to sleep and runs another goroutine until it is time to wake the first one up. Because it doesn’t need a switch to kernel context, rescheduling a goroutine is much cheaper than rescheduling a thread.
+
+#### GOMAXPROCS
+
+The Go scheduler uses a parameter called GOMAXPROCS to determine how many OS threads may be actively executing Go code simultaneously. Its default value is the number of CPUs on the machine, so on a machine with 8 CPUs, the scheduler will schedule Go code on up to 8 OS threads at once. (GOMAXPROCS is the *n* in *m:n* scheduling.) Goroutines that are sleeping or blocked in a communication do not need a thread at all. Goroutines that are blocked in I/O or other system calls or are calling non-Go functions, do need an OS thread, but GOMAXPROCS need not account for them.
+
+You can explicitly control this parameter using the GOMAXPROCS environment variable or the runtime.GOMAXPROCS function.
 
 ## Testing
 
@@ -5744,42 +5977,3 @@ func main() {
 ```
 
 Any additional non-flag arguments can be retrieved with `flag.Args()` which returns a `[]string`.
-
-## Synchronization Primitives
-
-The preferred way to handle concurrency and synchronization in Go is through goroutines and channels.However, Go does provide more traditional multithreading routines in the `sync` and `sync/atomic` packages.
-
-### Mutexes
-
-A mutex (mutal exclusive lock) locks a section of code to a single thread at a time and is used to protect shared resources from non-atomic operations. Here is an example of a mutex:
-
-```go
-package main
-
-import (
-  "fmt"
-  "sync"
-  "time"
-)
-
-func main() {
-  m := new(sync.Mutex)
-
-  for i := 0; i < 10; i++ {
-    go func(i int) {
-      m.Lock()
-      fmt.Println(i, "start")
-      time.Sleep(time.Second)
-      fmt.Println(i, "end")
-      m.Unlock()
-    }(i)
-  }
-
-  var input string
-  fmt.Scanln(&input)
-}
-```
-
-When the mutex (`m`) is locked any other attempt to lock it will block until it is unlocked. Great care should be taken when using mutexes or the synchronization primitives provided in the `sync/atomic` package.
-
-Traditional multithreaded programming is difficult; it's easy to make mistakes and those mistakes are hard to find, since they may depend on a very specific, relatively rare, and difficult to reproduce set of circumstances. One of Go's biggest strengths is that the concurrency features it provides are much easier to understand and use properly than threads and locks.

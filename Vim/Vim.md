@@ -46,7 +46,9 @@
 
 `*` Move to function declaration or go back
 
-`opt + up arrow` Move current line up to one line/
+`opt + up arrow` Move current line up to one line
+
+`gd`: find function defination
 
 ### Move by word
 
