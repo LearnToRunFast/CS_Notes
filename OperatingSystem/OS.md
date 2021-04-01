@@ -944,3 +944,36 @@ This code snippet from `lowlevellock.h` in the `nptl` library (part of the gnu l
 A two-phase lock realizes that spinning can be useful, particularly if the lock is about to be released. So in the first phase, the lock spins for a while, hoping that it can acquire the lock.
 
 However, if the lock is not acquired during the first spin phase, a second phase is entered, where the caller is put to sleep, and only woken up when the lock becomes free later. The Linux lock above is a form of such a lock, but it only spins once; a generalization of this could spin in a loop for a fixed amount of time before using **futex** support to sleep.
+
+### Condition Variables
+
+In multi-threaded programs, it is often useful for a thread to wait for some condition to become true before proceeding. To wait for a condition to become true, a thread can make use of what is known as a **condition variable**. A **condition variable** is an explicit queue that threads can put themselves on when some state of execution (i.e., some **condition**) is not as desired (by **waiting** on the condition); some other thread, when it changes said state, can then wake one (or more) of those waiting threads and thus allow them to continue (by **signaling** on the condition).
+
+To declare such a condition variable, use `pthread cond t c`, which declares c as a condition variable (note: proper initialization is also required). A condition variable has two operations associated with it: `wait()` and `signal()`. The wait() call is executed when a thread wishes to put itself to sleep; the signal() call is executed when a thread has changed something in the program and thus wants to wake a sleeping thread waiting on this condition.
+
+```c
+pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m);
+pthread_cond_signal(pthread_cond_t *c);
+```
+
+The wait() call is that it also takes a mutex as a parameter; it assumes that this mutex is locked when wait() is called. The responsibility of wait() is to release the lock and put the calling thread to sleep (atomically); when the thread wakes up (after some other thread has signaled it), it must re-acquire the lock before returning to the caller. This complexity stems from the desire to prevent certain race conditions from occurring when a thread is trying to put itself to sleep.
+
+> _**Note**_: Always **hold the lock when calling signal or wait**, and you will always be in good shape. When checking for a condition in a multi-threaded program, using a while loop is always correct; using an if statement only might be, depending on the semantics of signaling. Thus, always use while and your code will behave as expected.
+
+![image-20210401231210516](Asserts/image-20210401231210516.png)
+
+#### The Producer/Consumer (Bounded Buffer) Problem
+
+![image-20210401233227135](Asserts/image-20210401233227135.png)
+
+A producer only sleeps if all buffers are currently filled (p2); similarly, a consumer only sleeps if all buffers are currently empty (c2). And thus we solve the producer/consumer problem; time to sit back and drink a cold one.
+
+#### Covering Conditions
+
+Consider the following scenario. Assume there are zero bytes free; thread $T_a$ calls allocate(100), followed by thread $T_b$ which asks for less memory by calling allocate(10). Both $T_a$ and $T_b$ thus wait on the condition and go to sleep; there aren’t enough free bytes to satisfy either of these requests. Assume a third thread, $T_c$ calls free(50). Unfortunately, when it calls signal to wake a waiting thread, it might not wake the correct waiting thread $T_b$ which is waiting for only 10 bytes to be freed; $T_a$ should remain waiting, as not enough memory is yet free. Thus, the code in the figure does not work, as the thread waking other threads does not know which thread (or threads) to wake up.
+
+![image-20210401233711072](Asserts/image-20210401233711072.png)
+
+Replace the `pthread_cond_signal()` call in the code above with a call to `pthread_cond_broadcast()`, which wakes up *all* waiting threads. By doing so, we guarantee that any threads that should be woken are. The downside, of course, can be a negative performance impact, as we might needlessly wake up many other waiting threads that shouldn’t (yet) be awake.
+
+Such a condition a *covering condition*, as it covers all the cases where a thread needs to wake up (conservatively).

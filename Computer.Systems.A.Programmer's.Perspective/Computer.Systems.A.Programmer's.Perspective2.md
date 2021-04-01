@@ -795,3 +795,133 @@ Here is how to run the program from the bash shell:
 linux> LD_PRELOAD="./mymalloc.so" ./intr
 ```
 
+## Exceptional Control Flow
+
+From the time you first apply power to a processor until the time you shut it off, the program counter assumes a sequence of values $a_0,a_1,\dots, a_{n-1}$ where each  $a_i$ is the is the address of some corresponding instruction $I_i$. Each transition from $a_i$ to $a_{k+1}$ is called a *control transfer*. A sequence of such control transfers is called the *flow of control*, or *control flow*, of the processor.
+
+The simplest kind of control flow is a “smooth” sequence where each $I_k$ and $I_{k+1}$ are adjacent in memory. Typically, abrupt changes to this smooth flow, where $I_{k+1}$ is not adjacent to $I_k$, are caused by familiar program instructions such as jumps, calls, and returns. Such instructions are necessary mechanisms that allow programs to react to changes in internal program state represented by program variables.
+
+But systems must also be able to react to changes in system state that are not captured by internal program variables and are not necessarily related to the execution of the program. For example, a hardware timer goes off at regular intervals and must be dealt with. Packets arrive at the network adapter and must be stored in memory. Programs request data from a disk and then sleep until they are notified that the data are ready. Parent processes that create child processes must be notified when their children terminate.
+
+Modern systems react to these situations by making abrupt changes in the control flow. In general, we refer to these abrupt changes as *exceptional control flow (ECF)*. ECF occurs at all levels of a computer system. 
+
+- At the hardware level, events detected by the hardware trigger abrupt control transfers to exception handlers. 
+- At the operating systems level, the kernel transfers control from one user process to another via context switches. 
+- At the application level, a process can send a *signal* to another process that abruptly transfers control to a signal handler in the recipient. 
+- An individual program can react to errors by sidestepping the usual stack discipline and making nonlocal jumps to arbitrary locations in other functions.
+
+### Exceptions
+
+Exceptions are a form of exceptional control flow that are implemented partly by the hardware and partly by the operating system.
+
+Figure 8.1 shows the basic idea, the processor is executing some current instruction $I_{curr}$ when a significant change in the processor’s *state* occurs. The state is encoded in various bits and signals inside the processor. The change in state is known as an *event*.
+
+![image-20210401100745080](Asserts/image-20210401100745080.png)
+
+When the processor detects that the event has occurred, it makes an indirect procedure call (the exception), through a jump table called an *exception table*, to an operating system subroutine (the *exception handler*) that is specifically designed to process this particular kind of event. When the exception handler finishes processing, one of three things happens, depending on the type of event that caused the exception:
+
+1. The handler returns control to the current instruction $I_{curr}$, the instruction that was executing when the event occurred.
+2. The handler returns control to $I_{next}$ ,the instruction that would have executed next had the exception not occurred.
+3. The handler aborts the interrupted program.
+
+#### Exception Handling
+
+Each type of possible exception in a system is assigned a unique nonnegative integer *exception number*. Some of these numbers are assigned by the designers of the processor. Other numbers are assigned by the designers of the operating system *kernel*. At system boot time (when the computer is reset or powered on), the operat ing system allocates and initializes a jump table called an *exception table*, so that entry k contains the address of the handler for exception k. Figure 8.2 shows the format of an exception table.
+
+![image-20210401102625217](Asserts/image-20210401102625217.png)
+
+At run time (when the system is executing some program), the processor detects that an event has occurred and determines the corresponding exception number k. The processor then triggers the exception by making an indirect procedure call, through entry k of the exception table, to the corresponding handler. Figure 8.3 shows how the processor uses the exception table to form the address of the appropriate exception handler. The exception number is an index into the exception table, whose starting address is contained in a special CPU register called the *exception table base register*.
+
+![image-20210401102801296](Asserts/image-20210401102801296.png)
+
+An exception is akin to a procedure call, but with some important differences:
+
+- As with a procedure call, the processor pushes a return address on the stack before branching to the handler. However, depending on the class of exception, the return address is either the current instruction (the instruction that was executing when the event occurred) or the next instruction (the instruction that would have executed after the current instruction had the event not occurred).
+- The processor also pushes some additional processor state onto the stack that will be necessary to restart the interrupted program when the handler returns. For example, an x86-64 system pushes the EFLAGS register containing the current condition codes, among other things, onto the stack.
+- When control is being transferred from a user program to the kernel, all of these items are pushed onto the kernel’s stack rather than onto the user’s stack.
+- Exception handlers run in *kernel mode*, which means they have complete access to all system resources.
+
+After the handler has processed the event, it optionally returns to the interrupted program by executing a special “return from interrupt” instruction, which pops the appropriate state back into the processor’s control and data registers, restores the state to *user mode* if the exception interrupted a user program, and then returns control to the interrupted program.
+
+#### Classes of Exceptions
+
+Exceptions can be divided into four classes: *interrupts*, *traps*, *faults*, and *aborts*. The table in Figure 8.4 summarizes the attributes of these classes.
+
+![image-20210401105144231](Asserts/image-20210401105144231.png)
+
+##### Interrupts
+
+*Interrupts* occur *asynchronously* as a result of signals from I/O devices that are external to the processor. Exception handlers for hardware interrupts are often called *interrupt handlers*.
+
+Figure 8.5 summarizes the processing for an interrupt. I/O devices such as network adapters, disk controllers, and timer chips trigger interrupts by signaling a pin on the processor chip and placing onto the system bus the exception number that identifies the device that caused the interrupt.
+
+After the current instruction finishes executing, the processor notices that the interrupt pin has gone high, reads the exception number from the system bus, and then calls the appropriate interrupt handler. When the handler returns, it returns control to the next instruction. The effect is that the program continues executing as though the interrupt had never happened.
+
+![image-20210401105714871](Asserts/image-20210401105714871.png)
+
+##### Traps and System Calls
+
+*Traps* are *intentional* exceptions that occur as a result of executing an instruction. Like interrupt handlers, trap handlers return control to the next instruction. The most important use of traps is to provide a procedure-like interface between user programs and the kernel, known as a *system call*.
+
+User programs often need to request services from the kernel such as reading a file (read), creating a new process (fork), loading a new program (execve), and terminating the current process (exit). To allow controlled access to such kernel services, processors provide a special syscall n instruction that user programs can execute when they want to request service n. Executing the syscall instruction causes a trap to an exception handler that decodes the argument and calls the appropriate kernel routine. Figure 8.6 summarizes the processing for a system call.
+
+![image-20210401115744121](Asserts/image-20210401115744121.png)
+
+> <center><strong>Regular Functions and System Calls</strong></center>
+>
+> Regular functions run in *user mode*, which restricts the types of instructions they can execute, and they access the same stack as the calling function. A system call runs in *kernel mode*, which allows it to execute privileged instructions and access a stack defined in the kernel.
+
+##### Faults
+
+Faults result from error conditions that a handler might be able to correct. When a fault occurs, the processor transfers control to the fault handler. If the handler is able to correct the error condition, it returns control to the faulting instruction, thereby re-executing it. Otherwise, the handler returns to an abort routine in the kernel that terminates the application program that caused the fault. Figure 8.7 summarizes the processing for a fault.
+
+![image-20210401120444748](Asserts/image-20210401120444748.png)
+
+A classic example of a fault is the page fault exception, which occurs when an instruction references a virtual address whose corresponding page is not resident in memory and must therefore be retrieved from disk. The page fault handler loads the appropriate page from disk and then returns control to the instruction that caused the fault. When the instruction executes again, the appropriate page is now resident in memory and the instruction is able to run to completion without faulting.
+
+##### Aborts
+
+Aborts result from unrecoverable fatal errors, typically hardware errors such as parity errors that occur when DRAM or SRAM bits are corrupted. Abort handlers never return control to the application program. As shown in Figure 8.8, the handler returns control to an abort routine that terminates the application program.
+
+![image-20210401120657168](Asserts/image-20210401120657168.png)
+
+#### Exceptions in Linux/x86-64 Systems
+
+There are up to 256 different exception types for x86-64 systems. Numbers in the range from 0 to 31 correspond to exceptions that are defined by the Intel architects and thus are identical for any x86-64 system. Numbers in the range from 32 to 255 correspond to interrupts and traps that are defined by the operating system. Figure 8.9 shows a few examples.
+
+![image-20210401121054787](Asserts/image-20210401121054787.png)
+
+##### Linux/x86-64 Faults and Aborts
+
+- *Divide error.* A divide error (exception 0) occurs when an application attempts to divide by zero or when the result of a divide instruction is too big for the destination operand. Unix does not attempt to recover from divide errors, opting instead to abort the program. Linux shells typically report divide errors as “Floating exceptions.”
+
+- *General protection fault.* The infamous general protection fault (exception 13) occurs for many reasons, usually because a program references an undefined area of virtual memory or because the program attempts to write to a read-only text segment. Linux does not attempt to recover from this fault. Linux shells typically report general protection faults as “Segmentation faults.”
+
+- *Page fault.* A page fault (exception 14) is an example of an exception where the faulting instruction is restarted. The handler maps the appropriate page of virtual memory on disk into a page of physical memory and then restarts the faulting instruction. 
+- *Machine check.* A machine check (exception 18) occurs as a result of a fatal hardware error that is detected during the execution of the faulting instruction. Machine check handlers never return control to the application program.
+
+##### Linux/x86-64 System Calls
+
+Linux provides hundreds of system calls that application programs use when they want to request services from the kernel, such as reading a file, writing a file, and creating a new process. Figure 8.10 lists some popular Linux system calls. Each system call has a unique integer number that corresponds to an offset in a jump table in the kernel. (Notice that this jump table is not the same as the exception table.)
+
+![image-20210401121755383](Asserts/image-20210401121755383.png)
+
+C programs can invoke any system call directly by using the syscall function. However, this is rarely necessary in practice. The C standard library provides a set of convenient wrapper functions for most system calls. The wrapper functions package up the arguments, trap to the kernel with the appropriate system call instruction, and then pass the return status of the system call back to the calling program. 
+
+System calls are provided on x86-64 systems via a trapping instruction called `syscall`. All arguments to Linux system calls are passed through general-purpose registers rather than the stack. By convention, register `%rax` contains the `syscall number`, with up to six arguments in `%rdi`, `%rsi`, `%rdx`, `%r10`, `%r8`, and `%r9`. The first argument is in `%rdi`, the second in `%rsi`, and so on. On return from the system call, registers `%rcx` and `%r11` are destroyed, and `%rax` contains the return value. A negative return value between −4,095 and −1 indicates an error corresponding to negative errno.
+
+For example, consider the following version of the familiar hello program, written using the write system-level function instead of printf. The first argument to write sends the output to stdout. The second argument is the sequence of bytes to write, and the third argument gives the number of bytes to write.
+
+```c
+int main() {
+  write(1, "hello, world\n", 13);
+  _exit(0);
+}
+```
+
+Figure 8.11 shows an assembly-language version of hello that uses the syscall instruction to invoke the write and exit system calls directly. Lines 9–13 invoke the write function. First, line 9 stores the number of the write system call in `%rax`, and lines 10–12 set up the argument list. Then, line 13 uses the syscall instruction to invoke the system call. Similarly, lines 14–16 invoke the _exit system call.
+
+![image-20210401122751214](Asserts/image-20210401122751214.png)
+
+### Processes
+
