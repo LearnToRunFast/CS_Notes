@@ -977,3 +977,105 @@ Consider the following scenario. Assume there are zero bytes free; thread $T_a$ 
 Replace the `pthread_cond_signal()` call in the code above with a call to `pthread_cond_broadcast()`, which wakes up *all* waiting threads. By doing so, we guarantee that any threads that should be woken are. The downside, of course, can be a negative performance impact, as we might needlessly wake up many other waiting threads that shouldn’t (yet) be awake.
 
 Such a condition a *covering condition*, as it covers all the cases where a thread needs to wake up (conservatively).
+
+### Semaphores
+
+A semaphore is an object with an integer value that we can manipulate with two routines; in the POSIX standard, these routines are `sem_wait()` and `sem_post()`. The behavior of these two functions is seen in Figure 31.2.
+
+![image-20210402142513207](Asserts/image-20210402142513207.png)
+
+#### Binary Semaphores (Locks)
+
+![image-20210402144457035](Asserts/image-20210402144457035.png)
+
+Figure 31.3 shows a code snippet for using semaphore as lock. The X will be 1 here. Assume the first thread (Thread 0) calls `sem_wait()`; it will first decrement the value of the semaphore, changing it to 0. Then, it will wait only if the value is *not* greater than or equal to 0. Because the value is 0, `sem_wait()` will simply return and the calling thread will continue; Thread 0 is now free to enter the critical section. If no other thread tries to acquire the lock while Thread 0 is inside the critical section, when it calls `sem_post()`, it will simply restore the value of the semaphore to 1 (and not wake a waiting thread, because there are none). Figure 31.4 shows a trace of this scenario.
+
+![image-20210402144839032](Asserts/image-20210402144839032.png)
+
+A more interesting case arises when Thread 0 “holds the lock” and another thread (Thread 1) tries to enter the critical section by calling `sem_wait()`. In this case, Thread 1 will decrement the value of the semaphore to -1, and wait (putting itself to sleep and relinquishing the processor). When Thread 0 runs again, it will eventually call `sem_post()`, incrementing the value of the semaphore back to zero, and then wake the waiting thread (Thread 1), which will then be able to acquire the lock for itself. When Thread 1 finishes, it will again increment the value of the semaphore, restoring it to 1 again. Figure 31.5 shows a trace of this example. 
+
+![image-20210402145121395](Asserts/image-20210402145121395.png)
+
+#### Semaphores For Ordering
+
+Imagine a thread creates another thread and then wants to wait for it to complete its execution (Figure 31.6).
+
+![image-20210402145831870](Asserts/image-20210402145831870.png)
+
+There are two cases to consider. 
+
+- If the parent creates the child but the child has not run yet, then the parent will call `sem_wait()` before the child has called `sem_post()`. We’d like the parent to wait for the child to run. The only way this will happen is if the value of the semaphore is not greater or equals than 0; hence, 0 is the initial value. The parent runs, decrements the semaphore (to -1), then waits (sleeping). When the child finally runs, it will call `sem_post()`, increment the value of the semaphore to 0, and wake the parent, which will then return from `sem_wait()` and finish the program.
+- If the child runs to completion before the parent gets a chance to call `sem_wait()`. The child will first call `sem_post()`, thus incrementing the value of the semaphore from 0 to 1. When the parent then gets a chance to run, it will call `sem_wait()` and find the value of the semaphore to be 1; the parent will thus decrement the value (to 0) return from `sem_wait()` without waiting.
+
+ ![image-20210402150849052](Asserts/image-20210402150849052.png)
+
+
+
+> <center><strong>The Initial Value of A Semaphore</strong></center>
+>
+> Consider the number of resources you are willing to give away immediately after initialization. With the lock, it was 1, because you are willing to have the lock locked (given away) immediately after initialization. With the ordering case, it was 0, because there is nothing to give away at the start; only when the child thread is done is the resource created, at which point, the value is incremented to 1.
+
+#### The Producer/Consumer (Bounded Buffer) Problem
+
+![image-20210402153133328](Asserts/image-20210402153133328.png)
+
+#### Reader-Writer Locks
+
+Imaging a number of concurrent list operations, including inserts and simple lookups. While inserts change the state of the list (and thus a traditional critical section makes sense), lookups simply *read* the data structure; as long as we can guarantee that no insert is on-going, we can allow many lookups to proceed concurrently. The special type of lock we will now develop to support this type of operation is known as a **reader-writer lock**. The code for such a lock is available in Figure 31.13.
+
+![image-20210402154009124](Asserts/image-20210402154009124.png)
+
+However, it would be relatively easy for readers to starve writers. More sophisticated solutions to this problem exist; perhaps you can think of a better implementation? Hint: think about what you would need to do to prevent more readers from entering the lock once a writer is waiting.
+
+#### The Dining Philosophers
+
+Assume there are five “philosophers” sitting around a table. Between each pair of philosophers is a single fork (and thus, five total). The philosophers each have times where they think, and don’t need any forks, and times where they eat. In order to eat, a philosopher needs two forks, both the one on their left and the one on their right.
+
+![image-20210402155728842](Asserts/image-20210402155728842.png)
+
+Here is the basic loop of each philosopher, assuming each has a unique thread identifier p from 0 to 4 (inclusive):
+
+```c
+while (1) {
+  think();
+  get_forks(p);
+  eat();
+  put_forks(p);
+}
+```
+
+The key challenge, then, is to write the routines `get_forks()` and `put_forks()` such that there is no deadlock, no philosopher starves and never gets to eat, and concurrency is high (i.e., as many philosophers can eat at the same time as possible).
+
+```c
+int left(int p)  { return p; }
+int right(int p) { return (p + 1) % 5; }
+
+void put_forks(int p) {
+  sem_post(&forks[left(p)]);
+  sem_post(&forks[right(p)]);
+}
+void get_forks(int p) {
+  // with one guy who pick the right fork first , will break the deadlock
+  if (p == 4) {
+    sem_wait(&forks[right(p)]);
+    sem_wait(&forks[left(p)]);
+  } else {
+    sem_wait(&forks[left(p)]);
+    sem_wait(&forks[right(p)]);
+  }
+}
+```
+
+#### Thread Throttling
+
+How can a programmer prevent “too many” threads from doing something at once and bogging the system down? Use a semaphore to limit the number of threads concurrently executing the piece of code in question. We call this approach **throttling**, and consider it a form of **admission control**.
+
+Imagine that you create hundreds of threads to work on some problem in parallel. However, in a certain part of the code, each thread acquires a large amount of memory to perform part of the computation; let’s call this part of the code the *memory-intensive region*. If *all* of the threads enter the memory-intensive region at the same time, the sum of all the memory allocation requests will exceed the amount of physical memory on the machine. As a result, the machine will start thrashing (i.e., swapping pages to and from the disk), and the entire computation will slow to a crawl.
+
+By initializing the value of the semaphore to the maximum number of threads you wish to enter the memory-intensive region at once, and then putting a `sem_wait()` and `sem_post()` around the region, a semaphore can naturally throttle the number of threads that are ever concurrently in the dangerous region of the code.
+
+#### Semaphores Implementation
+
+![image-20210402161337502](Asserts/image-20210402161337502.png)
+
+> _**Note**_: One subtle difference between our Zemaphore and pure semaphores as defined by Dijkstra is that we don’t maintain the invariant that the value of the semaphore, when negative, reflects the number of waiting threads; indeed, the value will never be lower than zero. This behavior is easier to implement and matches the current Linux implementation.
