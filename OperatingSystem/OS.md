@@ -1079,3 +1079,112 @@ By initializing the value of the semaphore to the maximum number of threads you 
 ![image-20210402161337502](Asserts/image-20210402161337502.png)
 
 > _**Note**_: One subtle difference between our Zemaphore and pure semaphores as defined by Dijkstra is that we don’t maintain the invariant that the value of the semaphore, when negative, reflects the number of waiting threads; indeed, the value will never be lower than zero. This behavior is easier to implement and matches the current Linux implementation.
+
+### Common Concurrent Bugs
+
+#### Non-Deadlock Bugs
+
+Two major types of non-deadlock bugs: **atomicity violation** bugs and **order violation** bug.
+
+##### Atomicity-Violation Bugs
+
+The desired serializability among multiple memory accesses is violated. Assume the code at Figure 32.2.
+
+![image-20210403191417264](Asserts/image-20210403191417264.png)
+
+If the flow is line 2 to line 7, then when it return to thread 1 line 3, the condition of `thd->proc_info != NULL` is no longer true. The atomically guarantee is the line 2 and line 3 must be executed one by the another.
+
+To fix the bug, we can add locks between the critical section.
+
+![image-20210403191910985](Asserts/image-20210403191910985.png)  
+
+##### Order-Violation Bugs
+
+![image-20210403193730517](Asserts/image-20210403193730517.png)
+
+Certain codes need to follow specify order. Figure 32.4, line 8 must always get executed after line 3. Using **condition variables** is an easy and robust way to add this style of synchronization into modern code bases. In the example above, we could thus rewrite the code as seen in Figure 32.5.
+
+![image-20210403194014846](Asserts/image-20210403194014846.png)
+
+#### Deadlock Bugs
+
+Deadlock occurs when a thread (say Thread 1) is holding a lock (L1) and waiting for another lock (L2); unfortunately, the thread (Thread 2) that holds lock L2 is waiting for L1 to be released. Here is a code snippet that demonstrates such a potential deadlock:
+
+![image-20210403194423833](Asserts/image-20210403194423833.png)
+
+Four conditions need to hold for a deadlock to occur [C+71]:
+
+- **Mutual exclusion:** Threads claim exclusive control of resources that they require (e.g., a thread grabs a lock).
+- **Hold-and-wait:** Threads hold resources allocated to them(e.g.,locks that they have already acquired) while waiting for additional resources (e.g., locks that they wish to acquire).
+- **No preemption:** Resources (e.g., locks) cannot be forcibly removed from threads that are holding them.
+- **Circular wait:** There exists a circular chain of threads such that each thread holds one or more resources (e.g., locks) that are being requested by the next thread in the chain.
+
+If any of these four conditions are not met, deadlock cannot occur. Thus, we first explore techniques to *prevent* deadlock; each of these strategies seeks to prevent one of the above conditions from arising and thus is one approach to handling the deadlock problem.
+
+##### Prevention
+
+**Circular Wait**
+
+The Circular Wait requirement for deadlock can be avoided by providing a **total ordering** on lock acquisition. For example, if there are only two locks in the system (L1 and L2), you can prevent deadlock by always acquiring L1 before L2. Such strict ordering ensures that no cyclical wait arises; hence, no deadlock.
+
+In more complex systems, more than two locks will exist, a partial ordering can be a useful way to structure lock acquisition so as to avoid deadlock.
+
+> <center><strong>Enforce Lock Ordering by Lock Address</strong></center>
+>
+> By acquiring locks in either high-to-low or low-to-high address order, a function can guarantee that it always acquires locks in the same order, regardless of which order they are passed in. The code would look something like this:
+>
+> ```c
+> if (m1 > m2) { // grab in high-to-low address order
+>   pthread_mutex_lock(m1);
+>   pthread_mutex_lock(m2);
+> } else {
+>   pthread_mutex_lock(m2);
+>   pthread_mutex_lock(m1);
+> }
+> // Code assumes that m1 != m2 (not the same lock)
+> ```
+>
+> By using this simple technique, a programmer can ensure a simple and efficient deadlock-free implementation of multi-lock acquisition.
+
+**Hold-and-wait**
+
+The hold-and-wait requirement for deadlock can be avoided by acquiring all locks at once, atomically. In practice, this could be achieved as follows:
+
+```c
+pthread_mutex_lock(prevention); // begin acquisition
+pthread_mutex_lock(L1);
+pthread_mutex_lock(L2);
+// ...
+pthread_mutex_unlock(prevention); // end
+```
+
+This approach requires us to know exactly which locks must be held and to acquire them ahead of time. This technique also is likely to decrease concurrency as all locks must be acquired early on (at once) instead of when they are truly needed.
+
+**No Preemption**
+
+The routine `pthread_mutex_trylock()` either grabs the lock (if it is available) and returns success or returns an error code indicating the lock is held; in the latter case, you can try again later if you want to grab that lock. Such an interface could be used as follows to build a deadlock-free, ordering-robust lock acquisition protocol:
+
+```c
+top:
+pthread_mutex_lock(L1);
+if (pthread_mutex_trylock(L2) != 0) {
+  pthread_mutex_unlock(L1);
+  goto top;
+}
+```
+
+This solution might introduce livelock which two threads could both be repeatedly attempting this sequence and repeatedly failing to acquire both locks but no progress is being made. We could add a random delay before looping back and trying the entire thing over again, thus decreasing the odds of repeated interference among competing threads.
+
+**Mutual Exclusion**
+
+The final prevention technique would be to avoid the need for mutual exclusion at all. The idea behind these **lock-free** (and related **wait-free**) approaches. Using powerful hardware instructions, you can build data structures in a manner that does not require explicit locking.
+
+**Deadlock Avoidance via Scheduling**
+
+Instead of deadlock prevention, in some scenarios deadlock **avoidance** is preferable. Avoidance requires some global knowledge of which locks various threads might grab during their execution, and subsequently schedules said threads in a way as to guarantee no deadlock can occur.  You need to know all the details about the each program and it can limit concurrency as we need to prevent the deadlock by not allowing them run at same time. Thus, avoidance of deadlock via scheduling is not a widely-used general-purpose solution.
+
+**Detect and Recover**
+
+One final general strategy is to allow deadlocks to occasionally occur, and then take some action once such a deadlock has been detected.
+
+Many database systems employ deadlock detection and recovery techniques. A deadlock detector runs periodically, building a resource graph and checking it for cycles. In the event of a cycle (deadlock), the system needs to be restarted. If more intricate repair of data structures
