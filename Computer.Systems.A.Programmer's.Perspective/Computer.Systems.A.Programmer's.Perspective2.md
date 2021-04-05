@@ -269,3 +269,218 @@ Suppose the MMU triggers a page fault while trying to translate some virtual add
 
 ### Memory Mapping
 
+Linux initializes the contents of a virtual memory area by associating it with an *object* on disk, a process known as *memory mapping*. Areas can be mapped to one of two types of objects:
+
+- *Regular file in the Linux file system:* An area can be mapped to a contiguous section of a regular disk file, such as an executable object file. The file section is divided into page-size pieces, with each piece containing the initial contents of a virtual page. Because of demand paging, none of these virtual pages is actually swapped into physical memory until the CPU first *touches* the page (i.e., issues a virtual address that falls within that page’s region of the address space). If the area is larger than the file section, then the area is padded with zeros.
+- *Anonymous file:* An area can also be mapped to an anonymous file, created by the kernel, that contains all binary zeros. The first time the CPU touches a virtual page in such an area, the kernel finds an appropriate victim page in physical memory, swaps out the victim page if it is dirty, overwrites the victim page with binary zeros, and updates the page table to mark the page as resident. Notice that no data are actually transferred between disk and memory. For this reason, pages in areas that are mapped to anonymous files are sometimes called *demand-zero pages*.
+
+In either case, once a virtual page is initialized, it is swapped back and forth between a special *swap file* maintained by the kernel. The swap file is also known as the *swap space* or the *swap area*. An important point to realize is that at any point in time, the swap space bounds the total amount of virtual pages that can be allocated by the currently running processes.
+
+#### Shared Objects
+
+Memory mapping provides us with a clean mechanism for controlling how objects are shared by multiple processes. 
+
+An object can be mapped into an area of virtual memory as either a *shared object* or a *private object*. A virtual memory area for a shared object is called a *shared area*. Similarly for a *private area*.
+
+- Any writes to shared object will be visible to any processes that mapped the shared object into their virtual memory, the changes are also reflected in the original object on disk.
+- On the other hand, changes made to an area mapped to a private object are not visible to other processes, and any writes that the process makes to the area are *not* reflected back to the object on disk. 
+
+![image-20210404183004285](Asserts/image-20210404183004285.png)
+
+Private objects are mapped into virtual memory using a clever technique known as *copy-on-write*. A private object begins life in exactly the same way as a shared object, with only one copy of the private object stored in physical memory  show in Figure 9.30(a). By deferring the copying of the pages in private objects until the last possible moment, copy-on-write makes the most efficient use of scarce physical memory.
+
+For each process that maps the private object, the page table entries for the corresponding private area are flagged as read-only, and the area struct is flagged as *private copy-on-write*. If a process attempts to write to some page in the private area, the write triggers a protection fault.
+
+When the fault handler notices that the protection exception was caused by the process trying to write to a page in a private copy-on-write area, it creates a new copy of the page in physical memory, updates the page table entry to point to the new copy, and then restores write permissions to the page, as shown in Figure 9.30(b). When the fault handler returns, the CPU re-executes the write, which now proceeds normally on the newly created page.
+
+#### Fork
+
+When the fork function is called by the *current process*, the kernel creates various data structures for the *new process* and assigns it a unique PID. To create the virtual memory for the new process, it creates exact copies of the current process’s `mm_struct`, `area structs`, and page tables. It flags each page in both processes as read-only, and flags each area struct in both processes as private copy-on-write.
+
+When the fork returns in the new process, the new process now has an exact copy of the virtual memory as it existed when the fork was called. When either of the processes performs any subsequent writes, the copy-on-write mechanism creates new pages, thus preserving the abstraction of a private address space for each process.
+
+#### Execve
+
+Suppose that the program running in the current process makes the following call:
+
+```c
+execve("a.out", NULL, NULL);
+```
+
+![image-20210404212556076](Asserts/image-20210404212556076.png)
+
+Loading and running `a.out` requires the following steps:
+
+1. *Delete existing user areas.* Delete the existing area structs in the user portion of the current process’s virtual address.
+
+2. *Map private areas.* Create new area structs for the code, data, bss, and stack areas of the new program. All of these new areas are private copy-on-write. The code and data areas are mapped to the `.text` and `.data` sections of the a.out file. The bss area is demand-zero, mapped to an anonymous file whose size is contained in a.out. The stack and heap area are also demand-zero, initially of zero length. Figure 9.31 summarizes the different mappings of the private areas.
+3. *Map shared areas.* If the a.out program was linked with shared objects, such as the standard C library libc.so, then these objects are dynamically linked into the program, and then mapped into the shared region of the user’s virtual address space.
+4. *Set the program counter (PC).* The last thing that `execve` does is to set the program counter in the current process’s context to point to the entry point in the code area.
+
+#### User-Level Memory Mapping with the mmap Function
+
+Linux processes can use the `mmap` function to create new areas of virtual memory and to map objects into these areas.
+
+```c
+#include <unistd.h>
+#include <sys/mman.h>
+void  *mmap(void *start, size_t length, int prot, int flags,
+            int fd, off_t offset);
+```
+
+![image-20210404213246657](Asserts/image-20210404213246657.png)
+
+The `mmap` function asks the kernel to create a new virtual memory area, preferably one that starts at address `start`, and to map a contiguous chunk of the object specified by file descriptor `fd` to the new area. The contiguous object chunk has a size of `length` bytes and starts at an offset of `offset` bytes from the beginning of the file. The start address is merely a hint, and is usually specified as NULL. For our purposes, we will always assume a NULL start address. Figure 9.32 depicts the meaning of these arguments.
+
+The `prot` argument contains bits that describe the access permissions of the newly mapped virtual memory area (i.e., the vm_prot bits in the corresponding area struct).
+
+- `PROT_EXEC`. Pages in the area consist of instructions that may be executed by the CPU.
+- `PROT_READ`. Pages in the area may be read. 
+- `PROT_WRITE`. Pages in the area may be written. 
+- `PROT_NONE`. Pages in the area cannot be accessed.
+
+The `flags` argument consists of bits that describe the type of the mapped object.
+
+- If the `MAP_ANON` flag bit is set, then the backing store is an anonymous object and the corresponding virtual pages are demand-zero.
+- `MAP_PRIVATE` indicates a private copy-on-write object
+- `MAP_SHARED` indicates a shared object. For example,
+
+For example, asks the kernel to create a new read-only, private, demand-zero area of virtual memory containing size bytes. If the call is successful, then `bufp` contains the address of the new area.
+
+```c
+bufp = Mmap(NULL, size, PROT_READ, MAP_PRIVATE|MAP_ANON, 0, 0);
+```
+
+The `munmap` function deletes regions of virtual memory:
+
+```c
+#include <unistd.h>
+#include <sys/mman.h>
+int munmap(void *start, size_t length);
+```
+
+### Dynamic Memory Allocation
+
+While it is certainly possible to use the low-level `mmap` and `munmap` functions to create and delete areas of virtual memory, C programmers typically find it more convenient and more portable to use a *dynamic memory allocator* when they need to acquire additional virtual memory at run time.
+
+![image-20210405110612071](Asserts/image-20210405110612071.png)
+
+A dynamic memory allocator maintains an area of a process’s virtual memory known as the *heap* (Figure 9.33). Details vary from system to system, but without loss of generality, we will assume that the heap is an area of demand-zero memory that begins immediately after the uninitialized data area and grows upward (toward higher addresses). For each process, the kernel maintains a variable `brk` (pronounced “break”) that points to the top of the heap.
+
+An allocator maintains the heap as a collection of various-size *blocks*. Each block is a contiguous chunk of virtual memory that is either *allocated* or *free*. An allocated block has been explicitly reserved for use by the application. A free block is available to be allocated. A free block remains free until it is explicitly allocated by the application. An allocated block remains allocated until it is freed, either explicitly by the application or implicitly by the memory allocator itself.
+
+Allocators come in two basic styles. Both styles require the application to explicitly allocate blocks. They differ about which entity is responsible for freeing allocated blocks.
+
+- *Explicit allocators* require the application to explicitly free any allocated blocks. For example, the C standard library provides an explicit allocator called the malloc package. C programs allocate a block by calling the `malloc` function, and free a block by calling the `free` function. The new and delete calls in C++ are comparable.
+- *Implicit allocators* require the allocator to detect when an allocated block is no longer being used by the program and then free the block. Implicit allocators are also known as *garbage collectors*, and the process of automatically freeing unused allocated blocks is known as *garbage collection*. For example, higher-level languages such as Lisp, ML, and Java rely on garbage collection to free allocated blocks.
+
+#### The malloc and free Functions
+
+The `malloc` function returns a pointer to a block of memory of at least size bytes that is suitably aligned for any kind of data object that might be contained in the block. If `malloc` encounters a problem (e.g., the program requests a block of memory that is larger than the available virtual memory), then it returns NULL and sets `errno`. `Malloc` does not initialize the memory it returns. Applications that want initialized dynamic memory can use `calloc`, a thin wrapper around the `malloc` function that initializes the allocated memory to zero. Applications that want to change the size of a previously allocated block can use the `realloc` function.
+
+```c
+#include <stdlib.h>
+void *malloc(size_t size);
+```
+
+Dynamic memory allocators such as `malloc` can allocate or deallocate heap memory explicitly by using the `mmap` and `munmap` functions, or they can use the `sbrk` function. The `sbrk` function grows or shrinks the heap by adding `incr` to the kernel’s `brk` pointer. If successful, it returns the old value of `brk`, otherwise it returns −1 and sets `errno` to *ENOMEM*. If `incr` is zero, then `sbrk` returns the current value of `brk`. Calling `sbrk` with a negative incr is legal but tricky because the return value (the old value of brk) points to `abs(incr)` bytes past the new top of the heap.
+
+```c
+#include <unistd.h>
+void *sbrk(intptr_t incr);
+```
+
+Programs free allocated heap blocks by calling the `free` function. The `ptr` argument must point to the beginning of an allocated block that was obtained from `malloc`, `calloc`, or `realloc`. If not, then the behavior of `free` is undefined. Even worse, since it returns nothing, free gives no indication to the application that something is wrong. This can produce some baffling run-time errors.
+
+#### Allocator Requirements and Goals
+
+Explicit allocators must operate within some rather stringent constraints:
+
+- *Handling arbitrary request sequences.* The allocator cannot make any assumptions about the ordering of allocate and free requests. 
+
+- *Making immediate responses to requests.* The allocator must respond immediately to allocate requests. Thus, the allocator is not allowed to reorder or buffer requests in order to improve performance.
+- *Using only the heap.* In order for the allocator to be scalable, any nonscalar data structures used by the allocator must be stored in the heap itself.
+- *Aligning blocks (alignment requirement).* The allocator must align blocks in such a way that they can hold any type of data object.
+- *Not modifying allocated blocks.* Allocators can only manipulate or change free blocks. In particular, they are not allowed to modify or move blocks once they are allocated. Thus, techniques such as compaction of allocated blocks are not permitted.
+
+Working within these constraints, the author of an allocator attempts to meet the often conflicting performance goals of maximizing throughput and memory utilization.
+
+- *Goal 1: Maximizing throughput.*  For example, if an allocator completes 500 allocate requests and 500 free requests in 1 second, then its throughput is 1,000 operations per second. In general, we can maximize throughput by minimizing the average time to satisfy allocate and free requests.
+- *Goal 2: Maximizing memory utilization.* Good programmers know that virtual memory is a finite resource that must be used efficiently. 
+
+#### Fragmentation
+
+The primary cause of poor heap utilization is a phenomenon known as *fragmentation*, which occurs when otherwise unused memory is not available to satisfy allocate requests. There are two forms of fragmentation: *internal fragmentation* and *external fragmentation*.
+
+- *Internal fragmentation* occurs when an allocated block is larger than the payload. The smallest unit in heap is block size, if the requested size is not multiple of block size, the free spaces left is internal fragmentation.
+- *External fragmentation* occurs when there *is* enough aggregate free memory to satisfy an allocate request, but no single free block is large enough to handle the request. 
+
+#### Implementation
+
+A practical allocator that strikes a better balance between throughput and utilization must consider the following issues:
+
+- *Free block organization.* How do we keep track of free blocks?
+- *Placement.* How do we choose an appropriate free block in which to place a newly allocated block?
+- *Splitting.* After we place a newly allocated block in some free block, what do we do with the remainder of the free block?
+- *Coalescing.* What do we do with a block that has just been freed?
+
+#### Implicit Free Lists
+
+![image-20210405121805699](Asserts/image-20210405121805699.png)
+
+Any practical allocator needs some data structure that allows it to distinguish block boundaries and to distinguish between allocated and free blocks. Most allocators embed this information in the blocks themselves. One simple approach is shown in Figure 9.35.
+
+#### Explicit Free Lists
+
+The implicit free list provides us with a simple way to introduce some basic allocator concepts. However, because block allocation time is linear in the total number of heap blocks, the implicit free list is not appropriate for a general purpose allocator (although it might be fine for a special-purpose allocator where the number of heap blocks is known beforehand to be small).
+
+![image-20210405133827538](Asserts/image-20210405133827538.png)
+
+A better approach is to organize the free blocks into some form of explicit data structure. Since by definition the body of a free block is not needed by the program, the pointers that implement the data structure can be stored within the bodies of the free blocks. For example, the heap can be organized as a doubly linked free list by including a `pred` (predecessor) and `succ` (successor) pointer in each free block, as shown in Figure 9.48.
+
+#### Segregated Free Lists
+
+A popular approach for reducing the allocation time, known generally as *segregated storage*, is to maintain multiple free lists, where each list holds blocks that are roughly the same size. The general idea is to partition the set of all possible block sizes into equivalence classes called *size classes*. 
+
+The allocator maintains an array of free lists, with one free list per size class, ordered by increasing size. When the allocator needs a block of size n, it searches the appropriate free list. If it cannot find a block that fits, it searches the next list, and so on.
+
+##### Simple Segregated Storage
+
+With simple segregated storage, the free list for each size class contains same-size blocks, each the size of the largest element of the size class. For example, if some size class is defined as {17–32}, then the free list for that class consists entirely of blocks of size 32.
+
+To allocate a block of some given size, we check the appropriate free list. If the list is not empty, we simply allocate the first block in its entirety. Free blocks are never split to satisfy allocation requests. If the list is empty, the allocator requests a fixed-size chunk of additional memory from the operating system (typically a multiple of the page size), divides the chunk into equal-size blocks, and links the blocks together to form the new free list. To free a block, the allocator simply inserts the block at the front of the appropriate free list.
+
+There are a number of advantages to this simple scheme. 
+
+- Allocating and freeing blocks are both fast constant-time operations. 
+- The combination of the same-size blocks in each chunk, no splitting, and no coalescing means that there is very little per-block memory overhead. 
+- Since each chunk has only same-size blocks, the size of an allocated block can be inferred from its address.
+- Since there is no coalescing, allocated blocks do not need an allocated/free flag in the header. Thus, allocated blocks require no headers, and since there is no coalescing, they do not require any footers either. 
+- Since allocate and free operations insert and delete blocks at the beginning of the free list, the list need only be singly linked instead of doubly linked. 
+- The only required field in any block is a one-word `succ` pointer in each free block, and thus the minimum block size is only one word.
+
+A significant disadvantage is that simple segregated storage is 
+
+- susceptible to internal and external fragmentation. Internal fragmentation is possible because free blocks are never split. Worse, certain reference patterns can cause extreme external fragmentation because free blocks are never coalesced.
+
+##### Segregated Fits
+
+The allocator maintains an array of free lists. Each free list is associated with a size class and is organized as some kind of explicit or implicit list. Each list contains potentially different-size blocks whose sizes are members of the size class. There are many variants of segregated fits allocators. Here we describe a simple version.
+
+To allocate a block, we determine the size class of the request and do a first-fit search of the appropriate free list for a block that fits. If we find one, then we (optionally) split it and insert the fragment in the appropriate free list. If we cannot find a block that fits, then we search the free list for the next larger size class. We repeat until we find a block that fits. If none of the free lists yields a block that fits, then we request additional heap memory from the operating system, allocate the block out of this new heap memory, and place the remainder in the appropriate size class. To free a block, we coalesce and place the result on the appropriate free list.
+
+The segregated fits approach is a popular choice with production-quality allocators such as the GNU `malloc` package provided in the C standard library because it is both fast and memory efficient. Search times are reduced because searches are limited to particular parts of the heap instead of the entire heap. Memory utilization can improve because of the interesting fact that a simple first-fit search of a segregated free list approximates a best-fit search of the entire heap.
+
+##### Buddy Systems
+
+A *buddy system* is a special case of segregated fits where each size class is a power of 2. The basic idea is that, given a heap of $2^m$ words, we maintain a separate free list for each block size $2^k$, where 0 ≤ k ≤ m. Requested block sizes are rounded up to the nearest power of 2. Originally, there is one free block of size $2^m$ words.
+
+To allocate a block of size $2^k$, we find the first available block of size $2^j$, such that k ≤ j ≤ m. If j = k, then we are done. Otherwise, we recursively split the block in half until j = k. As we perform this splitting, each remaining half (known as a *buddy*) is placed on the appropriate free list. To free a block of size $2^k$, we continue coalescing with the free buddies. When we encounter an allocated buddy, we stop the coalescing.
+
+A key fact about buddy systems is that, given the address and size of a block, it is easy to compute the address of its buddy; the addresses of a block and its buddy differ in exactly one bit position. For example, a block of size 32 bytes with address `xxx . . . x00000` has its buddy at address `xxx . . . x10000`
+
+The major advantage of a buddy system allocator is its fast searching and coalescing. 
+
+The major disadvantage is that the power-of-2 requirement on the block size can cause significant internal fragmentation. For this reason, buddy system allocators are not appropriate for general-purpose workloads. However, for certain application-specific workloads, where the block sizes are known in advance to be powers of 2, buddy system allocators have a certain appeal.
+
+### Garbage Collection

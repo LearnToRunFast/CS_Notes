@@ -10,32 +10,39 @@ It is implicitly initialized to the *zero value* for its type, which is 0 for nu
 
 ## Packages and the Go Tool
 
-### Go Tools
+### Workspace Organization
 
-`goimports`: manages the insertion and removal of import declarations as needed.
+The only configuration most users ever need is the GOPATH environment variable, which specifies the root of the workspace.
 
-`gofmt`: Format the code automatically.
+```go
+$ export GOPATH=$HOME/go // working directory
+```
 
-### GO CLI
+### Packages
 
-1. `go build` Compiles a bunch of go source code files.
-2. `go run` Compiles and executes one or two files.
-3. `go fmt` Formats all the code in each file in the current directory.
-4. `go install` Compiles and "install" a package.
-5. `go get` Downloads the raw source code of other's package.
-6. `go test` Runs any tests associated with the current project.
+#### Import Paths
 
-### Package
+Each package is identified by a unique string called its *import path*. Import paths are the strings that appear in import declarations. The Go language specification doesn’t define the meaning of these strings or how to determine a package’s import path, but leaves these issues to the tools.
 
-Packages in Go serve the same purposes as libraries or modules in other languages, supporting modularity, encapsulation, separate compilation, and reuse.
+```go
+import "fmt"
+import "golang-book/chapter11/math"
 
-Package-level names like the types and constants declared in one file of a package are visible to all the other files of the package, as if the source code were all in a single file. 
+// or as a parenthesized list rather than as individual import declarations.
+import (
+  "fmt"
+  "math/rand"
+  "encoding/json"
+  "golang.org/x/net/html"
+  "github.com/go-sql-driver/mysql"
+)
 
-The *doc comment*  immediately preceding the package declaration documents the package as a whole. Conventionally, it should start with a summary sentence in the style illustrated. Only one file in each package should have a package doc comment. Extensive doc comments are often placed in a file of their own, conventionally called doc.go.
-
-#### Public & private
-
-Every function in the packages we've seen start with a capital letter. In Go if something starts with a capital letter that means other packages (and programs) are able to see it. If we had named the function `average` instead of `Average` our `main` program would not have been able to see it.
+import (
+  "crypto/rand"
+  mrand "math/rand" // alternative name mrand avoids conflict
+  . "fmt" // you can call Printf without fmt
+)
+```
 
 #### Alias
 
@@ -50,6 +57,10 @@ func main() {
   fmt.Println(avg)
 }
 ```
+
+#### Public & Private
+
+Every function in the packages we've seen start with a capital letter. In Go if something starts with a capital letter that means other packages (and programs) are able to see it. If we had named the function `average` instead of `Average` our `main` program would not have been able to see it.
 
 #### Type of Package
 
@@ -72,17 +83,207 @@ func main() {
 }
 ```
 
-#### Import Packages
+There are three major exceptions to the ‘‘last segment’’ convention. 
+
+- The first is that a package defining a command (an executable Go program) always has the name main, regardless of the package’s import path. This is a signal to go build that it must invoke the linker to make an executable file.
+
+- The second exception is that some files in the directory may have the suffix `_test` on their package name if the file name ends with _test.go. Such a directory may define *two* packages: the usual one, plus another one called an *external test package*. The _test suffix signals to go test that it must build both packages, and it indicates which files belong to each package. External test packages are used to avoid cycles in the import graph arising from dependencies of the test.
+
+- The third exception is that some tools for dependency management append version number suffixes to package import paths, such as `gopkg.in/yaml.v2`. The package name excludes the suffix, so in this case it would be just `yaml`.
+
+  
+
+#### Blank Imports
+
+On occasion we must import a package merely for the side effects of doing so: evaluation of the initializer expressions of its package-level variables and execution of its init functions.
+
+The standard library’s `image` package exports a `Decode` function that reads bytes from an `io.Reader`, figures out which image format was used to encode the data, invokes the appropriate decoder, then returns the resulting `image.Image`. Using `image.Decode`, it’s easy to build a simple image converter that reads an image in one format and writes it out in another:
 
 ```go
-import "fmt"
-import "golang-book/chapter11/math"
-
-// or as a parenthesized list rather than as individual import declarations.
+// The jpeg command reads a PNG image from the standard input
+// and writes it as a JPEG image to the standard output.
+package main
 import (
   "fmt"
+  "image"
+  "image/jpeg"
+  _ "image/png" // register PNG decoder
+  "io"
   "os"
 )
+func main() {
+  if err := toJPEG(os.Stdin, os.Stdout); err != nil {
+    fmt.Fprintf(os.Stderr, "jpeg: %v\n", err)
+    os.Exit(1)
+  } 
+}
+func toJPEG(in io.Reader, out io.Writer) error {
+  img, kind, err := image.Decode(in)
+  if err != nil {
+    return err
+  }
+  fmt.Fprintln(os.Stderr, "Input format =", kind)
+  return jpeg.Encode(out, img, &jpeg.Options{Quality: 95})
+}
+```
+
+A normal output will like 
+
+```zsh
+$ go build gopl.io/ch3/mandelbrot
+$ go build gopl.io/ch10/jpeg
+$ ./mandelbrot | ./jpeg >mandelbrot.jpg
+Input format = png
+```
+
+But without the `_ "image/png"`, the program compiles and links as usual but can no longer recognize or decode input in PNG format:
+
+```zsh
+$ go build gopl.io/ch10/jpeg
+$ ./mandelbrot | ./jpeg >mandelbrot.jpg
+jpeg: image: unknown format
+```
+
+By import `_ "image/png"`, it invokes the `init()` inside the png, which add png information to Decoder format table.
+
+```go
+package png // image/png
+func Decode(r io.Reader) (image.Image, error)
+func DecodeConfig(r io.Reader) (image.Config, error)
+func init() {
+  const pngHeader = "\x89PNG\r\n\x1a\n"
+  image.RegisterFormat("png", pngHeader, Decode, DecodeConfig)
+}
+
+
+```
+
+The `database/sql` package uses a similar mechanism to let users install just the database drivers they need. For example:
+
+```go
+import (
+  "database/sql"
+  _ "github.com/lib/pq"              // enable support for Postgres
+  _ "github.com/go-sql-driver/mysql" // enable support for MySQL
+)
+db, err = sql.Open("postgres", dbname) // OK
+db, err = sql.Open("mysql", dbname)    // OK
+db, err = sql.Open("sqlite3", dbname)  // returns error:
+unknown driver "sqlite3"
+```
+
+#### Packages and Naming
+
+Some advice on how to follow Go’s distinctive conventions for naming packages and their members.
+
+- When creating a package, keep its name short, but not so short as to be cryptic. The most frequently used packages in the standard library are named `bufio`, `bytes`, `flag`, `fmt`, `http`, `io`, `json`, `os`, `sort`, `sync`, and `time`.
+
+- Be descriptive and unambiguous where possible. For example, don’t name a utility package util when a name such as `imageutil` or `ioutil` is specific yet still concise.
+
+- Avoid choosing package names that are commonly used for related local variables, or you may compel the package’s clients to use renaming imports, as with the path package.
+
+- Package names usually take the singular form. The standard packages `bytes`, `errors`, and `strings` use the plural to avoid hiding the corresponding predeclared types and, in the case of go/types, to avoid conflict with a keyword.
+
+- Avoid package names that already have other connotations.
+
+- When designing a package, consider how the two parts of a qualified identifier work together, not the member name alone. Here are some characteristic examples:
+
+  ```go
+  bytes.Equal        flag.Int        http.Get        json.Marshal
+  ```
+
+#### Downloading Packages
+
+The `go get` command can download a single package or an entire subtree or repository using the `…` notation.
+
+If you specify the `-u` flag, go get will ensure that all packages it visits, including dependencies, are updated to their latest version before being built and installed. Without that flag, packages that already exist locally will not be updated.
+
+#### Building Packages
+
+The `go build` command compiles each argument package. If the package is a library, the result is discarded; this merely checks that the package is free of compile errors. If the package is named main, `go build` invokes the linker to create an executable in the current directory; the name of the executable is taken from the last segment of the package’s import path. 
+
+The `go install` command is very similar to `go build`, except that it saves the compiled code for each package and command instead of throwing it away. Compiled packages are saved beneath the `$GOPATH/pkg` directory corresponding to the `src` directory in which the source resides, and command executables are saved in the `$GOPATH/bin` directory. (Many users put $GOPATH/bin on their executable search path.) Thereafter, `go build` and `go install` donot run the compiler for those packages and commands if they have not changed, making subsequent builds much faster. For convenience, `go build -i` installs the packages that are dependencies of the build target.
+
+Since compiled packages vary by platform and architecture, `go install` saves them beneath a subdirectory whose name incorporates the values of the `GOOS` and `GOARCH` environment variables. For example, on a Mac the `golang.org/x/net/html` package is compiled and installed in the file `golang.org/x/net/html.a` under `$GOPATH/pkg/darwin_amd64`.
+
+By setting the `GOOS` or `GOARCH` variables during the build, we can build an executable intended for a different operating system or CPU. The cross program prints the operating system and architecture for which it was built:
+
+```go
+func main() {
+  fmt.Println(runtime.GOOS, runtime.GOARCH)
+}
+```
+
+If a file name includes an operating system or processor architecture name like `net_linux.go` or `asm_amd64.s`, then the go tool will compile the file only when building for that target. Special comments called *build tags* give more fine-grained control. For example, if a file contains this comment below before the package declaration (and its doc comment), `go build` will compile it only when building for Linux or Mac OS X.
+
+```go
+// +build linux darwin
+```
+
+This comment says never to compile the file:
+
+```go
+// +build ignore
+```
+
+#### Documenting Packages
+
+Go style strongly encourages good documentation of package APIs. Each declaration of an exported package member and the package declaration itself should be immediately preceded by a comment explaining its purpose and usage.
+
+Go *doc comments* are always complete sentences, and the first sentence is usually a summary that starts with the name being declared. Function parameters and other identifiers are mentioned without quotation or markup. For example, here’s the doc comment for fmt.Fprintf:
+
+```go
+// Fprintf formats according to a format specifier and writes to w.
+// It returns the number of bytes written and any write error encountered.
+func Fprintf(w io.Writer, format string, a ...interface{}) (int, error)
+```
+
+The `go doc` tool prints the declaration and doc comment of the entity specified on the command line, which may be a package:
+
+```zsh
+$ go doc time
+package time // import "time"
+Package time provides functionality for measuring and displaying time.
+const Nanosecond Duration = 1 ...
+func After(d Duration) <-chan Time
+func Sleep(d Duration)
+func Since(t Time) Duration
+func Now() Time
+type Duration int64
+type Time struct { ... } 
+...many more...
+```
+
+The `godoc`, serves cross-linked HTML pages that provide the same information as `go doc` and much more. The `godoc` server at https://golang.org/pkg covers the standard library. The godoc server at https://godoc.org has a searchable index of thousands of open-source packages.
+
+You can also run an instance of godoc in your workspace if you want to browse your own packages. Visit http://localhost:8000/pkg in your browser while running this command:
+
+```zsh
+$ godoc -http :8000
+```
+
+#### Internal Packages
+
+There a way to define identifiers that are visible to a small set of trusted packages, but not to everyone. To address these needs, the `go build` tool treats a package specially if its import path contains a path segment named `internal`. Such packages are called *internal packages*. An internal package may be imported only by another package that is inside the tree rooted at the parent of the internal directory. For example, `net/http/internal/chunked` can be imported from `net/http/httputil` or `net/http`, but not from `net/url`. However,`net/url` may import `net/http/httputil`.
+
+#### Querying Packages
+
+The `go list` tool reports information about available packages.
+
+```go
+$ go list github.com/go-sql-driver/mysql // check for specify package
+$ go list ... // all packages within the go workspace
+$ go list net/http/... // within a specific subtree
+$ go list ...xml... // related to a particular topic
+```
+
+The `go list` command obtains the complete metadata for each package, not just the import path, and makes this information available to users or other tools in a variety of formats. The `-json` flag causes `go list` to print the entire record of each package in JSON format.
+
+The `-f` flag lets users customize the output format using the template language of package `text/template`. This command prints the transitive dependencies of the strconv package, separated by spaces:
+
+```go
+$ go list -f '{{join .Deps " "}}' strconv
+errors math runtime unicode/utf8 unsafe
 ```
 
 #### Creating Packages
@@ -133,39 +334,41 @@ func f() int { return c + 1 }
 ##### Init Function
 
 ```go
-   func init() { /* ... */ }
+func init() { /* ... */ }
 ```
 
 Within each file, init functions are automatically executed when the program starts, in the order in which they are declared.
 
-## Documentation
+### Go Tools
 
-Go has the ability to automatically generate documentation for packages we write in a similar way to the standard package documentation. In a terminal run this command:
+The go tool, which is used for downloading, querying, formatting, building, testing, and installing packages of Go code. The go tool combines the features of a diverse set of tools into one command set. 
 
-```bash
-godoc golang-book/chapter11/math Average
+- It is a package manager (analogous to apt or rpm) that answers queries about its inventory of packages, computes their dependencies, and downloads them from remote version-control systems. 
+- It is a build system that computes file dependencies and invokes compilers, assemblers, and linkers, although it is intentionally less complete than the standard Unix make. 
+- And it is a test driver.
+
+The most commonly used commands below:
+
+```zsh
+
+$ go 
+...
+  build       compile packages and dependencies
+  clean       remove object files
+  doc         show documentation for package or symbol
+  env         print Go environment information
+  fmt         run gofmt on package sources
+  get         download and install packages and dependencies
+  install     compile and install packages and dependencies
+  imports     manages the insertion and removal of import declarations as needed
+  list        list packages
+  run         compile and run Go program
+  test        test packages
+  version     print Go version
+  vet         run go tool vet on packages
+  Use "go help [command]" for more information about a command.
+...
 ```
-
-You should see information displayed for the function we just wrote. We can improve this documentation by adding a comment before the function:
-
-```go
-// Finds the average of a series of numbers
-func Average(xs []float64) float64 {
-```
-
-If you run `go install` in the `math` folder, then re-run the `godoc` command you should see our comment below the function definition. This documentation is also available in web form by running this command:
-
-```go
-godoc -http=":6060"
-```
-
-and entering this URL into your browser:
-
-```go
-http://localhost:6060/pkg/
-```
-
-You should be able to browse through all of the packages installed on your system.
 
 ## Printf 
 

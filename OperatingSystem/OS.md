@@ -1188,3 +1188,129 @@ Instead of deadlock prevention, in some scenarios deadlock **avoidance** is pref
 One final general strategy is to allow deadlocks to occasionally occur, and then take some action once such a deadlock has been detected.
 
 Many database systems employ deadlock detection and recovery techniques. A deadlock detector runs periodically, building a resource graph and checking it for cycles. In the event of a cycle (deadlock), the system needs to be restarted. If more intricate repair of data structures
+
+### Event-based Concurrency
+
+Pseudocode for an event loop looks like this:
+
+```c
+while (1) {
+  events = getEvents();
+  for (e in events)
+    processEvent(e);
+}
+```
+
+> <center><strong>Blocking Vs. Non-Blocking Interfaces</strong></center>
+>
+> Blocking (or **synchronous**) interfaces do all of their work before returning to the caller.
+>
+> Non-blocking (or **asynchronous**) interfaces begin some work but return immediately, thus letting whatever work that needs to be done get done in the background.
+
+#### Select API
+
+```c
+int select(int nfds,
+           fd_set *restrict readfds,
+           fd_set *restrict writefds,
+           fd_set *restrict errorfds,
+           struct timeval *restrict timeout);
+```
+
+![image-20210404224114498](Asserts/image-20210404224114498.png)
+
+ Figure 33.1 shows a simple example. Inside the loop, it uses the `FD_ZERO()` macro to first clear the set of file descriptors, and then uses `FD_SET()` to include all of the file descriptors from `minFD` to `maxFD` in the set. This set of descriptors might represent, for example, all of the network sockets to which the server is paying attention. Finally, the server calls `select()` to see which of the connections have data available upon them. By then using `FD_ISSET()` in a loop, the event server can see which of the descriptors have data ready and process the incoming data.
+
+#### Asynchronous I/O
+
+Event-based servers enable fine-grained control over scheduling of tasks. However, to maintain such control, no call that blocks the execution of the caller can ever be made; failing to obey this design tip will result in a blocked event-based server.
+
+With some blocking system calls like I/O, there is an **asynchronous I/O** interface. The APIs revolve around a basic structure, the struct aiocb or **AIO control block** in common terminology. A simplified version of the structure looks like this:
+
+```c
+struct aiocb {
+  // File descriptor
+    int								aio_fildes; 
+  // File offset
+		off_t  						aio_offset;	
+  // Location of buffer
+  	volatile void			*aio_buf;
+// Length of transfer
+	  size_t						aio_nbytes;
+};
+```
+
+To issue an asynchronous read to a file, an application should first fill in this structure with the relevant information: 
+
+- the file descriptor of the file to be read (`aio_fildes`)
+- the offset within the file (`aio_offset`)
+- the length of the request (`aio_nbytes`)
+- the target memory location into which the results of the read should be copied (`aio_buf`).
+
+After this structure is filled in, the application must issue the asynchronous call to read the file; on a Mac, this API is simply the **asynchronous read** API:
+
+```c
+int aio_read(struct aiocb *aiocbp);
+```
+
+One last API is needed. On a Mac, it is referred to as `aio_error()`. The API looks like this:
+
+```c
+int aio_error(const struct aiocb *aiocbp);
+```
+
+This system call checks whether the request referred to by `aiocbp` has completed. If it has, the routine returns success (indicated by a zero); if not, `EINPROGRESS` is returned. Thus, for every outstanding asynchronous I/O, an application can periodically **poll** the system via a call to `aio_error()` to determine whether said I/O has yet completed.
+
+Some other methods uses UNIX **signals** to inform applications when an asynchronous I/O completes, thus removing the need to repeatedly ask the system.
+
+#### State Management
+
+When an event handler issues an asynchronous I/O, it must package up some program state for the next event handler to use when the I/O finally completes; this additional work is not needed in thread-based programs, as the state the program needs is on the stack of the thread. This work **manual stack management**, and it is fundamental to event-based programming.
+
+So we need to record the needed information to finish processing this event in some data structure; when the event happens (i.e., when the disk I/O completes), look up the needed information and process the event.
+
+Let’s look at a simple example in which a thread-based server needs to read from a file descriptor (fd) and, once complete, write the data that it read from the file to a network socket descriptor (sd). The code (ignoring error checking) looks like this:
+
+```c
+int rc = read(fd, buffer, size);
+rc = write(sd, buffer, size);
+```
+
+In this specific case, the solution would be to record the socket descriptor (sd) in some kind of data structure (e.g., a hash table), indexed by the file descriptor (fd). When the disk I/O completes, the event handler would use the file descriptor to look up the continuation, which will return the value of the socket descriptor to the caller. At this point (finally), the server can then do the last bit of work to write the data to the socket.
+
+#### Other Problems With Events
+
+##### Need Lock on Multiple CPUs System
+
+When systems moved from a single CPU to multiple CPUs, some of the simplicity of the event-based approach disappeared. In order to utilize more than one CPU, the event server has to run multiple event handlers in parallel. Thus, on modern multicore systems, simple event handling without locks is no longer possible.
+
+##### Implicit Blocking
+
+If an event-handler page faults, it will block, and thus the server will not make progress until the page fault completes. Even though the server has been structured to avoid *explicit* blocking, this type of *implicit* blocking due to page faults is hard to avoid and thus can lead to large performance problems when prevalent.
+
+##### Code Management Issue
+
+The event-based code can be hard to manage over time, as the exact semantics of various routines changes. For example, if a routine changes from non-blocking to blocking, the event handler that calls that routine must also change to accommodate its new nature, by ripping itself into two pieces. Because blocking is so disastrous for event-based servers, a programmer must always be on the lookout for such changes in the semantics of the APIs each event uses.
+
+
+
+## Persistance
+
+![image-20210405212732117](Asserts/image-20210405212732117.png)
+
+### Device
+
+#### Direct Memory Access (DMA)
+
+When using programmed I/O (PIO) to transfer a large chunk of data to a device, the CPU is once again over-burdened with a rather trivial task, and thus wastes a lot of time and effort that could better be spent running other processes. The solution to this problem is something we refer to as **Direct Memory Access (DMA)**.  A DMA engine is essentially a very specific device within a system that can orchestrate transfers between devices and main memory without much CPU intervention.
+
+#### Methods Of Device Interaction
+
+Over time, two primary methods of device communication have developed. 
+
+- Explicit **I/O instructions**. These instructions specify a way for the OS to send data to specific device registers and thus allow the construction of the protocols described above.
+- Interact with devices is known as **memory-mapped I/O**. With this approach, the hardware makes device registers available as if they were memory locations. To access a particular register, the OS issues a load (to read) or store (to write) the address; the hardware then routes the load/store to the device instead of main memory.
+
+#### The Device Driver
+
+At the lowest level, a piece of software in the OS must know in detail how a device works. We call this piece of software a **device driver**, and any specifics of device interaction are encapsulated within.
