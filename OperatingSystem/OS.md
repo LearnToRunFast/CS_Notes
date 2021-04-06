@@ -1298,7 +1298,7 @@ The event-based code can be hard to manage over time, as the exact semantics of 
 
 ![image-20210405212732117](Asserts/image-20210405212732117.png)
 
-### Device
+### I/O Devices
 
 #### Direct Memory Access (DMA)
 
@@ -1314,3 +1314,14 @@ Over time, two primary methods of device communication have developed.
 #### The Device Driver
 
 At the lowest level, a piece of software in the OS must know in detail how a device works. We call this piece of software a **device driver**, and any specifics of device interaction are encapsulated within.
+
+### Hard Disk Drives
+
+I/O time as the sum of three major components:
+$$
+T_{I/O} = T_{seek} + T_{rotation} + T_{transfer}
+$$
+The rate of I/O (RI/O), which is often more easily used for comparison between drives (as we will do below), is easily computed from the time. Simply divide the size of the transfer by the time it took:
+$$
+R_{I/O} = \frac{SizeTransfer}{T_{I /O}}
+$$

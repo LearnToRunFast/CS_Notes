@@ -484,3 +484,318 @@ The major advantage of a buddy system allocator is its fast searching and coales
 The major disadvantage is that the power-of-2 requirement on the block size can cause significant internal fragmentation. For this reason, buddy system allocators are not appropriate for general-purpose workloads. However, for certain application-specific workloads, where the block sizes are known in advance to be powers of 2, buddy system allocators have a certain appeal.
 
 ### Garbage Collection
+
+A *garbage collector* is a dynamic storage allocator that automatically frees allocated blocks that are no longer needed by the program. Such blocks are known as *garbage*. The process of automatically reclaiming heap storage is known as *garbage collection*. In a system that supports garbage collection, applications explicitly allocate heap blocks but never explicitly free them. In the context of a C program, the application calls malloc but never calls free. Instead, the garbage collector periodically identifies the garbage blocks and makes the appropriate calls to free to place those blocks back on the free list.
+
+#### Garbage Collector Basics
+
+![image-20210406091241538](Asserts/image-20210406091241538.png)
+
+A garbage collector views memory as a directed *reachability graph* of the form shown in Figure 9.49. The nodes of the graph are partitioned into a set of *root nodes* and a set of *heap nodes*. Each heap node corresponds to an allocated block in the heap. A directed edge p → q means that some location in block p points to some location in block q. Root nodes correspond to locations not in the heap that contain pointers into the heap. These locations can be registers, variables on the stack, or global variables in the read/write data area of virtual memory. The unreachable nodes correspond to garbage that can never be used again by the application. A node p is *reachable* if there exists a directed path from any root node to p. The role of a garbage collector is to maintain some representation of the reachability graph and periodically reclaim the unreachable nodes by freeing them and returning them to the free list.
+
+#### Mark&Sweep Garbage Collectors
+
+A Mark&Sweep garbage collector consists of a *mark phase*, which marks all reachable and allocated descendants of the root nodes, followed by a *sweep phase*, which frees each unmarked allocated block. Typically, one of the spare low-order bits in the block header is used to indicate whether a block is marked or not.
+
+### Common Memory-Related Bugs in C Programs
+
+#### Dereferencing Bad Pointers
+
+```c
+// you should pass in address of val instead of the content
+scanf("%d", &val)
+// dont do this
+scanf("%d", val)
+```
+
+#### Reading Uninitialized Memory
+
+```c
+/* Return y = Ax */
+int *matvec(int **A, int *x, int n) {
+  int i, j;
+  int *y = (int *)Malloc(n * sizeof(int));
+  for(i=0;i<n;i++) {
+        // you should initialize y[i] before use it
+    y[i] = 0;
+    for (j = 0; j < n; j++)
+      y[i] += A[i][j] * x[j];
+  }
+
+  return y;
+}
+
+```
+
+#### Stack Buffer Overflows
+
+```c
+void bufoverflow() {
+  char buf[64];
+   /* Here is the stack buffer overflow bug 
+   	the gets function copies an arbitrary-length string to the buffer.
+   */
+  gets(buf);
+  // use fget instead
+  fgets(buf);
+  return;
+}
+```
+
+#### Assuming That Pointers and the Objects They Point to Are the Same Size
+
+```c
+/* Create an nxm array */
+
+int **makeArray1(int n, int m) {
+  int i;
+  // should be sizeof(int *) here
+  int **A = (int **)Malloc(n * sizeof(int));
+  for (i = 0; i < n; i++)
+    A[i] = (int *)Malloc(m * sizeof(int));
+  return A;
+}
+
+```
+
+#### Making Off-by-One Errors
+
+```c
+/* Create an nxm array */
+int **makeArray2(int n, int m) {
+  int i;
+  int **A = (int **)Malloc(n * sizeof(int *));
+  // should be < n here
+  for (i = 0; i <= n; i++)
+    A[i] = (int *)Malloc(m * sizeof(int));
+  return A;
+}
+
+```
+
+#### Referencing a Pointer Instead of the Object It Points To
+
+```c
+int *binheapDelete(int **binheap, int *size) {
+  int *packet = binheap[0];
+  binheap[0] = binheap[*size - 1];
+  *size--; /* This should be (*size)-- */
+  heapify(binheap, *size, 0);
+  return(packet);
+}
+```
+
+#### Misunderstanding Pointer Arithmetic
+
+Arithmetic operations on pointers are performed in units that are the size of the objects they point to, which are not necessarily bytes. 
+
+```c
+int *search(int *p, int val) {
+  while (*p && *p != val)
+    p += sizeof(int); /* Should be p++ */
+  return p;
+}
+```
+
+#### Referencing Nonexistent Variables
+
+When the function return, the address of val is invalid.
+
+```c
+int *stackref () {
+  int val;
+  return &val; 
+}
+```
+
+#### Referencing Data in Free Heap Blocks
+
+```c
+int *heapref(int n, int m) {
+  int i;
+  int *x, *y;
+  x = (int *)Malloc(n * sizeof(int));
+  // Other calls to malloc and free go here free(x);
+  y= (int *)Malloc(m * sizeof(int)); 
+  for (i=0;i<m;i++)
+    y[i] = x[i]++; /* Oops! x[i] is a word in a free block */
+  return y;
+}
+```
+
+#### Introducing Memory Leaks
+
+```c
+void leak(int n)
+{
+  int *x = (int *)Malloc(n * sizeof(int)); 
+  // need to free the x before returning
+  return; /* x is garbage at this point */ 
+}
+```
+
+## System-Level I/O
+
+*Input/output (I/O)* is the process of copying data between main memory and external devices such as disk drives, terminals, and networks. An input operation copies data from an I/O device to main memory, and an output operation copies data from memory to a device.
+
+A Linux *file* is a sequence of m bytes. All I/O devices, such as networks, disks, and terminals, are modeled as files, and all input and output is performed by reading and writing the appropriate files. This elegant mapping of devices to files allows the Linux kernel to export a simple, low-level application interface, known as *Unix I/O*, that enables all input and output to be performed in a uniform and consistent way:
+
+- *Opening files.* An application ask the kernel to *open* the corresponding file. The kernel returns a small nonnegative integer, called a *descriptor*, that identifies the file in all subsequent operations on the file. The kernel keeps track of all information about the open file. The application only keeps track of the descriptor.
+
+  Each process created by a Linux shell begins life with three open files:
+
+  - *standard input* (descriptor 0)
+  - *standard output* (descriptor 1)
+  - *standard error* (descriptor 2). 
+
+  The header file `<unistd.h>` defines constants `STDIN_ FILENO`, `STDOUT_FILENO`, and `STDERR_FILENO`, which can be used instead of the explicit descriptor values.
+
+- *Changing the current file position.* The kernel maintains a *file position* k, initially 0, for each open file. The file position is a byte offset from the beginning of a file. An application can set the current file position k explicitly by performing a `seek` operation.
+
+- *Reading and writing files.* A *read* operation copies n bytes (n > 0) from a file to memory, starting at the current file position k and then incrementing k by n. 
+
+  Given a file with a size of m bytes, performing a read operation when k ≥ m triggers a condition known as *end-of-file (EOF)*, which can be detected by the application. There is no explicit “EOF character” at the end of a file.
+
+  Similarly, a *write* operation copies n bytes (n > 0) from memory to a file, starting at the current file position k and then updating k.
+
+- *Closing files.* When an application has finished accessing a file, it asks the kernel to *close* the file. The kernel responds by freeing the data structures it created when the file was opened and restoring the descriptor to a pool of available descriptors. When a process terminates for any reason, the kernel closes all open files and frees their memory resources.
+
+### Files
+
+Each Linux file has a *type* that indicates its role in the system:
+
+- A *regular file* contains arbitrary data. Application programs often distinguish between *text files*, which are regular files that contain only ASCII or Unicode characters, and *binary files*, which are everything else. To the kernel there is no difference between text and binary files.
+
+  A Linux text file consists of a sequence of *text lines*, where each line is a sequence of characters  by a *newline* character (‘\n’). The newline character is the same as the ASCII line feed character (LF) and has a numeric value of `0x0a`.
+
+- A *directory* is a file consisting of an array of *links*, where each link maps a *filename* to a file, which may be another directory. Each directory contains at least two entries: 
+
+  - `.` (dot) is a link to the directory itself
+  - `..` (dot-dot) is a link to the *parent directory* in the directory hierarchy. 
+
+- A *socket* is a file that is used to communicate with another process across a network.
+
+Other file types include *named pipes*, *symbolic links*, and *character* and *block devices*.
+
+The Linux kernel organizes all files in a single *directory hierarchy* anchored by the *root directory* named `/` (slash). Each file in the system is a direct or indirect descendant of the root directory. Figure 10.1 shows a portion of the directory hierarchy on our Linux system.
+
+![image-20210406141420307](Asserts/image-20210406141420307.png)
+
+Locations in the directory hierarchy are specified by *pathnames*. A pathname is a string consisting of an optional slash followed by a sequence of filenames separated by slashes. Pathnames have two forms:
+
+- An *absolute pathname* starts with a slash and denotes a path from the root node. For example, in Figure 10.1, the absolute pathname for `hello.c` is `/home/droh/hello.c`.
+- A *relative pathname* starts with a filename and denotes a path from the current working directory. For example, in Figure 10.1, if `/home/droh` is the current working directory, then the relative pathname for `hello.c` is `./hello.c`.
+
+### Opening and Closing Files
+
+```c
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+// Returns: new file descriptor if OK, −1 on error
+int open(char *filename, int flags, mode_t mode);
+```
+
+A process opens an existing file or creates a new file by calling the `open` function. The `open` function converts a filename to a file descriptor and returns the descriptor number. The descriptor returned is always the smallest descriptor that is not currently open in the process. The flags argument indicates how the process intends to access the file, we can join them by `O_WRONLY|O_APPEND`.
+
+- `O_RDONLY`. Reading only 
+- `O_WRONLY`. Writing only 
+- `O_RDWR`. Reading and writing
+- `O_CREAT`. If the file doesn’t exist, then create a *truncated* (empty) version of it.
+- `O_TRUNC`. If the file already exists, then truncate it.
+- `O_APPEND`. Before each write operation, set the file position to the end of the file.
+
+![image-20210406154222589](Asserts/image-20210406154222589.png)
+
+The mode argument specifies the access permission bits of new files. The symbolic names for these bits are shown in Figure 10.2. Each process has a `umask` that is set by calling the `umask` function. When a process creates a new file by calling the `open` function with some `mode` argument, then the access permission bits of the file are set to `mode & ~umask`. 
+
+Finally, a process closes an open file by calling the `close` function. Closing a descriptor that is already closed is an error.
+
+```c
+#include <unistd.h>
+// Returns: 0 if OK, −1 on error
+int close(int fd);
+```
+
+### Reading and Writing Files
+
+```c
+#include <unistd.h>
+// Returns: number of bytes read if OK, 0 on EOF, −1 on error
+ssize_t read(int fd, void *buf, size_t n);
+//Returns: number of bytes written if OK, −1 on error
+ssize_t write(int fd, const void *buf, size_t n);
+
+```
+
+Applications can explicitly modify the current file position by calling the `lseek` function. In some situations, read and write transfer fewer bytes than the application requests. Such *short counts* do *not* indicate an error. They occur for a number of reasons:
+
+- *Encountering EOF on reads.* 
+- *Reading text lines from a terminal.*
+- *Reading and writing network sockets.* 
+
+### Robust Reading and Writing with the Rio Package
+
+Rio provides two different kinds of functions:
+
+- *Unbuffered input and output functions.* 
+
+- *Buffered input functions.* These functions allow you to efficiently read text lines and binary data from a file whose contents are cached in an application-level buffer, similar to the one provided for standard I/O functions such as printf. 
+
+#### Rio Unbuffered Input and Output Functions
+
+![image-20210406163431460](Asserts/image-20210406163431460.png)
+
+#### Rio Buffered Input Functions
+
+![image-20210406184044560](Asserts/image-20210406184044560.png)
+
+![image-20210406184107588](Asserts/image-20210406184107588.png)
+
+![image-20210406184118027](Asserts/image-20210406184118027.png)
+
+### Reading File Metadata
+
+An application can retrieve information about a file (sometimes called the file’s
+
+*metadata*) by calling the stat and fstat functions.
+
+![image-20210406184333305](Asserts/image-20210406184333305.png)
+
+The `stat` function takes as input a filename and fills in the members of a stat structure shown in Figure 10.9. The `fstat` function is similar, but it takes a file descriptor instead of a filename. 
+
+```c
+#include <unistd.h>
+#include <sys/stat.h>
+int stat(const char *filename, struct stat *buf);
+int fstat(int fd, struct stat *buf);
+```
+
+### Reading Directory Contents
+
+![image-20210406184626489](Asserts/image-20210406184626489.png)
+
+### Sharing Files
+
+The kernel represents open files using three related data structures:
+
+- *Descriptor table.* Each process has its own separate *descriptor table* whose entries are indexed by the process’s open file descriptors. Each open descriptor entry points to an entry in the *file table.*
+
+- *File table.* The set of open files is represented by a file table that is shared by all processes. Each file table entry consists of (for our purposes) the current file position, a *reference count* of the number of descriptor entries that currently point to it, and a pointer to an entry in the *v-node table*. Closing a descriptor decrements the reference count in the associated file table entry. The kernel will not delete the file table entry until its reference count is zero.
+- *v-node table.* Like the file table, the v-node table is shared by all processes. Each entry contains most of the information in the stat structure, including the `st_mode` and `st_size` members.
+
+![image-20210406184920559](Asserts/image-20210406184920559.png)
+
+Figure 10.12 shows an example where descriptors 1 and 4 reference two different files through distinct open file table entries. This is the typical situation, where files are not shared and where each descriptor corresponds to a distinct file.
+
+![image-20210406185124576](Asserts/image-20210406185124576.png)
+
+Multiple descriptors can also reference the same file through different file table entries, as shown in Figure 10.13. This might happen, for example, if you were to call the open function twice with the same filename. The key idea is that each descriptor has its own distinct file position, so different reads on different descriptors can fetch data from different locations in the file.
+
+![image-20210406185256307](Asserts/image-20210406185256307.png)
+
+Suppose that before a call to `fork`, the parent process has the open files shown in Figure 10.12. Then Figure 10.14 shows the situation after the call to `fork`.
+
+The child gets its own duplicate copy of the parent’s descriptor table. Parent and child share the same set of open file tables and thus share the same file position. An important consequence is that the parent and child must both close their descriptors before the kernel will delete the corresponding file table entry.
+
+### I/O Redirection
