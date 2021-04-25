@@ -5416,7 +5416,311 @@ You can explicitly control this parameter using the GOMAXPROCS environment varia
 
 ## Testing
 
-Create a testing with \<name of original Go file>_test.go. And run the test with command `go test`.
+The `go test` subcommand is a test driver for Go packages that are organized according to certain conventions. In a package directory, files whose names end with _test.go are not part of the package ordinarily built by go build but are a part of it when built by `go test`.
+
+Within `*_test.go` files, three kinds of functions are treated specially: 
+
+- A *test function*, which is a function whose name begins with `Test`, exercises some program logic for correct behavior; `go test` calls the test function and reports the result, which is either PASS or FAIL. 
+- A *benchmark function* has a name beginning with `Benchmark` and measures the performance of some operation; go test reports the mean execution time of the operation. A
+- An *example function*, whose name starts with Example, provides machine-checked documentation.
+
+The `go test` tool scans the *_test.go files for these special functions, generates a temporary main package that calls them all in the proper way, builds and runs it, reports the results, and then cleans up.
+
+### Test Functions
+
+Test function names must begin with Test; the optional suffix Name must begin with a capital letter:
+
+```go
+func TestSin(t *testing.T) { /* ... */ }
+func TestCos(t *testing.T) { /* ... */ }
+func TestLog(t *testing.T) { /* ... */ }
+func TestFrenchPalindrome(t *testing.T) {
+  if !IsPalindrome("été") {
+    t.Error(`IsPalindrome("été") = false`)
+  } 
+}
+
+```
+
+ If the test suite contains many slow tests, we may make even faster progress if we’re selective about which ones we run. The `-v` flag prints the name and execution time of each test in the package and the `-run` flag, whose argument is a regular expression, causes go test to run only those tests whose function name matches the pattern:
+
+```go
+$ go test -v
+=== RUN TestPalindrome
+--- PASS: TestPalindrome (0.00s)
+=== RUN TestFrenchPalindrome
+--- FAIL: TestFrenchPalindrome (0.00s)
+word_test.go:28: IsPalindrome("été") = false
+
+$ go test -v -run="French|Canal"
+=== RUN TestFrenchPalindrome
+--- FAIL: TestFrenchPalindrome (0.00s)
+word_test.go:28: IsPalindrome("été") = false
+=== RUN TestCanalPalindrome
+--- FAIL: TestCanalPalindrome (0.00s)
+word_test.go:35: IsPalindrome("A man, a plan, a canal: Panama") = false
+FAIL
+exit status 1
+FAIL    gopl.io/ch11/word1  0.014s
+
+// with coverage or go test -cover
+$ go test -run=Coverage -coverprofile=c.out gopl.io/ch7/eval
+ok      gopl.io/ch7/eval    0.032s  coverage: 68.5% of statements
+
+// generate html report
+$ go tool cover -html=c.out
+```
+
+This style of *table-driven* testing is very common in Go. It is straightforward to add new table entries as needed, and since the assertion logic is not duplicated, we can invest more effort in producing a good error message.
+
+```go
+func TestIsPalindrome(t *testing.T) {
+  var tests = []struct {
+    input string
+    want  bool
+  }{
+
+    {"", true},
+    {"a", true},
+    {"aa", true},
+    {"ab", false},
+    {"kayak", true},
+    {"detartrated", true},
+    {"A man, a plan, a canal: Panama", true},
+    {"Evil I did dwell; lewd did I live.", true},
+    {"Able was I ere I saw Elba", true},
+    {"été", true},
+    {"Et se resservir, ivresse reste.", true},
+    {"palindrome", false}, // non-palindrome
+    {"desserts", false},   // semi-palindrome
+  }
+  for _, test := range tests {
+    if got := IsPalindrome(test.input); got != test.want {
+      t.Errorf("IsPalindrome(%q) = %v", test.input, got)
+    } 
+  }
+}
+```
+
+### Randomized Testing
+
+Table-driven tests are convenient for checking that a function works on inputs carefully selected to exercise interesting cases in the logic. Another approach, *randomized testing*, explores a broader range of inputs by constructing inputs at random.
+
+There are two strategies to expect the output. The first is to write an alternative implementation of the function that uses a less efficient but simpler and clearer algorithm, and check that both implementations give the same result. The second is to create input values according to a pattern so that we know what output to expect. For example, random generate all valid palindrome.
+
+### Testing Quality
+
+A good test does not explode on failure but prints a clear and succinct description of the symptom of the problem, and perhaps other relevant facts about the context. Ideally, the maintainer should not need to read the source code to decipher a test failure. A good test should not give up after one failure but should try to report several errors in a single run, since the pattern of failures may itself be revealing.
+
+### Benchmark Functions
+
+```go
+import "testing"
+func BenchmarkIsPalindrome(b *testing.B) {
+  for i := 0; i < b.N; i++ {
+    IsPalindrome("A man, a plan, a canal: Panama")
+  } 
+}
+
+$ go test -bench=.
+PASS
+BenchmarkIsPalindrome-8 1000000              1035 ns/op
+ok      gopl.io/ch11/word2      2.179s
+
+// The -benchmem command-line flag will include memory allocation statistics in its report.
+$ go test -bench=. -benchmem
+PASS
+BenchmarkIsPalindrome    1000000  1026 ns/op   304 B/op  4 allocs/op
+```
+
+### Profiling
+
+When we wish to look carefully at the speed of our programs, the best technique for identifying the critical code is *profiling*. Profiling is an automated approach to performance measurement based on sampling a number of profile *events* during execution, then extrapolating from them during a post-processing step; the resulting statistical summary is called a *profile*. The go test tool has built-in support for several kinds of profiling.
+
+A *CPU profile* identifies the functions whose execution requires the most CPU time. The currently running thread on each CPU is interrupted periodically by the operating system every few milliseconds, with each interruption recording one profile event before normal execution resumes.
+
+A *heap profile* identifies the statements responsible for allocating the most memory. The profiling library samples calls to the internal memory allocation routines so that on average, one profile event is recorded per 512KB of allocated memory.
+
+A *blocking profile* identifies the operations responsible for blocking goroutines the longest, such as system calls, channel sends and receives, and acquisitions of locks. The profiling library records an event every time a goroutine is blocked by one of these operations.
+
+The `-text` flag specifies the output format, in this case, a textual table with one row per function, sorted so the ‘‘hottest’’ functions—those that consume the most CPU cycles—appear first. The `-nodecount=10` flag limits the result to 10 rows. 
+
+```go
+$ go test -cpuprofile=cpu.out
+$ go test -blockprofile=block.out
+$ go test -memprofile=mem.out
+
+$ go test -run=NONE -bench=ClientServerParallelTLS64 \
+-cpuprofile=cpu.log net/http
+PASS
+BenchmarkClientServerParallelTLS64-8  1000
+3141325 ns/op  143010 B/op  1747 allocs/op
+ok      net/http       3.395s
+$ go tool pprof -text -nodecount=10 ./http.test cpu.log
+2570ms of 3590ms total (71.59%)
+Dropped 129 nodes (cum <= 17.95ms)
+Showing top 10 nodes out of 166 (cum >= 60ms)
+  flat  flat%   sum%     cum   cum%
+  1730ms 48.19% 48.19%  1750ms 48.75%  crypto/elliptic.p256ReduceDegree
+  230ms  6.41% 54.60%   250ms  6.96%  crypto/elliptic.p256Diff
+  120ms  3.34% 57.94%   120ms  3.34%  math/big.addMulVVW
+  110ms  3.06% 61.00%   110ms  3.06%  syscall.Syscall
+  90ms  2.51% 63.51%  1130ms 31.48%  crypto/elliptic.p256Square
+  70ms  1.95% 65.46%   120ms  3.34%  runtime.scanobject
+  60ms  1.67% 67.13%   830ms 23.12%  crypto/elliptic.p256Mul
+  60ms  1.67% 68.80%   190ms  5.29%  math/big.nat.montgomery
+  50ms  1.39% 70.19%    50ms  1.39%  crypto/elliptic.p256ReduceCarry
+  50ms  1.39% 71.59%    60ms  1.67%  crypto/elliptic.p256Sum
+```
+
+### Example Functions
+
+The third kind of function treated specially by go test is an example function, one whose name starts with Example. It has neither parameters nor results. Here’s an example function for IsPalindrome:
+
+```go
+func ExampleIsPalindrome() {
+  fmt.Println(IsPalindrome("A man, a plan, a canal: Panama"))
+  fmt.Println(IsPalindrome("palindrome"))
+  // Output:
+  // true
+  // false
+}
+```
+
+## Reflection
+
+Go provides a mechanism to update variables and inspect their values at run time, to call their methods, and to apply the operations intrinsic to their representation, all without knowing their types at compile time. This mechanism is called *reflection*. Reflection also lets us treat types themselves as first-class values.
+
+Reflection is provided by the `reflect` package. It defines two important types, `Type` and `Value`. A Type represents a Go type. It is an interface with many methods for discriminating among types and inspecting their components, like the fields of a struct or the parameters of a function. The sole implementation of `reflect.Type` is the type descriptor, the same entity that identifies the dynamic type of an interface value.
+
+The `reflect.TypeOf` function accepts any interface{} and returns its dynamic type as a `reflect.Type`:
+
+```go
+t := reflect.TypeOf(3)  // a reflect.Type
+fmt.Println(t.String()) // "int"
+fmt.Println(t)          // "int"
+
+var w io.Writer = os.Stdout
+fmt.Println(reflect.TypeOf(w)) // "*os.File"
+fmt.Printf("%T\n", 3) // "int"
+
+v := reflect.ValueOf(3) // a reflect.Value
+fmt.Println(v)          // "3"
+fmt.Printf("%v\n", v)   // "3"
+fmt.Println(v.String()) // NOTE: "<int Value>"
+t := v.Type() // a reflect.Type
+fmt.Println(t.String()) // "int"
+
+v := reflect.ValueOf(3) // a reflect.Value
+x := v.Interface() // an interface{}
+i := x.(int) // an int
+fmt.Printf("%d\n", i) // "3"
+
+```
+
+An assignment from a concrete value to an interface type performs an implicit interface conversion, which creates an interface value consisting of two components: its *dynamic type* is the operand’s type (int) and its *dynamic value* is the operand’s value (3).
+
+Instead of a type switch, we use `reflect.Value’s Kind` method to discriminate the cases. Although there are infinitely many types, there are only a finite number of *kinds* of type: the basic types `Bool`, `String`, and all the numbers; the aggregate types `Array` and `Struct`; the reference types `Chan`, `Func`, `Ptr`, `Slice`, and `Map`; Interface types; and finally Invalid, meaning no value at all. (The zero value of a reflect.Value has kind Invalid.)
+
+```go
+package format
+
+import (
+  "reflect"
+  "strconv"
+)
+
+// Any formats any value as a string.
+func Any(value interface{}) string {
+  return formatAtom(reflect.ValueOf(value))
+}
+
+// formatAtom formats a value without inspecting its internal structure.
+func formatAtom(v reflect.Value) string {
+  switch v.Kind() {
+    case reflect.Invalid:
+    return "invalid"
+    case reflect.Int, reflect.Int8, reflect.Int16,
+    reflect.Int32, reflect.Int64:
+    return strconv.FormatInt(v.Int(), 10)
+    case reflect.Uint, reflect.Uint8, reflect.Uint16,
+    reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+    return strconv.FormatUint(v.Uint(), 10)
+    // ...floating-point and complex cases omitted for brevity...
+    case reflect.Bool:
+    return strconv.FormatBool(v.Bool())
+    case reflect.String:
+    return strconv.Quote(v.String())
+    case reflect.Chan, reflect.Func, reflect.Ptr, reflect.Slice, reflect.Map:
+    return v.Type().String() + " 0x" +
+    strconv.FormatUint(uint64(v.Pointer()), 16)
+    default: // reflect.Array, reflect.Struct, reflect.Interface
+    return v.Type().String() + " value"
+  }
+}
+var x int64 = 1
+var d time.Duration = 1 * time.Nanosecond
+fmt.Println(format.Any(x)) // "1"
+fmt.Println(format.Any(d)) // "1"
+fmt.Println(format.Any([]int64{x})) // "[]int64 0x8202b87b0"
+fmt.Println(format.Any([]time.Duration{d})) // "[]time.Duration 0x8202b87e0"
+
+func display(path string, v reflect.Value) {
+  switch v.Kind() {
+    case reflect.Invalid:
+    	fmt.Printf("%s = invalid\n", path)
+    case reflect.Slice, reflect.Array:
+      for i := 0; i < v.Len(); i++ {
+        display(fmt.Sprintf("%s[%d]", path, i), v.Index(i))
+      }
+    case reflect.Struct:
+      for i := 0; i < v.NumField(); i++ {
+        fieldPath := fmt.Sprintf("%s.%s", path, v.Type().Field(i).Name)
+        display(fieldPath, v.Field(i))
+      }
+    case reflect.Map:
+      for _, key := range v.MapKeys() {
+        display(fmt.Sprintf("%s[%s]", path,
+                            formatAtom(key)), v.MapIndex(key))
+      }
+    case reflect.Ptr:
+      if v.IsNil() {
+        fmt.Printf("%s = nil\n", path)
+      } else {
+        display(fmt.Sprintf("(*%s)", path), v.Elem())
+      }
+    case reflect.Interface:
+      if v.IsNil() {
+        fmt.Printf("%s = nil\n", path)
+      } else {
+        fmt.Printf("%s.type = %s\n", path, v.Elem().Type())
+        display(path+".value", v.Elem())
+      }
+    default: // basic types, channels, funcs
+      fmt.Printf("%s = %s\n", path, formatAtom(v))
+  } 
+}
+
+```
+
+### Setting Variables with reflect.Value
+
+ A variable is an *addressable* storage location that contains a value, and its value may be updated through that address.
+
+The value within a is not addressable. It is merely a copy of the integer 2. The same is true of b. The value within c is also non-addressable, being a copy of the pointer value &x. In fact, no reflect.Value returned by reflect.ValueOf(x) is addressable. But d, derived from c by dereferencing the pointer within it, refers to a variable and is thus addressable. We can use this approach, calling reflect.ValueOf(&x).Elem(), to obtain an addressable Value for any variable x.
+
+```go
+x := 2 // value type   variable?
+a := reflect.ValueOf(2) // 2 int    no
+b := reflect.ValueOf(x)  // 2 int    no
+c := reflect.ValueOf(&x) // &x *int   no
+d := c.Elem()  //2 int yes (x)
+
+fmt.Println(a.CanAddr()) // "false"
+fmt.Println(b.CanAddr()) // "false"
+fmt.Println(c.CanAddr()) // "false"
+fmt.Println(d.CanAddr()) // "true"
+```
 
 
 

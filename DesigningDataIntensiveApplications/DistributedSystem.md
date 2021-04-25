@@ -259,3 +259,9 @@ Read-only operations can be handled without writing anything into the log. Howev
 - First, a leader must have the latest information on which entries are committed. The Leader Completeness Property guarantees that a leader has all committed entries, but at the start of its term, it may not know which those are. To find out, it needs to commit an entry from its term. 
   - Raft handles this by having each leader commit a blank *no-op* entry into the log at the start of its term. 
 - Second, a leader must check whether it has been deposed before processing a read-only request (its information may be stale if a more recent leader has been elected). Raft handles this by having the leader exchange heart-beat messages with a majority of the cluster before responding to read-only requests. Alternatively, the leader could rely on the heartbeat mechanism to provide a form of lease, but this would rely on timing for safety (it assumes bounded clock skew).
+
+## ZooKeeper
+
+ZooKeeper is a service for coordinating processes of distributed applications. ZooKeeper aims to provide a simple and high performance kernel for building more complex coordination primitives at the client. 
+
+The ZooKeeper service comprises an ensemble of servers that use replication to achieve high availability and performance.
