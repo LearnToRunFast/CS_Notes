@@ -122,5 +122,11 @@ git branch --track <new-branch> origin/<base-branch>
 git branch <new-branch> hashValue
 ```
 
+### Remove Cache
 
+To move cached file in order for git ignore to take effect
+
+```
+git rm --cached FILENAME
+```
 
