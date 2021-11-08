@@ -1206,3 +1206,36 @@ public class TST<Value> {
 }
 ```
 
+## Single Source Shortest Path
+
+### Dijkstra algorithm
+
+1. Find the Source Point, Mark all other vertices's weight as infinity.
+2. Relax the neighbour vertices by choosing the min weight, it will need to relax n times, where n is number of neighbours
+   - From u to v, we have W(u): weight of v, C(u,v): cost of u to v.
+   - W(u) = min(W(v) + C(u, v),  W(u))
+3. Find the next min weight vertex and repeat the step 2-3 until all vertices are relaxed.
+
+#### Runtime
+
+$O(|V| |V - 1|) = O(V^2)$
+
+#### Drawback
+
+Only applied for positive weight directed acyclic graph(DAG)
+
+### Bellman-Ford
+
+1. Find the Source Point, Mark all other vertices's weight as infinity.
+2. List out all edges in sequences and relax the vertex
+3. Continue Step 2 for V - 1 times where V is the number of vertices in the graph
+
+#### Runtime
+
+O(|E| |V-1|)
+
+In a complete graph, $|E| = \frac{n(n - 1)}{2}, |E| \times|V-1| = V^3$ 
+
+#### Drawback
+
+Only applied for directed acyclic graph(DAG), can be negative weight but the graph should not contain cyclic.

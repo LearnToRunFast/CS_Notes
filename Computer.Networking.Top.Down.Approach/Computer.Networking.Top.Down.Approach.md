@@ -1288,9 +1288,10 @@ The window size must be less than or equal to half the size of the sequence numb
 
 ### Connection-Oriented Transport: TCP
 
-TCP is said to be **connection-oriented**, it must establish connection first before client and server to talk to each other.
+TCP is
 
-A TCP connection provides a **full-duplex service**: Client and Server can send and receive data at the same time.
+-  **connection-oriented**, it must establish connection first before client and server to talk to each other.
+- Provides a **full-duplex service**: Client and Server can send and receive data at the same time.
 
 The client process passes a stream of data through the socket and reached to TCP. As shown in Figure 3.28, TCP directs this data to the connection’s **send buffer**, which is one of the buffers that is set aside during the initial three-way handshake. From time to time, TCP will grab chunks of data from the send buffer and pass the data to the network layer. The maximum amount of data that can be grabbed and placed in a segment is limited by the **maximum segment size (MSS)**. The MSS is typically set by first determining the length of the largest link-layer frame that can be sent by the local sending host (the so-called **maximum transmission unit, MTU**), and then setting the MSS to ensure that a TCP segment (when encapsulated in an IP datagram) plus the TCP/IP header length (typically 40 bytes) will fit into a single link-layer frame. Both Ethernet and PPP link-layer protocols have an MTU of 1,500 bytes. Thus a typical value of MSS is 1460 bytes. 
 
