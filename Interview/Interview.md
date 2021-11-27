@@ -1,21 +1,21 @@
-# Interview
 
-## Algorithm
 
-### Tree
+# Algorithm
 
-#### Binary Tree
+## Tree
+
+### Binary Tree
 
 - has at most two children, left and right
 - At most $2^{i-1}$ nodes at level $i$
 
-##### Binary Search Tree
+#### Binary Search Tree
 
 - the left children's values are always smaller or equal to it's parent node and the right children of the parent node
 
-##### Binary Tree Traversal
+#### Binary Tree Traversal
 
-###### General Form of Traversal
+#### General Form of Traversal
 
 ```go
 func inorderTraversal(root *TreeNode) []int {
@@ -133,23 +133,23 @@ func postorderTraversal(root *TreeNode) []int {
 
 
 
-#### AVL Tree
+### AVL Tree
 
-#### B Tree
+### B Tree
 
-#### B+ Tree
+### B+ Tree
 
-#### Red-Black Tree
+### Red-Black Tree
 
-#### Tire
+### Tire
 
-#### Segment Tree
+### Segment Tree
 
-#### Haffman Tree
+### Haffman Tree
 
-#### Binary Heap
+### Binary Heap
 
-#### Minimal Spanning Tree
+### Minimal Spanning Tree
 
 **Minimum spanning tree** (**MST**) or **minimum weight spanning tree** is a subset of the edges of a connected, edge-weighted undirected graph that connects all the vertices together, without any cycles and with the minimum possible total edge weight.
 
@@ -168,7 +168,7 @@ func postorderTraversal(root *TreeNode) []int {
 2. Find the next smallest edge which the result tree will remain connected
 3. Repeat step 2 until there are (V-1) edges in the spanning tree.
 
-### Sort
+## Sort
 
 Sort has few properties:
 
@@ -179,7 +179,7 @@ Sort has few properties:
 - in-place
   - Whether the swap is in place.
 
-#### Merge Sort
+### Merge Sort
 
 ```go
 func merge(nums *[]int, temp *[]int, l, mid, r int) {
@@ -224,7 +224,7 @@ func main() {
 }
 ```
 
-#### Quick Sort
+### Quick Sort
 
 ```go
 type quickSort struct {
@@ -270,7 +270,7 @@ func main() {
 }
 ```
 
-#### Topological Sort
+### Topological Sort
 
 Normally use it for cycle detection
 
@@ -278,9 +278,9 @@ Normally use it for cycle detection
 2. If we haven't visit that neighbour yet, mark it as visited and increase the in-degree by one. If it's in-degree of 0, add it to the queue.
 3. Continue for all the nodes inside the queue, until the queue is empty.
 
-### Search
+## Search
 
-#### 3-Way Quick Search
+### 3-Way Quick Search
 
 ```go
 // 3 way quick search for top k value
@@ -339,11 +339,11 @@ func main() {
 }
 ```
 
-### Hash Table
+## Hash Table
 
 Key-Value pair store which key will be hashed using hash function.
 
-#### Collision Resolution
+### Collision Resolution
 
 - **Open addressing**: if the event of collision, it will find the next available slots
   - *linear probing*: Find the next available slot linearly by increasing the index
@@ -351,11 +351,11 @@ Key-Value pair store which key will be hashed using hash function.
   - *Double Hashing*:(hash1(key) + i \* hash2(key)) % TABLE_SIZE
 - **Separate Chaining**: Every slots inside the array will be a chain of linked list which stores all the collision hash values
 
-### Graph
+## Graph
 
-#### Single Source Shortest Path
+### Single Source Shortest Path
 
-##### Dijkstra algorithm
+#### Dijkstra algorithm
 
 1. Find the Source Point, Mark all other vertices's weight as infinity.
 2. Relax the neighbour vertices by choosing the min weight, it will need to relax n times, where n is number of neighbours
@@ -371,7 +371,7 @@ $O(|V| |V - 1|) = O(V^2)$
 
 Only applied for positive weight directed acyclic graph(DAG)
 
-##### Bellman-Ford
+#### Bellman-Ford
 
 1. Find the Source Point, Mark all other vertices's weight as infinity.
 2. List out all edges in sequences and relax the vertex
@@ -387,11 +387,11 @@ In a complete graph, $|E| = \frac{n(n - 1)}{2}, |E| \times|V-1| = V^3$
 
 Only applied for directed acyclic graph(DAG), can be negative weight but the graph should not contain cyclic.
 
-### String
+## String
 
-#### Pattern Matching
+### Pattern Matching
 
-##### KMP
+#### KMP
 
 1. Create a Next array to keep track of repeating patterns
 
@@ -469,9 +469,9 @@ Only applied for directed acyclic graph(DAG), can be negative weight but the gra
 
 
 
-## Network
+# Network
 
-### TCP
+## TCP
 
 TCP directs this data to the connection’s **send buffer**, which is one of the buffers that is set aside during the initial three-way handshake. 
 
@@ -555,7 +555,7 @@ $LastByteSent\ – \ LastByteAcked <= rwnd$
 
 The TCP specification requires sender to continue to send segments with one data byte when receiver window is zero. 
 
-#### Hand Shake
+### Hand Shake
 
 1. The client-side TCP first sends a special TCP segment to the server-side TCP. 
    - no application-layer data but SYN bit is set to 1
@@ -568,7 +568,7 @@ The TCP specification requires sender to continue to send segments with one data
 
 ![image-20211107191703979](Asserts/image-20211107191703979.png)
 
-#### Close Connection
+### Close Connection
 
 When the client application process issues a close command.
 
@@ -579,7 +579,7 @@ When the client application process issues a close command.
 
 ![image-20211107193002656](Asserts/image-20211107193002656.png)
 
-#### Congestion Control
+### Congestion Control
 
 At the highest level, we can distinguish among congestion-control approaches by whether the network layer provides explicit assistance to the transport layer for congestion-control purposes:
 
@@ -623,21 +623,105 @@ Use acknowledgments to increase its congestion window size (and hence its transm
 
 Slow start and congestion avoidance are mandatory components of TCP, differing in how they increase the size of cwnd in response to received ACKs. Slow start increases the size of cwnd more rapidly than congestion avoidance. Fast recovery is recommended, but not required, for TCP senders.
 
-- slow start
+- **slow start**
   - When a TCP connection begins, the value of cwnd is typically initialized to a small value of 1 MSS, resulting in an initial sending rate of roughly MSS/ RTT. And increases by 1 MSS(for every ACK) every time a transmitted segment is first acknowledged. 
   - If there is a loss event (i.e., congestion) indicated by a timeout
     - the TCP sender sets the value of cwnd to 1 and begins the slow start process anew.
     -  It also sets the value of a second state variable, *ssthresh* (shorthand for “slow start threshold”) to *cwnd/2*—half of the value of the congestion window value when congestion was detected.
   - When the value of cwnd equals ssthresh, slow start ends and TCP transitions into congestion avoidance mode. TCP increases cwnd more cautiously when in congestion avoidance mode. 
   - If three duplicate ACKs are detected, in which case TCP performs a fast retransmit and enters the fast recovery state. 
-- congestion avoidance
+- **congestion avoidance**
   - increases the value of cwnd by just a single MSS every RTT. A common approach is for the TCP sender to increase cwnd by MSS bytes (MSS/cwnd) whenever a new acknowledgment arrives. 
     - For example, if MSS is 1,460 bytes and cwnd is 14,600 bytes, then 10 segments are being sent within an RTT. Each arriving ACK (assuming one ACK per segment) increases the congestion window size by 1/10 MSS, and thus, the value of the congestion window will have increased by one MSS after ACKs when all 10 segments have been received.
   - If three duplicate ACKs are detected, TCP halves the value of cwnd (adding in 3 MSS for good measure to account for the triple duplicate ACKs received) and records the value of ssthresh to be half the value of cwnd when the triple duplicate ACKs were received. The fast-recovery state is then entered.
-- fast recovery
+- **fast recovery**
   - the value of cwnd is increased by 1 MSS for every duplicate ACK received for the missing segment that caused TCP to enter the fast-recovery state. Eventually, when an ACK arrives for the missing segment, TCP enters the congestion-avoidance state after deflating cwnd. 
   - If a timeout event occurs, fast recovery transitions to the slow-start state after performing the same actions as in slow start and congestion avoidance: The value of cwnd is set to 1 MSS, and the value of ssthresh is set to half the value of cwnd when the loss event occurred.
 
 ![image-20211108154556039](Asserts/image-20211108154556039.png)
 
 Ignoring the initial slow-start period when a connection begins and assuming that losses are indicated by triple duplicate ACKs rather than timeouts, TCP’s congestion control consists of linear (additive) increase in cwnd of 1 MSS per RTT and then a halving (multiplicative decrease) of cwnd on a triple duplicate-ACK event. For this reason, TCP congestion control is often referred to as an **additive-increase, multiplicative- decrease (AIMD)** form of congestion control. 
+
+# Computer Architecture
+
+## Floating Point Representation
+
+**Numerical Form:** $(-1)^s \cdot M \cdot 2^E$
+
+- Sign bit **s** determines whether number is negative or positive 
+- Significand **M** normally a fractional value in range [1.0,2.0)
+- Exponent **E** weights value by power of two
+
+**Encoding** 
+
+- MSB s is sign bit **s**
+- **exp** field encodes **E** (but is not equal to E)
+- **frac** field encodes **M** (but is not equal to M)
+
+**Exponent E coded as a biased value:**  E = exp – Bias
+
+- *exp*: unsigned value of exp field
+- *Bias* = $2^{k-1} - 1$, where *k* is number of exponent bits
+  - Single precision: $2^{8-1} - 1= 127$ (**exp**: 1...254, E: -126...127)
+  - Double precision: $2^{11-1} - 1= 1023$ (**exp**: 1...2046, E: -1022…1023)
+
+![image-20211109135525478](Asserts/image-20211109135525478.png)
+
+## Translation Process of an Executable File
+
+![image-20211109142454539](Asserts/image-20211109142454539.png)
+
+# Operation System
+
+## Process
+
+### Interprocess communication (IPC)
+
+Interprocess communication is the mechanism provided by the operating system that allows processes to communicate with each other. This communication could involve a process letting another process know that some event has occurred or the transferring of data from one process to another.
+
+#### Synchronization in Interprocess Communication
+
+- **Semaphore**
+
+  A semaphore is a variable that controls the access to a common resource by multiple processes. The two types of semaphores are binary semaphores and counting semaphores.
+
+- **Mutual Exclusion**
+
+  Mutual exclusion requires that only one process thread can enter the critical section at a time. This is useful for synchronization and also prevents race conditions.
+
+- **Barrier**
+
+  A barrier does not allow individual processes to proceed until all the processes reach it. Many parallel languages and collective routines impose barriers.
+
+- **Spinlock**
+
+  This is a type of lock. The processes trying to acquire this lock wait in a loop while checking if the lock is available or not. This is known as busy waiting because the process is not doing any useful operation even though it is active.
+
+#### Approaches to Interprocess Communication
+
+The different approaches to implement interprocess communication are given as follows:
+
+- **Pipe**
+
+  A pipe is a data channel that is unidirectional. Two pipes can be used to create a two-way data channel between two processes. This uses standard input and output methods. Pipes are used in all POSIX systems as well as Windows operating systems.
+
+- **Socket**
+
+  The socket is the endpoint for sending or receiving data in a network. This is true for data sent between processes on the same computer or data sent between different computers on the same network. Most of the operating systems use sockets for interprocess communication.
+
+- **File**
+
+  A file is a data record that may be stored on a disk or acquired on demand by a file server. Multiple processes can access a file as required. All operating systems use files for data storage.
+
+- **Signal**
+
+  Signals are useful in interprocess communication in a limited way. They are system messages that are sent from one process to another. Normally, signals are not used to transfer data but are used for remote commands between processes.
+
+- **Shared Memory**
+
+  Shared memory is the memory that can be simultaneously accessed by multiple processes. This is done so that the processes can communicate with each other. All POSIX systems, as well as Windows operating systems use shared memory.
+
+- **Message Queue**
+
+  Multiple processes can read and write data to the message queue without being connected to each other. Messages are stored in the queue until their recipient retrieves them. Message queues are quite useful for interprocess communication and are used by most operating systems.
+

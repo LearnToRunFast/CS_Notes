@@ -1,24 +1,279 @@
 [toc]
 
-# Designing Data Intensive Applications
+# Overview
 
-## Chapter 2
+Three concerns that are import in most software systems:
 
-Choose right database type for your application, SQL or NoSQL.
+- **Reliability**
+  The system should continue to work correctly (performing the correct function at the desired level of performance) even in the face of adversity (hardware or software faults, and even human error). 
 
-### Application Example
+- **Scalability**
+  As the system grows (in data volume, traffic volume, or complexity), there should be reasonable ways of dealing with that growth.
 
-#### Resume
+- **Maintainability** 
 
-Most people have had more than one job in their career, so there is a one-to-many relationship from the user to their experiences and jobs.
+  Over time, many different people will work on the system (engineering and operations, both maintaining current behavior and adapting the system to new use cases), and they should all be able to work on it productively.
 
-In SQL way, there are three ways to store them:
+## Reliability
 
-1. Store positions, education and contact information in separate tables and associate with foreign key to user table.
-2. Later version of the SQL support for structured datatypes and XML data which allowed multi-valued data to be stored within a single row.
-3. Encode jobs, education and contact information as a JSON or XML and store it on a text column, but you can use the database to query for values inside the encoded column.
+For software, typical expectations for reliability include:
 
-For a data structure like a résumé, which is mostly a self-contained document, a **JSON** representation can be quite appropriate.The JSON representation has better locality than the multi-table schema.
+- The application performs the function that the user expected.
+- It can tolerate the user making mistakes or using the software in unexpected ways.
+- Its performance is good enough for the required use case, under the expected load and data volume.
+- The system prevents any unauthorized access and abuse.
+
+The things that can go wrong are called *faults*, and systems that anticipate *faults* and can cope with them are called *fault-tolerant* or *resilient*. 
+
+> _**Fault vs Failure**_: A *fault* is usually defined as one component of the system deviating from its spec, whereas a *failure* is when the system as a whole stops providing the required service to the user. 
+
+It is impossible to reduce the probability of a fault to zero; therefore it is usually best to design fault-tolerance mechanisms that prevent faults from causing failures.
+
+### Hardware Faults
+
+Hard disks crash, RAM becomes faulty, the power grid has a blackout, someone unplugs the wrong network cable. 
+
+As the volumes of data and traffic increased, there is a move toward systems that can tolerate the loss of entire machines, by using software fault-tolerance techniques in preference or in addition to hardware redundancy. 
+
+Such systems also have operational advantages: no downtime, as the back up machine can take over when primary machine need to restart.
+
+### Software Errors
+
+Another class of fault is a systematic error within the system. Such faults are harder to anticipate, and because they are correlated across nodes, they tend to cause many more system failures than uncorrelated hardware faults.
+
+There is no quick solution to the problem of systematic faults in software. Lots of small things can help: 
+
+- carefully thinking about assumptions and interactions in the system; 
+- thorough testing; 
+- process isolation; 
+- allowing processes to crash and restart; measuring, monitoring, and analyzing system behavior in production. 
+- If a system is expected to provide some guarantee (for example, in a message queue, that the number of incoming messages equals the number of outgoing messages), it can constantly check itself while it is running and raise an alert if a discrepancy is found.
+
+### Human Errors
+
+The best systems combine several approaches to prevent unreliable humans:
+
+- Design systems in a way that minimizes opportunities for error. 
+  - For example, well-designed abstractions, APIs, and admin interfaces make it easy to do “the right thing” and discourage “the wrong thing.” However, if the interfaces are too restrictive people will work around them, negating their benefit, so this is a tricky balance to get right.
+- Decouple the places where people make the most mistakes from the places where they can cause failures. 
+  - In particular, provide fully featured non-production sandbox environments where people can explore and experiment safely, using real data, without affecting real users.
+- Test thoroughly at all levels, from unit tests to whole-system integration tests and manual tests. Automated testing is widely used, well understood, and especially valuable for covering corner cases that rarely arise in normal operation.
+- Allow quick and easy recovery from human errors, to minimize the impact in the case of a failure. 
+  - For example, make it fast to roll back configuration changes, roll out new code gradually (so that any unexpected bugs affect only a small subset of users), and provide tools to recompute data (in case it turns out that the old computation was incorrect).
+- Set up detailed and clear monitoring, such as performance metrics and error rates. In other engineering disciplines this is referred to as telemetry. (Once a rocket has left the ground, telemetry is essential for tracking what is happening, and for understanding failures.) 
+  - Monitoring can show us early warning signals and allow us to check whether any assumptions or constraints are being violated. When a problem occurs, metrics can be invaluable in diagnosing the issue.
+- Implement good management practices and training.
+
+## Scalability
+
+Scalability is the term to describe a system’s ability to cope with increased load. However, it is meaningless to say “X is scalable” or “Y doesn’t scale.” Rather, discussing scalability means considering questions like “If the system grows in a particular way, what are our options for coping with the growth?” and “How can we add computing resources to handle the additional load?”
+
+### Describing Load
+
+Load can be described with a few numbers of load parameters. The best choice of parameters depends on the architecture of your system: it may be requests per second to a web server, the ratio of reads to writes in a database, the number of simultaneously active users in a chat room, the hit rate on a cache, or something else. 
+
+#### Twitter Twitte Case Study
+
+Let’s consider Twitter as an example. Two of Twitter’s main operations are:
+
+- Post tweet
+  A user can publish a new message to their followers (4.6k requests/sec on aver‐ age, over 12k requests/sec at peak).
+- Home timeline
+  A user can view tweets posted by the people they follow (300k requests/sec).
+
+Twitter’s scaling challenge is not primarily due to tweet volume, but due to *fan-out*—each user follows many people, and each user is followed by many people. There are broadly two ways of implementing these two operations:
+
+1. Posting a tweet simply inserts the new tweet into a global collection of tweets. When a user requests their home timeline, look up all the people they follow, find all the tweets for each of those users, and merge them (sorted by time). In a relational database like in Figure 1-2, you could write a query such as:
+
+   ```sql
+   SELECT tweets.*, users.* FROM tweets
+     JOIN users ON tweets.sender_id = users.id 
+     JOIN follows ON follows.followee_id = users.id 
+     WHERE follows.follower_id = current_user
+   ```
+
+   ![image-20211120223548492](Asserts/image-20211120223548492.png)
+
+2. Maintain a cache for each user’s home timeline—like a mailbox of tweets for each recipient user. When a user posts a tweet, look up all the people who follow that user, and insert the new tweet into each of their home timeline caches. The request to read the home timeline is then cheap, because its result has been computed ahead of time.
+
+   - If the an user has over 30 million followers, this means that result in over 30 million writes to home timelines which is challenger to match Twitter's goal, deliver tweets to followers within five seconds.
+
+   ![image-20211120223648644](Asserts/image-20211120223648644.png)
+
+In the example of Twitter, the distribution of followers per user (maybe weighted by how often those users tweet) is a key load parameter for discussing scalability, since it determines the fan-out load.
+
+Twitter is moving to a hybrid of both approaches. Most users’ tweets continue to be fanned out to home timelines at the time when they are posted, but a small number of users with a very large number of followers (i.e., celebrities) are excepted from this fan-out. Tweets from any celebrities that a user may follow are fetched separately and merged with that user’s home timeline when it is read. This hybrid approach is able to deliver consistently good performance.
+
+### Describing Performance
+
+Once you have described the load on your system, you can investigate what happens when the load increases. 
+
+- When you increase a load parameter and keep the system resources (CPU, memory, network bandwidth, etc.) unchanged, how is the performance of your system affected?
+- When you increase a load parameter, how much do you need to increase the resources if you want to keep performance unchanged?
+
+Let’s look briefly at describing the performance of a system.
+
+- In a batch processing system such as Hadoop, we usually care about *throughput*—the number of records we can process per second, or the total time it takes to run a job on a dataset of a certain size.
+- In online systems, what’s usually more important is the service’s response time—the time between a client sending a request and receiving a response.
+
+The median a good metric if you want to know how long users typically have to wait: half of user requests are served in less than the median response time, and the other half take longer than the median. The median is also known as the 50th percentile, and sometimes abbreviated as p50.
+
+- For example, if the 95th percentile response time is 1.5 seconds, that means 95 out of 100 requests take less than 1.5 seconds, and 5 out of 100 requests take 1.5 seconds or more. High percentiles of response times, also known as *tail latencies*, are important because they directly affect users’ experience of the service.
+- Percentiles are often used in *service level objectives (SLOs)* and *service level agreements (SLAs)*, contracts that define the expected performance and availability of a service. An SLA may state that the service is considered to be up if it has a median response time of less than 200 ms and a 99th percentile under 1 s (if the response time is longer, it might as well be down), and the service may be required to be up at least 99.9% of the time. These metrics set expectations for clients of the service and allow customers to demand a refund if the SLA is not met.
+
+> _**Latency and response time**_
+> Latency and response time are often used synonymously, but they are not the same. 
+>
+> The response time is what the client sees: besides the actual time to process the request (the service time), it includes network delays and queueing delays. The latency is the duration that a request is waiting to be handled—during which it is latent, awaiting service.
+
+Queueing delays often account for a large part of the response time at high percentiles. 
+
+- As a server can only process a small number of things in parallel (limited, for example, by its number of CPU cores), it only takes a small number of slow requests to hold up the processing of subsequent requests—an effect sometimes known as *head-of-line blocking*. Even if those subsequent requests are fast to process on the server, the client will see a slow overall response time due to the time waiting for the prior request to complete. Due to this effect, it is important to measure response times on the client side.
+- Even if only a small percentage of backend calls are slow, the chance of getting a slow call increases if an end-user request requires multiple back‐end calls, and so a higher proportion of end-user requests end up being slow (an effect known as *tail latency amplification*)
+
+### Approaches for Coping with Load
+
+An architecture that is appropriate for one level of load is unlikely to cope with 10 times that load. If you are working on a fast-growing service, it is therefore likely that you will need to rethink your architecture on every order of magnitude load increase —or perhaps even more often than that.
+
+- **scaling up** (vertical scaling, moving to a more powerful machine)
+- **scaling out** (horizontal scaling, distributing the load across multiple smaller machines). 
+  - Distributing load across multiple machines is also known as a shared-nothing architecture.
+
+In reality, good architectures usually involve a pragmatic mixture of approaches: for example, using several fairly powerful machines can still be simpler and cheaper than a large number of small virtual machines.
+Some systems are elastic, meaning that they can automatically add computing resources when they detect a load increase, whereas other systems are scaled manually (a human analyzes the capacity and decides to add more machines to the system).
+
+## Maintainability
+
+we can and should design software in such a way that it will hopefully minimize pain during maintenance, and thus avoid creating legacy software ourselves. To this end, we will pay particular attention to three design principles for software systems:
+
+- **Operability**
+  Make it easy for operations teams to keep the system running smoothly.
+- **Simplicity**
+  Make it easy for new engineers to understand the system, by removing as much complexity as possible from the system.
+- **Evolvability**
+  Make it easy for engineers to make changes to the system in the future, adapting it for unanticipated use cases as requirements change. Also known as extensibility, modifiability, or plasticity.
+
+### Operability: Making Life Easy for Operations
+
+Data systems can do various things to make routine tasks easy, including:
+
+- Providing visibility into the runtime behavior and internals of the system, with good monitoring
+- Providing good support for automation and integration with standard tools
+- Avoiding dependency on individual machines (allowing machines to be taken down for maintenance while the system as a whole continues running uninter‐ rupted)
+- Providing good documentation and an easy-to-understand operational model (“If I do X, Y will happen”)
+- Providing good default behavior, but also giving administrators the freedom to override defaults when needed
+- Self-healing where appropriate, but also giving administrators manual control over the system state when needed
+- Exhibiting predictable behavior, minimizing surprises
+
+### Simplicity: Managing Complexity
+
+Reducing complexity greatly improves the maintainability of software, and thus simplicity should be a key goal for the systems we build.
+
+We can remove *accidental complexity*,if it is not inherent in the problem that the software solves (as seen by the users) but arises only from the implementation.
+
+One of the best tools we have for removing accidental complexity is abstraction. A good abstraction can hide a great deal of implementation detail behind a clean, simple-to-understand façade. 
+
+A good abstraction can also be used for a wide range of different applications. 
+
+- Reuse
+- Leads to higher-quality software, as quality improvements in the abstracted component benefit all applications that use it.
+
+### Evolvability: Making Change Easy
+
+In terms of organizational processes, Agile working patterns provide a framework for adapting to change. The Agile community has also developed technical tools and pat‐ terns that are helpful when developing software in a frequently changing environment, such as test-driven development (TDD) and refactoring.
+
+# Data Models and Query Languages
+
+## Relational Model Versus Document Model
+
+### NoSQL
+
+There are several driving forces behind the adoption of NoSQL databases, including:
+
+- A need for *greater scalability* than relational databases can easily achieve, including very large datasets or very high write throughput
+- A widespread preference for free and open source software over commercial database products
+- Specialized query operations that are not well supported by the relational model
+- Frustration with the restrictiveness of relational schemas, and a desire for a more dynamic and expressive data model
+
+### The Object-Relational Mismatch
+
+If data is stored in relational tables, an awkward translation layer is required between the objects in the application code and the database model of tables, rows, and columns. The disconnect between the models is sometimes called an *impedance mismatch*.
+
+**Object-relational mapping** (ORM) frameworks like ActiveRecord and Hibernate reduce the amount of boilerplate code required for this translation layer, but they can’t completely hide the differences between the two models.
+
+### Relational Versus Document Databases Versus Graph Model
+
+There are many differences to consider when comparing relational databases to document databases, including their fault-tolerance properties and handling of concurrency we will concentrate only on the differences in the data model.
+
+- **Document data model**
+  - schema-on-read
+    - the structure of the data is implicit, and only interpreted when the data is read
+    - start writing new documents with the new fields and have code in the application that handles the case when old documents are read if you want to change the field
+  - Pros
+    - schema flexibility
+    - better performance due to locality
+    - for some applications it is closer to the data structures used by the application
+  - Cons
+    - cannot refer directly to a nested item within a document. However, as long as documents are not too deeply nested, that is not usually a problem.
+    - Joins can be emulated in application code by making multiple requests to the database, using a document model can lead to significantly more complex application code and worse performance
+  - Use cases
+    - If application often needs to access the entire document, there is a performance advantage to this storage locality
+    - On updates to a document, the entire document usually needs to be rewritten—only modifications that don’t change the encoded size of a document can easily be performed in place
+    - application has mostly one-to-many relationships (tree-structured data) or no relationships between records
+- **The relational model**
+  - schema-on-write
+    - the schema is explicit and the database ensures all written data conforms to it
+    - you need to perform a migration if you want to change the field
+    - keep documents fairly small and avoid writes that increase the size of a document
+  - Pros
+    - providing better support for joins, and many-to-one and many-to-many relationships
+- **Graph Model**
+  - Pros
+    - For highly interconnected data
+
+## Query Languages for Data
+
+- declarative query 
+
+  In a declarative query language, like SQL or relational algebra, you just specify the pattern of the data you want
+
+  - typically more concise and easier to work with than an imperative API
+  - hides implementation details of the database engine, which makes it possible for the database system to introduce performance improvements without requiring any changes to queries.
+  - declarative languages often lend themselves to parallel execution.
+
+- imperative query
+  An imperative language tells the computer to perform certain operations in a certain order. 
+
+## Graph-Like Data Models
+
+Graph can provide a consistent way of storing completely different types of objects in a single datastore. 
+
+There are several different, but related, ways of structuring and querying data in graphs.
+
+- The **property graph model** (implemented by Neo4j, Titan, and InfiniteGraph)
+  - Each vertex consists of:
+    - A unique identifier
+    - A set of outgoing edges
+    - A set of incoming edges
+    - A collection of properties (key-value pairs)
+  - Each edge consists of:
+    - A unique identifier
+    - The vertex at which the edge starts (the tail vertex)
+    - The vertex at which the edge ends (the head vertex)
+    - A label to describe the kind of relationship between the two vertices
+    - A collection of properties (key-value pairs)
+  - There is no schema that restricts which kinds of things can or cannot be associated.
+  - Given any vertex, you can efficiently find both its incoming and its outgoing edges, and thus traverse the graph
+  - By using different labels for different kinds of relationships, you can store several different kinds of information in a single graph, while still maintaining a clean data model.
+- The triple-store model (implemented by Datomic, AllegroGraph, and others). 
+- declarative query languages for graphs
+  - Cypher, SPARQL, and Datalog
+- imperative graph query languages
+  - Gremlin
+- graph processing frameworks
+  - Pregel
+
+
 
 ## Chapter 3 Storage and Retrieval
 
@@ -2991,7 +3246,7 @@ We also touched on supercomputers, which assume reliable components and thus hav
 
 ## CHAPTER 9 Consistency and Consensus
 
-Lots of things can go wrong in distributed systems, as discussed in Chapter 8. The simplest way of handling such faults is to simply let the entire service fail, and show the user an error message. If that solution is unacceptable, we need to find ways of *tolerating* faults—that is, of keeping the service functioning correctly, even if some internal component is faulty.
+The simplest way of handling such faults is to simply let the entire service fail, and show the user an error message. If that solution is unacceptable, we need to find ways of *tolerating* faults—that is, of keeping the service functioning correctly, even if some internal component is faulty.
 
 In this chapter, we will talk about some examples of algorithms and protocols for building fault-tolerant distributed systems. We will assume that all the problems from Chapter 8 can occur: packets can be lost, reordered, duplicated, or arbitrarily delayed in the network; clocks are approximate at best; and nodes can pause (e.g., due to garbage collection) or crash at any time.
 

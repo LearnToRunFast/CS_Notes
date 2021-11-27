@@ -153,6 +153,10 @@ Server层也有自己的日志，称为binlog（归档日志), 逻辑日志。 B
 
 有了对这两个日志的概念性理解，我们再来看执行器和InnoDB引擎在执行这个简单的update语句时的内部流程。
 
+```sql
+update T set c=c+1 where ID=2;
+```
+
 1. 执行器先找引擎取ID=2这一行。ID是主键，引擎直接用树搜索找到这一行。如果ID=2这一行所在的数据页本来就在内存中，就直接返回给执行器；否则，需要先从磁盘读入内存，然后再返回。
 2. 执行器拿到引擎给的行数据，把这个值加上1，比如原来是N，现在就是N+1，得到新的一行数据，再调用引擎接口写入这行新数据。
 3. 引擎将这行新数据更新到内存中，同时将这个更新操作记录到redo log里面，此时redo log处于prepare状态。然后告知执行器执行完成了，随时可以提交事务。
@@ -167,20 +171,21 @@ Server层也有自己的日志，称为binlog（归档日志), 逻辑日志。 B
 
 redo log和binlog都可以用于表示事务的提交状态，而两阶段提交就是让这两个状态保持逻辑上的一致。
 
-redo log用于保证crash-safe能力。innodb_flush_log_at_trx_commit这个参数设置成1的时候，表示每次事务的redo log都直接持久化到磁盘。这个参数我建议你设置成1，这样可以保证MySQL异常重启之后数据不丢失。
+redo log用于保证crash-safe能力。
 
-sync_binlog这个参数设置成1的时候，表示每次事务的binlog都持久化到磁盘。这个参数我也建议你设置成1，这样可以保证MySQL异常重启之后binlog不丢失。
+- innodb_flush_log_at_trx_commit这个参数设置成1的时候，表示每次事务的redo log都直接持久化到磁盘。总是把它设置成1，这样可以保证MySQL异常重启之后数据不丢失。
+
+- sync_binlog这个参数设置成1的时候，表示每次事务的binlog都持久化到磁盘。总是把它也设置成1，这样可以保证MySQL异常重启之后binlog不丢失。
 
 #### 在两阶段提交的不同时刻，MySQL异常重启会出现什么现象
 
-写入redo log 处于prepare阶段之后、写binlog之前，发生了崩溃（crash），由于此时binlog还没写，redo log也还没提交，崩溃恢复的时候，这个事务会回滚。这时候，binlog还没写，所以也不会传到备库。
+- 写入redo log 处于prepare阶段之后、写binlog之前，发生了崩溃（crash），由于此时binlog还没写，redo log也还没提交，崩溃恢复的时候，这个事务会回滚。这时候，binlog还没写，所以也不会传到备库。
 
-当binlog写完，redo log还没commit前发生crash。
-
-1. 如果redo log里面的事务是完整的，也就是已经有了commit标识，则直接提交；
-2. 如果redo log里面的事务只有完整的prepare，则判断对应的事务binlog是否存在并完整：
-   a. 如果是，则提交事务；
-   b. 否则，回滚事务。
+- 当binlog写完，redo log还没commit前发生crash。
+  - 如果redo log里面的事务是完整的，也就是已经有了commit标识，则直接提交；
+  - 如果redo log里面的事务只有完整的prepare，则判断对应的事务binlog是否存在并完整：
+    - 如果是，则提交事务
+    - 否则，回滚事务。 
 
 ####  binlog的完整性
 
@@ -188,8 +193,7 @@ sync_binlog这个参数设置成1的时候，表示每次事务的binlog都持�
 
 - statement格式的binlog，最后会有COMMIT；
 - row格式的binlog，最后会有一个XID event。
-
-另外，在MySQL 5.6.2版本以后，还引入了binlog-checksum参数，用来验证binlog内容的正确性。对于binlog日志由于磁盘原因，可能会在日志中间出错的情况，MySQL可以通过校验checksum的结果来发现。
+- binlog-checksum参数，用来验证binlog内容的正确性。对于binlog日志由于磁盘原因，可能会在日志中间出错的情况，MySQL可以通过校验checksum的结果来发现。
 
 #### redo log 和 binlog是怎么关联起来的
 
