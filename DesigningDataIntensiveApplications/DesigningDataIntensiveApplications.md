@@ -230,10 +230,11 @@ There are many differences to consider when comparing relational databases to do
 - **Graph Model**
   - Pros
     - For highly interconnected data
+    - Good for evolvability: a graph can easily be extended to accommodate changes in your application’s data structures.
 
 ## Query Languages for Data
 
-- declarative query 
+- Declarative query 
 
   In a declarative query language, like SQL or relational algebra, you just specify the pattern of the data you want
 
@@ -241,7 +242,7 @@ There are many differences to consider when comparing relational databases to do
   - hides implementation details of the database engine, which makes it possible for the database system to introduce performance improvements without requiring any changes to queries.
   - declarative languages often lend themselves to parallel execution.
 
-- imperative query
+- Imperative query
   An imperative language tells the computer to perform certain operations in a certain order. 
 
 ## Graph-Like Data Models
@@ -251,37 +252,136 @@ Graph can provide a consistent way of storing completely different types of obje
 There are several different, but related, ways of structuring and querying data in graphs.
 
 - The **property graph model** (implemented by Neo4j, Titan, and InfiniteGraph)
-  - Each vertex consists of:
-    - A unique identifier
-    - A set of outgoing edges
-    - A set of incoming edges
-    - A collection of properties (key-value pairs)
-  - Each edge consists of:
-    - A unique identifier
-    - The vertex at which the edge starts (the tail vertex)
-    - The vertex at which the edge ends (the head vertex)
-    - A label to describe the kind of relationship between the two vertices
-    - A collection of properties (key-value pairs)
-  - There is no schema that restricts which kinds of things can or cannot be associated.
-  - Given any vertex, you can efficiently find both its incoming and its outgoing edges, and thus traverse the graph
-  - By using different labels for different kinds of relationships, you can store several different kinds of information in a single graph, while still maintaining a clean data model.
 - The triple-store model (implemented by Datomic, AllegroGraph, and others). 
-- declarative query languages for graphs
+
+There are declarative and imperative graph query languages:
+
+- Declarative query languages for graphs
   - Cypher, SPARQL, and Datalog
-- imperative graph query languages
+- Imperative graph query languages
   - Gremlin
-- graph processing frameworks
-  - Pregel
 
+### Property Graphs
 
+The **property graph model** (implemented by Neo4j, Titan, and InfiniteGraph)
 
-## Chapter 3 Storage and Retrieval
+- Each vertex consists of:
+  - A unique identifier
+  - A set of outgoing edges
+  - A set of incoming edges
+  - A collection of properties (key-value pairs)
+- Each edge consists of:
+  - A unique identifier
+  - The vertex at which the edge starts (the tail vertex)
+  - The vertex at which the edge ends (the head vertex)
+  - A label to describe the kind of relationship between the two vertices
+  - A collection of properties (key-value pairs)
+- There is no schema that restricts which kinds of things can or cannot be associated.
+- Given any vertex, you can efficiently find both its incoming and its outgoing edges, and thus traverse the graph
+- By using different labels for different kinds of relationships, you can store several different kinds of information in a single graph, while still maintaining a clean data model.
 
-We need to select a storage engine that is appropriate for our application.There are two families of storage engines: `log-structured storage engines` and `page-oriented storage engines`.
+#### The Cypher Query Language
 
-### Log-Structured Storage Engines
+Cypher is a declarative query language for property graphs, created for the Neo4j graph database.
 
-#### Hash Table
+![image-20211127211432793](Asserts/image-20211127211432793.png)
+
+Below code shows the Cypher query to insert the lefthand portion of Figure 2-5 into a graph database. 
+
+```cypher
+CREATE
+  (NAmerica:Location {name:'North America', type:'continent'}),
+  (USA:Location      {name:'United States', type:'country'  }),
+  (Idaho:Location    {name:'Idaho',         type:'state'    }),
+  (Lucy:Person       {name:'Lucy' }),
+  (Idaho) -[:WITHIN]->  (USA)  -[:WITHIN]-> (NAmerica),
+  (Lucy)  -[:BORN_IN]-> (Idaho)
+```
+
+Cypher query to find people who emigrated from the US to Europe
+
+```cypher
+MATCH
+  (person) -[:BORN_IN]->  () -[:WITHIN*0..]-> (us:Location {name:'United States'}),
+(person) -[:LIVES_IN]-> () -[:WITHIN*0..]-> (eu:Location {name:'Europe'}) 
+RETURN person.name
+```
+
+### Triple-Stores and SPARQL
+
+In a triple-store, all information is stored in the form of very simple three-part statements: (*subject*, *predicate*, *object*).
+
+The subject of a triple is equivalent to a vertex in a graph. 
+
+The object is one of two things:
+
+1. A value in a primitive datatype, such as a string or a number. 
+   - In that case, the predicate and object of the triple are equivalent to the key and value of a property on the subject vertex. 
+     - For example, (*lucy*, *age*, *33*) is like a vertex lucy with properties {"age":33}.
+2. Another vertex in the graph. 
+   - In that case, the predicate is an edge in the graph, the subject is the tail vertex, and the object is the head vertex. 
+     - For example, in (*lucy*, *marriedTo*, *alain*) the subject and object *lucy* and *alain* are both vertices, and the predicate *marriedTo* is the label of the edge that connects them.
+
+A subset of the data in Figure 2-5, represented as Turtle triples, vertices of the graph are written as _:*someName*.
+
+When the predicate represents an edge, the object is a vertex, as in *_:idaho :within _:usa*. When the predicate is a property, the object is a string literal, as in _:usa :name "United States".
+
+```turtle
+@prefix : <urn:example:>.
+_:lucy     a       :Person.
+_:lucy     :name   "Lucy".
+_:lucy     :bornIn _:idaho.
+_:idaho    a       :Location.
+_:idaho    :name   "Idaho".
+_:idaho    :type   "state".
+_:idaho		 :within _:usa.
+_:usa			 a				:Location.
+_:usa			 :name	 "United States".
+_:usa      :type   "country".
+_:usa      :within _:namerica.
+_:namerica a				:Location.
+_:namerica :name		"North America".
+_:namerica :type		"continent".
+
+# you can use semicolons to say multiple things about the same subject.
+# above can be equivalent to below
+@prefix : <urn:example:>.
+_:lucy	a :Person;   :name "Lucy";          :bornIn _:idaho.
+_:idaho	a :Location; :name "Idaho";         :type "state";   :within _:usa.
+_:usa		a :Location; :name "United States"; :type "country"; :within _:namerica.
+_:namerica a :Location; :name "North America"; :type "continent".
+```
+
+#### The SPARQL Query Language
+
+*SPARQL* is a query language for triple-stores using the *Resource Description Framework* (RDF) data model. It predates Cypher, and since Cypher’s pattern matching is borrowed from SPARQL, they look quite similar. 
+
+The same query as before—finding people who have moved from the US to Europe— is even more concise in SPARQL than it is in Cypher.
+
+```SPARQL
+PREFIX : <urn:example:>
+SELECT ?personName WHERE {
+  ?person :name ?personName.
+  ?person :bornIn  / :within* / :name "United States".
+  ?person :livesIn / :within* / :name "Europe".
+}
+```
+
+#### DataLog
+
+Skip
+
+# Storage and Retrieval
+
+There are two families of storage engines: `log-structured storage engines` and `page-oriented storage engine`such as B-tree.
+
+**Index**
+
+An *index* is an additional structure that stored as meta data, which is used to more efficiently find out the desired data location. A well-chosen indexes speed up read queries, but every index slows down writes. 
+
+## Log-Structured Storage Engines
+
+### Hash Indexes
 
 Keeping an in-memory hash map for every segment where every key is mapped to a byte offset in the data file—the location at which the value can be found.
 
@@ -289,89 +389,112 @@ Whenever you append a new key-value pair to the file, you also update the hash m
 
 When you want to look up a value, use the hash map to find the offset in the data file, seek to that location, and read the value.
 
-This is essentially what `Bitcask` (the default storage engine in Riak) does. A storage engine like `Bitcask` is well suited to situations where the value for each key is **updated frequently**.
+This is essentially what `Bitcask` (the default storage engine in *Riak*) does. A storage engine like `Bitcask` is well suited to situations where the value for each key is **updated frequently**.
 
-**To Avoid out of disk space:** Break the log into segments of a certain size by closing a segment file when it reaches a certain size, and making subsequent writes to a new segment file.We can then perform **compaction** on these segments by throwing away duplicate keys in the log, and keeping only the most recent update for each key. Since compaction often makes segments much smaller, we can also merge several segments together at the same time as performing the compaction. Such process can be done in the background thread. We continue to serve read and write requests as normal using the old segment files and switch read requests to using the new merged segment once the process is done.
+**To Avoid out of disk space:** 
 
-Lots of detail goes into making this simple idea work in practice. Briefly, some of the issues that are important in a real implementation are:
+1. Break the log into segments of a certain size by closing a segment file when it reaches a certain size, and making subsequent writes to a new segment file.
+2. We can then perform **compaction** on these segments by throwing away duplicate keys in the log, and keeping only the most recent update for each key. 
+3. Since compaction often makes segments much smaller, we can also merge several segments together at the same time as performing the compaction. 
+4. Segments are never modified after they have been written, so the merged segment is written to a new file. 
+5. Such process can be done in the background thread. We continue to serve read and write requests as normal using the old segment files and switch read requests to using the new merged segment once the process is done.
+6. Each segment now has its own in-memory hash table, mapping keys to file offsets. In order to find the value for a key, we first check the most recent segment’s hash map; if the key is not present we check the second-most-recent segment, and so on. The merging process keeps the number of segments small, so lookups don’t need to check many hash maps.
 
-**File Format** 
+**Some of the issues that are important in a real implementation are:**
 
-It’s faster and simpler to use a binary format that first encodes the length of a string in bytes, followed by the raw string (without need for escaping).
+- File Format 
+  CSV is not the best format for a log. It’s faster and simpler to use a binary format that first encodes the length of a string in bytes, followed by the raw string (without need for escaping).
+- Deleting Records
+  If you want to delete a key and its associated value, you have to append a special deletion record to the data file (sometimes called a *tombstone*). When log segments are merged, the tombstone tells the merging process to discard any previous values for the deleted key.
+- Crash recovery
+  If the database is restarted, the in-memory hash maps are lost. In principle, you can restore each segment’s hash map by reading the entire segment file from beginning to end and noting the offset of the most recent value for every key as you go along. However, that might take a long time if the segment files are large, which would make server restarts painful. 
+  - *Bitcask* speeds up recovery by storing a snapshot of each segment’s hash map on disk, which can be loaded into memory more quickly.
+- Partially written records
+  The database may crash at any time, including halfway through appending a record to the log. 
+  - *Bitcask* files include checksums, allowing such corrupted parts of the log to be detected and ignored.
+- Concurrency control
+  As writes are appended to the log in a strictly sequential order, a common implementation choice is to have only one writer thread. Data file segments are append-only and otherwise immutable, so they can be read concurrently by multiple threads.
+  - One Writer, multiple readers
 
-**Deleting Records**
-
-If you want to delete a key and its associated value, you have to append a special deletion record to the data file (sometimes called a tombstone). When log segments are merged, the tombstone tells the merging process to discard any previous values for the deleted key.
-
-**Crash recovery**
-
-If the database is restarted, the in-memory hash maps are lost. In principle, you can restore each segment’s hash map by reading the entire segment file from beginning to end and noting the offset of the most recent value for every key as you go along. However, that might take a long time if the segment files are large, which would make server restarts painful. Bitcask speeds up recovery by storing a snapshot of each segment’s hash map on disk, which can be loaded into memory more quickly.
-
-**Partially written records**
-
-The database may crash at any time, including halfway through appending a record to the log. Bitcask files include checksums, allowing such corrupted parts of the log to be detected and ignored.
-
-**Concurrency control**
-As writes are appended to the log in a strictly sequential order, a common imple‐ mentation choice is to have only one writer thread. Data file segments are append-only and otherwise immutable, so they can be read concurrently by multiple threads.
-
-**Why append-only design is good**
+**Advantage of append-only logs:**
 
 - Appending and segment merging are sequential write operations, which are generally much faster than random writes.
-- Concurrency and crash recovery are much simpler if segment files are append-only or immutable. For example, you don’t have to worry about the case where a crash happened while a value was being overwritten, leaving you with a file containing part of the old and part of the new value spliced together.
+- Concurrency and crash recovery are much simpler if segment files are append-only or immutable. 
+  - For example, you don’t have to worry about the case where a crash happened while a value was being overwritten, leaving you with a file containing part of the old and part of the new value spliced together.
+
 - Merging old segments avoids the problem of data files getting fragmented over time.
 
-**The hash table index also has limitations**
+**The hash table index‘s limitations**
 
-- The hash table must fit in memory.In principle, you could maintain a hash map on disk, but unfortunately it is difficult to make an on-disk hash map perform well. It requires a lot of random access I/O, it is expensive to grow when it becomes full, and hash collisions require fiddly logic.
-- Range queries are not efficient. For example, you cannot easily scan over all keys between kitty00000 and kitty99999—you’d have to look up each key individually in the hash maps.
+- The hash table must fit in memory.
+  - In principle, you could maintain a hash map on disk, but unfortunately it is difficult to make an on-disk hash map perform well. It requires a lot of random access I/O, it is expensive to grow when it becomes full, and hash collisions require fiddly logic.
 
-#### Sorted String Table(SSTable)
+- Range queries are not efficient. 
+  - For example, you cannot easily scan over all keys between kitty00000 and kitty99999—you’d have to look up each key individually in the hash maps.
 
-The sequence of key-value pairs is sorted by key.
+
+### Sorted String Table(SSTable)
+
+The sequence of key-value pairs is sorted by key, such format called *Sorted String Table*.
 
 Advantage over `Index Hash Table`:
 
-- Merging segments is simple and efficient, even if the files are bigger than the available memory. Start reading the input files side by side, look at the first key in each file, copy the lowest key (according to the sort order) to the output file, and repeat. This produces a new merged segment file, also sorted by key.When multiple segments contain the same key, we can keep the value from the most recent segment and discard the values in older segments.
-- Not need to keep indexing of all keys, an in-memory index to tell you the offsets for some of the keys, but it can be sparse: one key for every few kilobytes of segment file is sufficient, because a few kilobytes can be scanned very quickly.
+- Merging segments is simple and efficient, even if the files are bigger than the available memory. 
+  - Start reading the input files side by side, look at the first key in each file, copy the lowest key (according to the sort order) to the output file, and repeat. This produces a new merged segment file, also sorted by key. 
+  - When multiple segments contain the same key, we can keep the value from the most recent segment and discard the values in older segments.
+- Not need to keep indexing of all keys, since it's in order, an in-memory index can tell you the offsets for some of the keys, but it can be sparse: one key for every few kilobytes of segment file is sufficient, because a few kilobytes can be scanned very quickly.
 - Since read requests need to scan over several key-value pairs in the requested range anyway, it is possible to group those records into a block and compress it before writing it to disk. Each entry of the sparse in-memory index then points at the start of a compressed block. Besides saving disk space, compression also reduces the I/O bandwidth use.
 
-##### How it works
+#### Constructing and maintaining SSTables
 
-- When a write comes in, add it to an in-memory balanced tree data structure (for example, a red-black tree). This in-memory tree is sometimes called a `memtable`.
+- When a write comes in, add it to an in-memory balanced tree data structure (for example, a red-black tree). 
+  - This in-memory tree is sometimes called a `memtable`.
 
-- When the `memtable` gets bigger than some threshold—typically a few megabytes, write it out to disk as an SSTable file. This can be done efficiently because the tree already maintains the key-value pairs sorted by key. The new SSTable file becomes the most recent segment of the database. While the SSTable is being written out to disk, writes can continue to a new `memtable` instance.
+- When the `memtable` gets bigger than some threshold—typically a few megabytes, write it out to disk as an SSTable file. 
+  - This can be done efficiently because the tree already maintains the key-value pairs sorted by key. The new SSTable file becomes the most recent segment of the database. While the SSTable is being written out to disk, writes can continue to a new `memtable` instance.
+
 - In order to serve a read request, first try to find the key in the `memtable`, then in the most recent on-disk segment, then in the next-older segment, etc.
 - From time to time, run a merging and compaction process in the background to combine segment files and to discard overwritten or deleted values.
 
-**It only suffers from one problem**
+**Crash safe for memtable**
 
-If the database crashes, the most recent writes (which are in the memtable but not yet written out to disk) are lost. In order to avoid that problem, we can keep a separate log on disk to which every write is immediately appended. That log is not in sorted order, but that doesn’t matter, because its only purpose is to restore the `memtable` after a crash. Every time the `memtable` is written out to an SSTable, the corresponding log can be discarded.
+If the database crashes, the data in memtable which have not yet written out to disk will be lost. We can keep a separate log on disk to which every write is immediately appended. 
 
-##### Performance Optimisations
+- That log is not in sorted order, but that doesn’t matter, because its only purpose is to restore the `memtable` after a crash. Every time the `memtable` is written out to an SSTable, the corresponding log can be discarded.
+
+Storage engines that are based on this principle of merging and compacting sorted files are often called *Log-Structured Merge-Tree* (LSM) storage engines.
+
+> _**Lucene**_, an indexing engine for full-text search used by Elasticsearch and Solr, uses a similar method for storing its *term dictionary*. A full-text index is much more complex than a key-value index but is based on a similar idea: given a word in a search query, find all the documents (web pages, product descriptions, etc.) that mention the word. This is implemented with a key-value structure where the key is a word (a *term*) and the value is the list of IDs of all the documents that contain the word (the *postings list*). 
+>
+> In Lucene, this mapping from term to postings list is kept in SSTable-like sorted files, which are merged in the background as needed.
+
+#### Performance Optimisations
 
 **Search for non-exist key**
 
-Search non-exist key may required scan the whole database, can use additional Bloom filters to avoid scan the entire database.
+Search non-exist key may required scan the whole database, can use additional *Bloom filters* to avoid scan the entire database.
 
 > _**Note:**_ `Bloom filter` is a memory-efficient data structure for approximating the contents of a set. It can tell you if a key does not appear in the database, and thus saves many unnecessary disk reads for nonexistent keys.
 
-**Compaction and Merge** 
+**Strategies to determine the order and timing of how SSTables are compacted and merged** 
 
-In `size-tiered` compaction, newer and smaller SSTables are successively merged into older and larger SSTables. 
+- `size-tiered` compaction, newer and smaller SSTables are successively merged into older and larger SSTables. 
+  - HBase uses size-tiered, Cassandra
+- In `leveled` compaction, the key range is split up into smaller SSTables and older data is moved into separate “levels,” which allows the compaction to proceed more incrementally and use less disk space.
+  - LevelDB and RocksDB use leveled compaction, Cassandra
 
-In `leveled` compaction, the key range is split up into smaller SSTables and older data is moved into separate “levels,” which allows the compaction to proceed more incrementally and use less disk space.
+#### Summary
 
-**Summary**
+The basic idea of LSM-trees—keeping a cascade of SSTables that are merged in the background:
 
-Even though there are many subtleties, the basic idea of LSM-trees—keeping a cascade of SSTables that are merged in the background—is simple and effective. 
+- is simple and effective
+- dataset that bigger than available memory can still work well
+- efficiently perform range queries due to sorted order
+- support remarkably high write throughput thanks to sequential writes
 
-Even when the dataset is much bigger than the available memory it continues to work well. Since data is stored in sorted order, you can efficiently perform range queries (scanning all keys above some minimum and up to some maximum).
+## Page-Oritented Storage
 
-Because the disk writes are sequential the LSM-tree can support remarkably high write throughput.
-
-### Page-Oritented Storage
-
-#### B-Tree
+#### B-Trees
 
 B-trees break the database down into fixed-size *blocks* or *pages*, traditionally 4 KB in size (sometimes bigger), and read or write one page at a time. This design corresponds more closely to the underlying hardware, as disks are also arranged in fixed-size blocks.
 
