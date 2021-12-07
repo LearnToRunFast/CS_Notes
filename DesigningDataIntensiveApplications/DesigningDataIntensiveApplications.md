@@ -537,50 +537,107 @@ Extra steps need to done if there are changes for the locations:
 
 #### B-tree Optimizations
 
-- Instead of overwriting pages and maintaining a WAL for crash recovery, some databases (like LMDB) use a copy-on-write scheme . A modified page is written to a different location, and a new version of the parent pages in the tree is created, pointing at the new location. 
-- We can save space in pages by not storing the entire key, but abbreviating it. So that we can packing more keys into a page allows the tree to have a higher branching factor, and thus fewer levels.
-- If a query needs to scan over a large part of the key range in sorted order, that page-by-page layout can be inefficient, because a disk seek may be required for every page that is read. Many B-tree implementations therefore try to lay out the tree so that leaf pages appear in sequential order on disk. However, it’s difficult to maintain that order as the tree grows.
-- Additional pointers have been added to the tree. For example, each leaf page may have references to its sibling pages to the left and right, which allows scanning keys in order without jumping back to parent pages.
--  B-tree variants such as fractal trees borrow some log-structured ideas to reduce disk seeks. 
+- Instead of overwriting pages and maintaining a WAL for crash recovery, some databases (like LMDB) use a *copy-on-write* scheme.
+  -  A modified page is written to a different location, and a new version of the parent pages in the tree is created, pointing at the new location. 
 
-**Comparison between B-Trees and LSM-Trees**
+- We can save space in pages by not storing the entire key, but abbreviating it. So that we can packing more keys into a page allows the tree to have a higher *branching factor*, and thus fewer levels.
+- In general, pages can be positioned anywhere on disk, if a query needs to scan over a large part of the key range in sorted order, that page-by-page layout can be inefficient, because a disk seek may be required for every page that is read. 
+  - Many B-tree implementations therefore try to lay out the tree so that leaf pages appear in sequential order on disk. However, it’s difficult to maintain that order as the tree grows.
 
-| B-Tree                                                       | LSM-Tree                                                     |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
-| A B-tree index must write every piece of data at least twice: once to the write-ahead log, and once to the tree page itself.There is also overhead from having to write an entire page at a time, even if only a few bytes in that page changed. | Log-structured indexes also rewrite data multiple times due to repeated compaction and merging of SSTables. This effect—one write to the database resulting in multiple writes to the disk over the course of the database’s lifetime—is known as `write amplification`. **Low write amplification** |
-| Less write throughput than LSM-trees                         | LSM-trees are typically able to **sustain higher write** throughput.<br />Partly because they sometimes have lower write amplification. <br />Partly because they sequentially write compact SSTable files rather than having to overwrite several pages in the tree. |
-| B-tree storage engines leave some disk space unused due to fragmentation: when a page is split or when a row cannot fit into an existing page, some space in a page remains unused. | LSM-trees can be compressed better, and thus often produce smaller files on disk.**Low storage overheads**. |
-| B-trees can be more predictable.                             | Compaction process can sometimes interfere with the performance of ongoing reads and writes.The impact on throughput and average response time is usually small, but at higher percentiles.The response time of queries to log-structured storage engines can sometimes be quite high. |
-| -                                                            | Compaction arises at high write throughput: the disk’s finite write bandwidth needs to be shared between the initial write (logging and flushing a memtable to disk) and the compaction threads running in the background. When writing to an empty database, the full disk bandwidth can be used for the initial write, but the bigger the database gets, the more disk bandwidth is required for compaction. |
-| Each key exists in exactly one place in the index. This aspect makes B-trees attractive in databases that want to offer strong transactional semantics. | May have multiple copies of the same key in different segments. |
+- Additional pointers have been added to the tree. 
+  - For example, each leaf page may have references to its sibling pages to the left and right, which allows scanning keys in order without jumping back to parent pages.
 
-### More Indexing Structures
+- B-tree variants such as *fractal trees* borrow some log-structured ideas to reduce disk seeks. 
 
-**Secondary Indexes:** Same as primary indexes but it is not unique.
+#### Comparison between B-Trees and LSM-Trees
+
+Write:
+
+- B-Tree
+  - A B-tree index must write every piece of data at least twice: 
+    - once to the write-ahead log
+    - once to the tree page itself.
+  - There is also overhead from having to write an entire page at a time, even if only a few bytes in that page changed.
+- LSM-Tree
+  - Log-structured indexes also rewrite data multiple times due to repeated compaction and merging of SSTables. This effect—one write to the database resulting in multiple writes to the disk over the course of the database’s lifetime—is known as `write amplification`. 
+- LSM-trees are typically able to sustain higher write throughput than B-trees
+  - partly because they sometimes have lower write amplification (although this depends on the storage engine configuration and workload)
+  - partly because they sequentially write compact SSTable files rather than having to overwrite several pages in the tree. 
+
+Space:
+
+- LSM-tree
+  - Compressed better, produce smaller files on disk than B-trees. 
+- B-Tree
+  - B-tree storage engines leave some disk space unused due to fragmentation: 
+    - when a page is split or when a row cannot fit into an existing page, some space in a page remains unused. 
+- Since LSM-trees are not page-oriented and periodically rewrite SSTables to remove fragmentation, they have lower storage overheads, especially when using *leveled compaction*.
+
+Compaction Impact:
+
+- LSM-tree
+  - Compaction process can sometimes interfere with the performance of ongoing reads and writes. Disks have limited resources, so it can easily happen that a request needs to wait while the disk finishes an expensive compaction operation. The impact on throughput and average response time is usually small, but at higher percentiles the response time of queries to log-structured storage engines can sometimes be quite high.
+  - The disk’s finite write bandwidth needs to be shared between the initial write (logging and flushing a memtable to disk) and the compaction threads running in the background.
+    - When writing to an empty database, the full disk bandwidth can be used for the initial write, but the bigger the database gets, the more disk bandwidth is required for compaction.
+  - If write throughput is high and compaction is not configured carefully, it can happen that compaction cannot keep up with the rate of incoming writes. 
+    - In this case, the number of unmerged segments on disk keeps growing until you run out of disk space, and reads also slow down because they need to check more segment files. Typically, SSTable-based storage engines do not throttle the rate of incoming writes, even if compaction cannot keep up, so you need explicit monitoring to detect this situation.
+- B-Tree
+  - B-trees can be more predictable delay
+
+Keys:
+
+- B-trees
+  - Each key exists in exactly one place in the index
+    - This aspect makes B-trees attractive in databases that want to offer strong transactional semantics: in many relational databases, transaction isolation is implemented using locks on ranges of keys, and in a B-tree index, those locks can be directly attached to the tree
+- LSM-tree
+  - A log-structured storage engine may have multiple copies of the same key in different segments.
+
+There is no quick and easy rule for determining which type of storage engine is better for your use case, so it is worth testing empirically.
+
+## More Indexing Structures
+
+### Secondary Indexes
+
+**Secondary Indexes:** Same as primary indexes but it is not unique, and they are often crucial for performing joins efficiently.
 
 The key in an index is the thing that queries search for, but the value can be one of two things: 
 
 1. It could be the actual row (document, vertex) in question
 2. It could be a reference to the row stored elsewhere. 
-   - The place where rows are stored is known as a heap file, and it stores data in no particular order (it may be append-only, or it may keep track of deleted rows in order to overwrite them with new data later). 
+   - The place where rows are stored is known as a **heap file**, and it stores data in no particular order (it may be append-only, or it may keep track of deleted rows in order to overwrite them with new data later). 
    - The heap file approach is common because it avoids duplicating data when multiple secondary indexes are present: each index just references a location in the heap file, and the actual data is kept in one place.
    - Efficient on updating a value without changing the key, provided that the new value is not larger than the old value.
 
-> _**Clustered index:**_ In some situations, the extra hop from the index to the heap file is too much of a performance penalty for reads, so it can be desirable to store the indexed row directly within an index. This is known as a `clustered index`. 
+### Clustered index
 
-****
+In some situations, the extra hop from the index to the heap file is too much of a performance penalty for reads, so it can be desirable to store the indexed row directly within an index. This is known as a `clustered index`. 
 
-#### Multi-column Indexes
+- For example, in MySQL’s InnoDB storage engine, the primary key of a table is always a clustered index, and secondary indexes refer to the primary key (rather than a heap file location). 
+- In SQL Server, you can specify one clustered index per table.
+
+### Covering Index
+
+*Covering Index* is a compromise between a clustered index (storing all row data within the index) and a non-clustered index (storing only references to the data within the index)
+
+- which stores *some* of a table’s columns within the index
+
+As with any kind of duplication of data, clustered and covering indexes can speed up reads, but they require additional storage and can add overhead on writes. Databases also need to go to additional effort to enforce transactional guarantees, because applications should not see inconsistencies due to the duplication.
+
+### Multi-column Indexes
 
 The most common type of multi-column index is called a `concatenated index`, which simply combines several fields into one key by appending one column to another (the index definition specifies in which order the fields are concatenated).
 
-**Multi-dimensional Indexes**
+#### Multi-dimensional Indexes
 
 Multi-dimensional indexes are a more general way of querying several columns at once, which is particularly important for geospatial data. 
 
+A standard B-tree or LSM-tree index is not able to answer that kind of query efficiently: it can give you either all the restaurants in a range of latitudes (but at any longitude), or all the restaurants in a range of longitudes (but anywhere between the North and South poles), but not both simultaneously.
+
 One option is to translate a two-dimensional location into a single number using a space-filling curve, and then to use a regular B-tree index. More commonly, specialized spatial indexes such as R-trees are used. 
 
-#### Full-text search and fuzzy indexes
+- For example, *PostGIS* implements geospatial indexes as R-trees using PostgreSQL’s Generalized Search Tree indexing facility.
+
+### Full-text search and fuzzy indexes
 
 Use for finding similar keys or misspelled words.
 
@@ -588,11 +645,18 @@ Use for finding similar keys or misspelled words.
 
 `Lucene` uses a SSTable-like structure for its term dictionary. This structure requires a small in-memory index that tells queries at which offset in the sorted file they need to look for a key.The in-memory index is a finite state automaton over the characters in the keys, similar to a trie. 
 
+Other fuzzy search techniques go in the direction of document classification and machine learning. 
+
 ### In-memory Database
 
-Some of the in-memory stores such as Memcached, are intended for caching use only, where it’s acceptable for data to be lost if a machine is restarted. But other in-memory databases aim for `durability`, which can be achieved with special hardware (such as battery-powered RAM), by writing a log of changes to disk, by writing periodic snapshots to disk, or by replicating the in-memory state to other machines.
+There are different types of in-memory stores:
 
-Despite writing to disk, it’s still an in-memory database, because the disk is merely used as an append-only log for durability, and reads are served entirely from memory. Writing to disk also has operational advantages: files on disk can easily be backed up, inspected, and analyzed by external utilities.
+- Such as Memcached, are intended for caching use only, where it’s acceptable for data to be lost if a machine is restarted.
+- Some aim for `durability`, which can be achieved with special hardware 
+  - Such as battery-powered RAM
+  - Writing a log of changes to disk
+  - Writing periodic snapshots to disk
+  - Replicating the in-memory state to other machines.
 
 **Performance Advantage**
 
@@ -602,15 +666,17 @@ The performance advantage of in-memory databases is they can avoid the overheads
 
 In-memory databases is providing data models that are difficult to implement with disk-based indexes. For example, Redis offers a database-like interface to various data structures such as priority queues and sets. Because it keeps all data in memory, its implementation is comparatively simple.
 
-**Anti-caching**
+#### Anti-caching
 
-In-memory database architecture could be extended to support datasets larger than the available memory, without bringing back the overheads of a disk-centric architecture. It works by evicting the least recently used data from memory to disk when there is not enough memory, and loading it back into memory when it is accessed again in the future. This approach still requires indexes to fit entirely in memory.
+In-memory database architecture could be extended to support datasets larger than the available memory, without bringing back the overheads of a disk-centric architecture. The so-called *anti-caching* approach works by evicting the least recently used data from memory to disk when there is not enough memory, and loading it back into memory when it is accessed again in the future. This approach still requires indexes to fit entirely in memory.
 
-### Transaction Processing and Analytics
+- This is similar to what operating systems do with virtual memory and swap files, but the database can manage memory more efficiently than the OS, as it can work at the granularity of individual records rather than entire memory pages.
+
+## Transaction Processing and Analytics
 
 An application looks up a small number of records by some key, using an index. Records are inserted or updated based on the user’s input. Because these applications are interactive, the access pattern became known as **online transaction processing** (**OLTP**).
 
-Compared to data analytics, which  an analytic query needs to scan over a huge number of records, only reading a few columns per record, and calculates aggregate statistics (such as count, sum, or average) rather than returning the raw data to the user. These queries are often written by business analysts, and feed into reports that help the management of a company make better decisions (business intelligence). In order to differentiate this pattern of using databases from transaction processing, it has been called **online analytic processing** (**OLAP**)
+An analytic query needs to scan over a huge number of records, only reading a few columns per record, and calculates aggregate statistics (such as count, sum, or average) rather than returning the raw data to the user. These queries are often written by business analysts, and feed into reports that help the management of a company make better decisions (business intelligence). In order to differentiate this pattern of using databases from transaction processing, it has been called **online analytic processing** (**OLAP**)
 
 | Property             | Transaction processing systems (OLTP)             | Analytic systems (OLAP)                   |
 | -------------------- | ------------------------------------------------- | ----------------------------------------- |
@@ -620,76 +686,140 @@ Compared to data analytics, which  an analytic query needs to scan over a huge n
 | What data represents | Latest state of data (current point in time)      | History of events that happened over time |
 | Dataset size         | Gigabytes to terabytes                            | Terabytes to petabytes                    |
 
-#### Data Warehousing
+### Data Warehousing
 
-Data warehousing is a separate database mainly for data analysis without affecting OLTP operations.The data warehouse contains a read-only copy of the data in all the various OLTP systems in the company. Data is extracted from OLTP databases (using either a periodic data dump or a continuous stream of updates), transformed into an analysis-friendly schema, cleaned up, and then loaded into the data warehouse. This process of getting data into the warehouse is known as **Extract–Transform–Load** (**ETL**).
+Data warehousing is a separate database mainly for data analysis without affecting OLTP operations.The data warehouse contains a read-only copy of the data in all the various OLTP systems in the company. Data is extracted from OLTP databases (using either a periodic data dump or a continuous stream of updates), transformed into an analysis-friendly schema, cleaned up, and then loaded into the data warehouse. This process of getting data into the warehouse is known as **Extract–Transform–Load** (**ETL**) and is illustrated below:
 
-##### Star schema
+![image-20211205142611307](Asserts/image-20211205142611307.png)
 
-Star schema or dimensional modelling in Figure 3-9 shows a data warehouse that might be found at a grocery retailer. At the center of the schema is a so-called fact table (in this example, it is called fact_sales). Each row of the fact table represents an event that occurred at a particular time (here, each row represents a customer’s purchase of a product). If we were analyzing website traffic rather than retail sales, each row might represent a page view or a click by a user.
+
+
+A big advantage of using a separate data warehouse, rather than querying OLTP systems directly for analytics, is that the data warehouse can be optimized for analytic access patterns.
+
+The data model of a data warehouse is most commonly relational, because SQL is generally a good fit for analytic queries. There are many graphical data analysis tools that generate SQL queries, visualize the results, and allow analysts to explore the data (through operations such as *drill-down* and *slicing and dicing*).
+
+Some databases, such as Microsoft SQL Server and SAP HANA, have support for transaction processing and data warehousing in the same product. 
+
+- However, they are increasingly becoming two separate storage and query engines, which happen to be accessible through a common SQL interface.
+
+Data warehouse vendors such as
+
+-  *Teradata*, *Vertica*, *SAP HANA*, and *ParAccel* typically sell their systems under expensive commercial licenses. Amazon RedShift is a hosted version of *ParAccel*.
+- A plethora of open source SQL-on-Hadoop projects have emerged.
+  - These include *Apache Hive*, *Spark SQL*, *Cloudera Impala*, *Facebook Presto*, *Apache Tajo*, and *Apache Drill* . Some of them are based on ideas from Google’s *Dremel*.
+
+### Stars and Snowflakes: Schemas for Analytics
+
+#### Stars Schema
+
+In analytics, there is much less diversity of data models. Many data warehouses are used in a fairly formulaic style, known as a *star schema* (also known as *dimensional modeling*).
+
+Figure 3-9 shows a data warehouse that might be found at a grocery retailer. 
+
+- At the center of the schema is a so-called *fact table* (in this example, it is called *fact_sales*). 
+- Each row of the *fact table* represents an event that occurred at a particular time (here, each row represents a customer’s purchase of a product). 
+- If we were analyzing website traffic rather than retail sales, each row might represent a page view or a click by a user.
 
 ![image-20210117131541887](Asserts/DesigningDataIntensiveApplications/image-20210117131541887.png)
 
 Usually, facts are captured as individual events, because this allows maximum flexibility of analysis later. However, this means that the fact table can become extremely large.
-Some of the columns in the fact table are attributes, such as the price at which the product was sold and the cost of buying it from the supplier (allowing the profit margin to be calculated). Other columns in the fact table are foreign key references to other tables, called dimension tables. As each row in the fact table represents an event, the dimensions represent the who, what, where, when, how, and why of the event.
 
-##### Snowflask Schema
+- Some of the columns in the fact table are attributes, such as the price at which the product was sold and the cost of buying it from the supplier (allowing the profit margin to be calculated).
+- Other columns in the fact table are foreign key references to other tables, called *dimension tables*. 
+  - As each row in the fact table represents an event, the dimensions represent the who, what, where, when, how, and why of the event.
 
-Snowflask schema is a variation of star schema, where dimensions are further broken down into subdimensions. For example, there could be separate tables for brands and product categories, and each row in the dim_product table could reference the brand and category as foreign keys, rather than storing them as strings in the dim_product table. Snowflake schemas are more normalized than star schemas, but star schemas are often preferred because they are simpler for analysts to work with.
+#### Snowflask Schema
 
-### Column-Oriented Storage
+Snowflask schema is a variation of star schema, where dimensions are further broken down into subdimensions. 
+
+- For example, there could be separate tables for brands and product categories, and each row in the dim_product table could reference the brand and category as foreign keys, rather than storing them as strings in the dim_product table. 
+
+Snowflake schemas are more normalized than star schemas, but star schemas are often preferred because they are simpler for analysts to work with.
+
+## Column-Oriented Storage
 
 In a typical data warehouse, tables are often very wide: fact tables often have over 100 columns, sometimes several hundred. Dimension tables can also be very wide, as they include all the metadata that may be relevant for analysis. If you have trillions of rows and petabytes of data in your fact tables, storing and querying them efficiently becomes a challenging problem.
 
 But usually for the result of query, it only need few columns and ignore all other columns.
 
-We can use `column-oriented storage` to make the query efficiently.The idea behind column-oriented storage is simple: don’t store all the values from one row together, but store all the values from each column together instead. If each column is stored in a separate file, a query only needs to read and parse those columns that are used in that query, which can save a lot of work. This principle is illustrated in Figure 3-10.
+We can use `column-oriented storage` to make the query efficiently.
+
+- The idea behind column-oriented storage is simple: don’t store all the values from one row together, but store all the values from each column together instead. If each column is stored in a separate file, a query only needs to read and parse those columns that are used in that query, which can save a lot of work. This principle is illustrated in Figure 3-10.
+- Column storage is easiest to understand in a relational data model, but it applies equally to nonrelational data. 
+  - For example, *Parquet* is a columnar storage format that supports a document data model, based on Google’s Dremel.
 
 ![image-20210117132430659](Asserts/DesigningDataIntensiveApplications/image-20210117132430659.png)
 
-#### Column Compression
+### Column Compression
 
-We can further reduce the demands on disk throughput by compressing data.One technique that is particularly effective in data warehouses is bitmap encoding, illustrated in Figure 3-11.
+We can further reduce the demands on disk throughput by compressing data. Take a look at the sequences of values for each column in Figure 3-10: they often look quite repetitive, which is a good sign for compression. Depending on the data in the column, different compression techniques can be used. 
+
+- One technique that is particularly effective in data warehouses is bitmap encoding, illustrated in Figure 3-11.
+  - Often, the number of distinct values in a column is small compared to the number of rows. We can now take a column with n distinct values and turn it into n separate bitmaps: one bitmap for each distinct value, with one bit for each row. The bit is 1 if the row has that value, and 0 if not.
+  - If n is very small (for example, a country column may have approximately 200 distinct values), those bitmaps can be stored with one bit per row. 
+  - But if n is bigger, there will be a lot of zeros in most of the bitmaps (we say that they are sparse). 
+    - In that case, the bitmaps can additionally be run-length encoded, as shown at the bottom of Figure 3-11. This can make the encoding of a column remarkably compact.
 
 ![image-20210117132612241](Asserts/DesigningDataIntensiveApplications/image-20210117132612241.png)
 
-Often, the number of distinct values in a column is small compared to the number of rows. We can now take a column with n distinct values and turn it into n separate bitmaps: one bitmap for each distinct value, with one bit for each row. The bit is 1 if the row has that value, and 0 if not.
 
-If n is very small (for example, a country column may have approximately 200 distinct values), those bitmaps can be stored with one bit per row. But if n is bigger, there will be a lot of zeros in most of the bitmaps (we say that they are sparse). In that case, the bitmaps can additionally be run-length encoded, as shown at the bottom of Figure 3-11. This can make the encoding of a column remarkably compact.
 
-##### Memory bandwidth and vectorized processing
+Bitmap indexes such as these are very well suited for the kinds of queries that are common in a data warehouse. For example:
 
-Column-oriented storage not only reducing the volume of data that needs to be loaded from disk but also good for making efficient use of CPU cycles. For example, the query engine can take a chunk of compressed column data that fits comfortably in the CPU’s L1 cache and iterate through it in a tight loop (that is, with no function calls). A CPU can execute such a loop much faster than code that requires a lot of function calls and conditions for each record that is processed. 
+- WHERE product_sk IN (30, 68, 69):
+  - Load the three bitmaps for product_sk = 30, product_sk = 68, and product_sk = 69, and calculate the bitwise *OR* of the three bitmaps, which can be done very efficiently.
+- WHERE product_sk = 31 AND store_sk = 3:
+  - Load the bitmaps for product_sk = 31 and store_sk = 3, and calculate the bit‐wise *AND*. This works because the columns contain the rows in the same order, so the *k*th bit in one column’s bitmap corresponds to the same row as the *k*th bit in another column’s bitmap.
 
-Column compression allows more rows from a column to fit in the same amount of L1 cache. Bitwise AND and OR operators can be designed to operate on such chunks of compressed column data directly. This technique is known as **vectorized processing**.
+#### Memory bandwidth and vectorized processing
 
-##### Sort Oder in Column Storage
+The advantage of column-oriented storage:
 
-The data needs to be sorted an entire row at a time.The sorted order will depend on analysis needs, with the sorted order data, we now can query more efficiently. Another advantage of sorted order is that it can help with compression of columns. we can used bitmaps to compress the non-distinct values down to a few kilobytes—even if the table has billions of rows.
+- Reducing the volume of data that needs to be loaded from disk 
+- Making efficient use of CPU cycles. 
+  - For example, the query engine can take a chunk of compressed column data that fits comfortably in the CPU’s L1 cache and iterate through it in a *tight loop* (that is, with no function calls). A CPU can execute such a loop much faster than code that requires a lot of function calls and conditions for each record that is processed. 
+  - Column compression allows more rows from a column to fit in the same amount of L1 cache. Bitwise AND and OR operators can be designed to operate on such chunks of compressed column data directly. This technique is known as **vectorized processing**.
 
-##### Several different sort orders
+### Sort Oder in Column Storage
+
+The data needs to be sorted an entire row at a time.The sorted order will depend on analysis needs, with the sorted order data, we now can query more efficiently. 
+
+Sorted order can help with compression of columns. 
+
+- If the primary sort column does not have many distinct values, then after sorting, it will have long sequences where the same value is repeated many times in a row. 
+- A simple run-length encoding, like bitmaps, could compress that column down to a few kilobytes—even if the table has billions of rows.
+
+That compression effect is strongest on the first sort key. The second and third sort keys will be more jumbled up, and thus not have such long runs of repeated values. Columns further down the sorting priority appear in essentially random order, so they probably won’t compress as well. But having the first few columns sorted is still a win overall.
+
+#### Several different sort orders
 
 Different queries benefit from different sort orders, we can store the same data sorted in several different ways in different replicated data machines. You don’t lose data if one machine fails. When you’re processing a query, you can use the version that best fits the query pattern.
 
-##### Writing to Column-Oriented Storage
+### Writing to Column-Oriented Storage
 
 Column-oriented storage, compression, and sorting all help to make those read queries faster. However, they have the downside of making writes more difficult.
 
-Fortunately, we have already seen a good solution: LSM-trees. All writes first go to an in-memory store, where they are added to a sorted structure and prepared for writing to disk. It doesn’t matter whether the in-memory store is row-oriented or column-oriented. When enough writes have accumulated, they are merged with the column files on disk and written to new files in bulk. This is essentially what Vertica does.
+We can use LSM-trees, All writes first go to an in-memory store, where they are added to a sorted structure and prepared for writing to disk. It doesn’t matter whether the in-memory store is row-oriented or column-oriented. When enough writes have accumulated, they are merged with the column files on disk and written to new files in bulk. This is essentially what *Vertica* does.
 
 Queries need to examine both the column data on disk and the recent writes in memory, and combine the two. However, the query optimizer hides this distinction from the user.
 
-##### Aggregation: Data Cubes and Materialized Views
+### Aggregation: Data Cubes and Materialized Views
 
-Not every data warehouse is necessarily a column store: traditional row-oriented databases and a few other architectures are also used. Another aspect of data warehouses that is worth mentioning briefly is **materialized aggregates**. 
+Not every data warehouse is necessarily a column store: traditional row-oriented databases and a few other architectures are also used. 
 
-**Materialized Aggregates**
+Another aspect of data warehouses that is worth mentioning briefly is *materialized aggregates*. 
 
-We can cache some of the counts or sums that queries use most often.One way of creating such a cache is a materialized view. In a relational data model, it is often defined like a standard (virtual) view: a table-like object whose contents are the results of some query. The difference is that a materialized view is an actual copy of the query results, written to disk, whereas a virtual view is just a shortcut for writing queries. When you read from a virtual view, the SQL engine expands it into the view’s underlying query on the fly and then processes the expanded query.
+#### Materialized Aggregates
 
-When the underlying data changes, a materialized view needs to be updated, because it is a denormalized copy of the data. The database can do that automatically, but such updates make writes more expensive, which is why materialized views are not often used in OLTP databases. In read-heavy data warehouses they can make more sense (whether or not they actually improve read performance depends on the individual case).
+We can cache some of the counts or sums that queries use most often. 
 
-A common special case of a materialized view is known as a data cube or OLAP cube. It is a grid of aggregates grouped by different dimensions. Figure 3-12 shows an example.
+- One way of creating such a cache is a materialized view. 
+  - An materialized view is an actual copy of the query results, written to disk.
+  - When the underlying data changes, a materialized view needs to be updated, because it is a denormalized copy of the data. The database can do that automatically, but such updates make writes more expensive, which is why materialized views are not often used in OLTP databases. In read-heavy data warehouses they can make more sense (whether or not they actually improve read performance depends on the individual case).
+
+In a relational data model, it is often defined like a standard (virtual) view: a table-like object whose contents are the results of some query, a virtual view is just a shortcut for writing queries. When you read from a virtual view, the SQL engine expands it into the view’s underlying query on the fly and then processes the expanded query.
+
+A common special case of a materialized view is known as a *data cube* or OLAP cube. It is a grid of aggregates grouped by different dimensions. Figure 3-12 shows an example.
 
 ![image-20210117161424965](Asserts/DesigningDataIntensiveApplications/image-20210117161424965.png)
 
@@ -702,6 +832,23 @@ The advantage of a materialized data cube is that certain queries become very fa
 **Disadvantage**
 
 The disadvantage is that a data cube doesn’t have the same flexibility as querying the raw data. 
+
+## Summary
+
+Storage engines fall into two broad categories: 
+
+- Those optimized for transaction processing (OLTP)
+  - Typically user-facing
+  - A huge volume of requests. In order to handle the load, applications usually only touch a small number of records in each query. The application requests records using some kind of key, and the storage engine uses an index to find the data for the requested key. Disk seek time is often the bottleneck.
+  - Storage engines
+    - log-structured, which only permits appending to files and deleting obsolete files, but never updates a file that has been written. Bitcask, SSTables, LSM-trees, LevelDB, Cassandra, HBase, Lucene, and others belong to this group.
+      - Key idea is to turn random-access writes into sequential writes on disk, which enables higher write throughput due to the performance characteristics of hard drives and SSDs.
+    - Update-in-place, which treats the disk as a set of fixed-size pages that can be overwritten. B-trees is one of the example and it's being used in all major relational databases and also many nonrelational ones.
+- Those optimized for analytics (OLAP).
+  - Primarily used by business analysts. 
+  - They handle a much lower volume of queries than OLTP systems, but each query is typically very demanding, requiring many millions of records to be scanned in a short time. 
+  - Disk bandwidth (not seek time) is often the bottleneck here, and column-oriented storage is an increasingly popular solution for this kind of workload.
+  - Require sequentially scanning across a large number of rows, indexes are much less relevant. Instead it becomes important to encode data very compactly, to minimize the amount of data that the query needs to read from disk. Column-oriented storage helps achieve this goal.
 
 # Chapter 4 Encoding and Evolution
 
